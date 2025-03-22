@@ -1,0 +1,50 @@
+# Dependencias
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/*
+*.log
+npm-debug.log*
+
+# Directorios de compilación
+dist/
+build/
+
+# Archivos temporales
+tmp/
+temp/
+*.tmp
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE/Editor
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Storage (excepto .gitkeep)
+storage/**/
+!storage/**/.gitkeep
+
+# Archivos de Prisma generados
+prisma/migrations/
+prisma/generated/
+
+# Cache
+.npm
+.eslintcache
+
+# Testing
+coverage/
+
+# Archivos personales
+TODO.md
+NOTES.md
