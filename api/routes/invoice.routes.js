@@ -15,5 +15,6 @@ router.post('/:id/enviar', invoiceController.sendInvoiceByEmail);
 router.get('/:id/pdf', invoiceController.downloadInvoicePdf);
 router.get('/:id/xml', invoiceController.downloadInvoiceXml);
 router.get('/by-folio/:folio', invoiceController.getInvoiceByFolio);
+router.get('/search', invoiceController.searchInvoices);
 
 export default router;

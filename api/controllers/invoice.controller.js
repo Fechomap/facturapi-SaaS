@@ -446,6 +446,55 @@ class InvoiceController {
       next(error);
     }
   }
+    /**
+   * Busca facturas por rango de fechas y otros criterios
+   * @param {Object} req - Request de Express
+   * @param {Object} res - Response de Express
+   * @param {Function} next - Función next de Express
+   */
+  async searchInvoices(req, res, next) {
+    try {
+      const tenantId = req.tenant?.id;
+      
+      if (!tenantId) {
+        return res.status(401).json({ 
+          error: 'UnauthorizedError',
+          message: 'Se requiere un tenant válido para esta operación'
+        });
+      }
+      
+      // Extraer parámetros de búsqueda
+      const { 
+        startDate, 
+        endDate, 
+        customerId, 
+        status,
+        minAmount,
+        maxAmount 
+      } = req.query;
+      
+      // Crear objeto de criterios
+      const criteria = {
+        tenantId,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        customerId,
+        status,
+        minAmount: minAmount ? parseFloat(minAmount) : undefined,
+        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined
+      };
+      
+      // Llamar al servicio para buscar
+      const invoices = await InvoiceService.searchInvoices(criteria);
+      
+      res.json({
+        data: invoices,
+        count: invoices.length
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 // Crear instancia del controlador
