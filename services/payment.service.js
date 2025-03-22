@@ -1,6 +1,6 @@
 // services/payment.service.js
 import Stripe from 'stripe';
-import prisma from '../src/lib/prisma.js';
+import prisma from '../lib/prisma.js';
 
 // Inicializar cliente de Stripe (configurado en variables de entorno)
 let stripeClient = null;

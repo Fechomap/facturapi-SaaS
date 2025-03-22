@@ -5,6 +5,7 @@ import prisma from '../../lib/prisma.js';
 import { config } from '../../config/index.js';
 import { encryptApiKey } from '../../core/utils/encryption.js';
 import TenantService from '../../core/tenant/tenant.service.js';
+import CustomerSetupService from '../../services/customer-setup.service.js';
 
 
 // Estados del proceso de registro
@@ -678,29 +679,36 @@ export function registerOnboardingHandler(bot) {
 
         // Crear un usuario para el tenant
         await TenantService.createTenantUser({
-            tenantId: tenant.id,
-            telegramId: ctx.from.id,
-            firstName: ctx.from.first_name || 'Usuario',
-            lastName: ctx.from.last_name || '',
-            username: ctx.from.username || null,
-            role: 'admin',
-            isAuthorized: true
+          tenantId: tenant.id,
+          telegramId: ctx.from.id,
+          firstName: ctx.from.first_name || 'Usuario',
+          lastName: ctx.from.last_name || '',
+          username: ctx.from.username || null,
+          role: 'admin',
+          isAuthorized: true
         });
         
-        // Crear una suscripción de prueba para el tenant
+        // Añadir este bloque para configurar los clientes automáticamente
         try {
-            // Buscar el plan básico (o el primer plan activo)
-            const plan = await prisma.subscriptionPlan.findFirst({
-                where: { isActive: true },
-                orderBy: { price: 'asc' }
-            });
-            
-            if (plan) {
-                await TenantService.createSubscription(tenant.id, plan.id);
-            }
-        } catch (error) {
-            console.error('Error al crear suscripción de prueba:', error);
-            // Continuar a pesar del error en la suscripción
+          await ctx.reply('⏳ Configurando clientes predefinidos...');
+          
+          const clientSetupResults = await CustomerSetupService.setupPredefinedCustomers(tenant.id, true);
+          const successCount = clientSetupResults.filter(r => r.success).length;
+          
+          if (successCount > 0) {
+            await ctx.reply(
+              `✅ Se han configurado automáticamente ${successCount} clientes para tu empresa.`
+            );
+          } else {
+            await ctx.reply(
+              `⚠️ No se pudieron configurar los clientes automáticamente. Podrás hacerlo manualmente después.`
+            );
+          }
+        } catch (clientError) {
+          console.error('Error al configurar clientes predefinidos:', clientError);
+          await ctx.reply(
+            `⚠️ No se pudieron configurar los clientes automáticamente. Podrás hacerlo manualmente después.`
+          );
         }
         
         // Actualizar el estado del usuario con el tenant

@@ -95,6 +95,16 @@ export function registerClientHandler(bot) {
       // Ejecutar la configuración de clientes
       const results = await CustomerSetupService.setupPredefinedCustomers(tenantId, true);
       
+      // Verificar que los clientes se hayan creado correctamente
+      const clientService = await import('../../services/client.service.js');
+      const verification = await clientService.verifyClientSetup(tenantId);
+
+      if (!verification.success) {
+        await ctx.reply(
+          `⚠️ Se detectó un problema durante la verificación: ${verification.error}`
+        );
+      }
+      
       // Contar éxitos y fallos
       const successCount = results.filter(r => r.success).length;
       const newlyConfigured = results.filter(r => r.success && !r.message?.includes('ya existente')).length;

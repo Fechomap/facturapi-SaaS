@@ -8,6 +8,7 @@ import { config } from '../../config/index.js';
 import TenantService from '../../services/tenant.service.js';
 import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
+import CustomerSetupService from '../../services/customer-setup.service.js';
 
 // Motivos de cancelación del SAT para referencia
 const MOTIVOS_CANCELACION = {

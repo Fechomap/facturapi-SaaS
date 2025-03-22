@@ -1,6 +1,6 @@
 // services/facturapi.service.js
-import prisma from '../src/lib/prisma.js';
-import { decryptApiKey } from '../src/utils/encryption.js';
+import prisma from '../lib/prisma.js';
+import { decryptApiKey } from '../core/utils/encryption.js';
 
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;
@@ -37,12 +37,19 @@ class FacturapiService {
       try {
         apiKey = await decryptApiKey(tenant.facturapiApiKey);
         
+        console.log(`✅ API key desencriptada correctamente para tenant ${tenant.businessName} (ID: ${tenantId}). Longitud: ${apiKey?.length || 0}. Primeros caracteres: ${apiKey ? apiKey.substring(0, 5) + '...' : 'null o undefined'}`);
+
+        if (apiKey && apiKey.startsWith('sk_')) {
+          console.log(`🔑 API key del tenant ${tenantId} tiene formato válido.`);
+        } else {
+          console.warn(`⚠️ La API key del tenant ${tenantId} NO tiene formato válido. Valor actual: ${apiKey ? apiKey.substring(0, 10) + '...' : 'nulo o indefinido'}`);
+        }
+        
         if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
           console.error(`API key desencriptada inválida para tenant ${tenantId}:`, apiKey?.substring(0,5));
           throw new Error('La API key del tenant es inválida después de desencriptar');
         }
         
-        console.log(`API key desencriptada correctamente para tenant ${tenantId} (primeros caracteres: ${apiKey.substring(0, 5)}...)`);
       } catch (error) {
         console.error(`Error al desencriptar API key para tenant ${tenantId}:`, error);
         throw new Error(`Error al desencriptar la API key del tenant: ${error.message}`);

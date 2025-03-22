@@ -1,4 +1,3 @@
-// services/customer-setup.service.js
 import prisma from '../lib/prisma.js';
 
 /**
@@ -138,76 +137,16 @@ class CustomerSetupService {
    * @returns {Promise<Array>} - Resultados de la configuración
    */
   static async setupPredefinedCustomers(tenantId, forceAll = false) {
-    // Simula la configuración de clientes
-    // En una implementación real, aquí se llamaría a facturapiService o similar
-    
-    const results = [];
-    
-    // Obtener clientes ya configurados
-    const existingClients = await prisma.tenantCustomer.findMany({
-      where: { tenantId },
-      select: {
-        legalName: true,
-        facturapiCustomerId: true
-      }
-    });
-    
-    // Mapa para búsqueda rápida
-    const existingMap = {};
-    existingClients.forEach(client => {
-      existingMap[client.legalName] = client.facturapiCustomerId;
+    try {
+      // Importar el servicio real de clientes
+      const clientService = await import('./client.service.js');
       
-      // Añadir a resultados los clientes ya existentes
-      results.push({
-        legalName: client.legalName,
-        success: true,
-        id: client.facturapiCustomerId,
-        message: 'Cliente ya existente'
-      });
-    });
-    
-    // Contador para simulación
-    let counter = 1000;
-    
-    // Procesar cada cliente predefinido
-    for (const cliente of CLIENTES_PREDEFINIDOS) {
-      // Si ya existe y no estamos forzando, saltamos
-      if (existingMap[cliente.legal_name] && !forceAll) {
-        continue;
-      }
-      
-      try {
-        // Simular creación en FacturAPI (en un caso real se llamaría al servicio)
-        const mockFacturapiId = `cus_${counter++}`;
-        
-        // Simular guardado en base de datos (en un caso real se guardaría)
-        if (!existingMap[cliente.legal_name]) {
-          // Simular creación de cliente
-          results.push({
-            legalName: cliente.legal_name,
-            success: true,
-            id: mockFacturapiId,
-            message: 'Cliente creado con éxito'
-          });
-        } else {
-          // Simular actualización
-          results.push({
-            legalName: cliente.legal_name,
-            success: true,
-            id: existingMap[cliente.legal_name],
-            message: 'Cliente actualizado'
-          });
-        }
-      } catch (error) {
-        results.push({
-          legalName: cliente.legal_name,
-          success: false,
-          error: error.message || 'Error desconocido'
-        });
-      }
+      // Llamar a la implementación real de setupPredefinedClients
+      return await clientService.setupPredefinedClients(tenantId, forceAll);
+    } catch (error) {
+      console.error('Error en CustomerSetupService.setupPredefinedCustomers:', error);
+      throw error;
     }
-    
-    return results;
   }
 }
 

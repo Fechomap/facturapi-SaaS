@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import prisma from '../src/lib/prisma.js';
+import prisma from '../lib/prisma.js';
 
 // Para compatibilidad con el sistema actual, mantenemos la funcionalidad de archivo
 const __filename = fileURLToPath(import.meta.url);
