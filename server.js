@@ -3,6 +3,9 @@ import express from 'express';
 import { config, initConfig } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
+import routes from './api/routes/index.js';
+import tenantMiddleware from './api/middlewares/tenant.middleware.js';
+import errorMiddleware from './api/middlewares/error.middleware.js';
 
 // Logger específico para el servidor
 const serverLogger = logger.child({ module: 'server' });
@@ -15,8 +18,17 @@ async function initializeApp() {
   // Inicializar la aplicación Express
   const app = express();
   
-  // Middleware para parsing JSON
+  // Configuración especial para webhooks de Stripe (necesita el cuerpo raw)
+  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+  
+  // Middleware para parsing JSON para el resto de rutas
   app.use(express.json());
+  
+  // Middleware para extraer información de tenant
+  app.use('/api', tenantMiddleware);
+  
+  // Registrar todas las rutas bajo el prefijo /api
+  app.use('/api', routes);
   
   // Ruta principal para probar que el servidor está funcionando
   app.get('/', (req, res) => {
@@ -28,28 +40,7 @@ async function initializeApp() {
   });
   
   // Middleware para manejo de errores
-  app.use((err, req, res, next) => {
-    serverLogger.error({ err, path: req.path }, 'Error en la API');
-    
-    // Si ya se ha enviado una respuesta, pasar al siguiente middleware
-    if (res.headersSent) {
-      return next(err);
-    }
-    
-    // Errores específicos de FacturAPI
-    if (err.response && err.response.data) {
-      return res.status(err.response.status || 400).json({
-        error: err.message,
-        details: err.response.data
-      });
-    }
-    
-    // Error genérico
-    res.status(500).json({
-      error: 'Error interno del servidor',
-      message: err.message
-    });
-  });
+  app.use(errorMiddleware);
   
   return app;
 }
@@ -72,6 +63,7 @@ async function startServer() {
       serverLogger.info(`Servidor corriendo en http://localhost:${PORT}`);
       serverLogger.info(`Entorno: ${config.env}`);
       serverLogger.info(`API de Facturación SaaS lista y funcionando`);
+      serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
     });
   } catch (error) {
     serverLogger.error({ error }, 'Error al iniciar el servidor');

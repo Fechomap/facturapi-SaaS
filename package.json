@@ -15,11 +15,13 @@
         "migrate": "prisma migrate dev",
         "studio": "prisma studio",
         "lint": "eslint .",
-        "format": "prettier --write ."
+        "format": "prettier --write .",
+        "test:phase2": "NODE_ENV=development node test-phase2.js",
+        "test:phase3": "node test-phase3.js"
     },
     "dependencies": {
         "@prisma/client": "^6.5.0",
-        "axios": "^1.6.7",
+        "axios": "^1.8.4",
         "concurrently": "^8.2.2",
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
