@@ -64,6 +64,7 @@ class InvoiceService {
       console.log('Factura creada en FacturAPI:', factura.id);
       
       // Registrar la factura en la base de datos
+      // NOTA: TenantService.registerInvoice ya incrementa el contador internamente
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
@@ -74,74 +75,29 @@ class InvoiceService {
         data.userId || null
       );
       
-      // Incrementar el contador de facturas de forma segura
-      try {
-        await this.incrementInvoiceCount(tenantId);
-        console.log('Contador de facturas incrementado correctamente');
-      } catch (incrementError) {
-        console.error('Error al incrementar contador de facturas:', incrementError);
-        // No lanzamos el error para no interrumpir el flujo principal
-      }
-      
       // Verificación de registro (opcional, puedes comentar o eliminar después)
       try {
         const invoiceCount = await prisma.tenantInvoice.count({
           where: { tenantId }
         });
+        
+        const subscription = await prisma.tenantSubscription.findFirst({
+          where: {
+            tenantId,
+            OR: [{ status: 'active' }, { status: 'trial' }]
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+        
         console.log(`Total de facturas registradas para tenant ${tenantId}: ${invoiceCount}`);
+        console.log(`Contador actual en suscripción: ${subscription?.invoicesUsed || 'No encontrado'}`);
       } catch (e) {
-        console.error('Error al contar facturas:', e);
+        console.error('Error al verificar contadores:', e);
       }
       
       return factura;
     } catch (error) {
       console.error('Error al crear factura en FacturAPI:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Incrementa el contador de facturas usadas en la suscripción actual
-   * @param {string} tenantId - ID del tenant
-   * @returns {Promise<Object|null>} - Suscripción actualizada o null si no hay suscripción
-   */
-  static async incrementInvoiceCount(tenantId) {
-    console.log(`Incrementando contador de facturas para tenant ${tenantId}`);
-    
-    try {
-      // Obtener la suscripción activa
-      const subscription = await prisma.tenantSubscription.findFirst({
-        where: {
-          tenantId,
-          OR: [
-            { status: 'active' },
-            { status: 'trial' }
-          ]
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      });
-
-      if (!subscription) {
-        console.warn(`No se encontró suscripción activa para tenant ${tenantId}`);
-        return null;
-      }
-
-      // Incrementar el contador
-      const updatedSubscription = await prisma.tenantSubscription.update({
-        where: { id: subscription.id },
-        data: {
-          invoicesUsed: {
-            increment: 1
-          }
-        }
-      });
-
-      console.log(`Contador incrementado para tenant ${tenantId}: ${updatedSubscription.invoicesUsed} facturas`);
-      return updatedSubscription;
-    } catch (error) {
-      console.error(`Error al incrementar contador de facturas para tenant ${tenantId}:`, error);
       throw error;
     }
   }
