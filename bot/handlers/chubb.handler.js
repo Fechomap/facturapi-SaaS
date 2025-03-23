@@ -24,6 +24,44 @@ export function registerChubbHandler(bot) {
   // Agregar la opción CHUBB al menú principal
   bot.action('menu_chubb', async (ctx) => {
     await ctx.answerCbQuery();
+    
+    // Verificar si el usuario tiene un tenant asociado
+    if (!ctx.hasTenant()) {
+      return ctx.reply('⛔ No estás registrado en el sistema. Usa /registro para comenzar.');
+    }
+    
+    // Verificar si el usuario está autorizado
+    if (!ctx.isUserAuthorized()) {
+      return ctx.reply('⛔ Tu cuenta está pendiente de autorización por el administrador.');
+    }
+    
+    // MODIFICAR ESTA PARTE: buscar el cliente CHUBB en la base de datos
+    try {
+      const chubbClient = await prisma.tenantCustomer.findFirst({
+        where: {
+          tenantId: ctx.getTenantId(),
+          legalName: { contains: 'CHUBB' }
+        }
+      });
+      
+      if (!chubbClient) {
+        return ctx.reply(
+          '❌ Cliente CHUBB no encontrado. Por favor, asegúrate de que este cliente está configurado.',
+          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'menu_principal')]])
+        );
+      }
+      
+      // Guardar el ID del cliente CHUBB en el estado para usarlo después
+      ctx.userState.chubbClientId = chubbClient.facturapiCustomerId;
+      
+    } catch (error) {
+      console.error('Error al buscar cliente CHUBB:', error);
+      return ctx.reply(
+        '❌ Error al verificar cliente CHUBB. Por favor, contacta al administrador.',
+        Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'menu_principal')]])
+      );
+    }
+    
     ctx.userState.esperando = 'archivo_excel_chubb';
     await ctx.reply('Por favor, sube el archivo Excel con los datos de CHUBB para generar las facturas.');
   });
@@ -533,7 +571,7 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
   
   // Construir los datos de la factura
   const facturaData = {
-    customer: config.clientes.CHUBB,
+    customer: ctx.userState.chubbClientId,
     items: facturaItems,
     use: "G03",  // Uso de CFDI
     payment_form: "99",  // Forma de pago
@@ -558,9 +596,21 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
   try {
     await ctx.reply(`⏳ Generando factura para: ${claveSAT} (${conRetencion ? 'Con' : 'Sin'} retención)...`);
     
-    const apiUrl = `${config.apiBaseUrl}/facturas`;
+    const apiUrl = `${config.apiBaseUrl}/api/facturas`;
     console.log('Enviando solicitud a API con datos:', JSON.stringify(facturaData, null, 2));
-    const response = await axios.post(apiUrl, facturaData);
+    
+    // Obtener el tenant ID del contexto del usuario
+    const tenantId = ctx.getTenantId();
+    if (!tenantId) {
+      throw new Error('No se encontró el tenant ID en el contexto del usuario');
+    }
+    
+    const response = await axios.post(apiUrl, facturaData, {
+      headers: {
+        // Añadir el header X-Tenant-ID para que la API pueda identificar el tenant
+        'X-Tenant-ID': tenantId
+      }
+    });
     
     const factura = response.data;
     

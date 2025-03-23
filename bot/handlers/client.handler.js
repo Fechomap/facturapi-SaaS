@@ -1,4 +1,3 @@
-// bot/handlers/client.handler.js
 import { Markup } from 'telegraf';
 import prisma from '../../lib/prisma.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
@@ -30,6 +29,17 @@ export function registerClientHandler(bot) {
             [Markup.button.callback('Volver', 'menu_generar')]
           ])
         );
+      }
+
+      // Si es CHUBB, redirigir al flujo de Excel
+      if (cliente.legalName.includes('CHUBB')) {
+        await ctx.reply('Para facturar a CHUBB, se debe utilizar el proceso especial con archivo Excel.');
+        return ctx.telegram.answerCbQuery(ctx.callbackQuery.id, {
+          text: 'Redirigiendo al flujo especial de CHUBB...',
+          show_alert: true
+        }).then(() => {
+          return ctx.telegram.answerCbQuery(ctx.callbackQuery.id, 'menu_chubb');
+        });
       }
       
       // Guardar datos del cliente en el estado

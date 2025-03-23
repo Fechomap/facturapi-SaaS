@@ -9,6 +9,7 @@ import TenantService from '../../services/tenant.service.js';
 import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
+import { clientSelectionMenu } from '../views/menu.view.js';
 
 // Motivos de cancelación del SAT para referencia
 const MOTIVOS_CANCELACION = {
@@ -216,15 +217,18 @@ export function registerInvoiceHandler(bot) {
       // Guardar el mapa de nombres en el estado del contexto
       ctx.clientNameMap = shortToFullNameMap;
       
-      // Iniciamos el flujo para generar factura con los clientes disponibles
+      // Filtrar clientes, excluyendo CHUBB del flujo normal
+      const clientsForMenu = availableCustomers
+        .filter(customer => !customer.legalName.includes('CHUBB'))
+        .map(customer => ({
+          id: customer.facturapiCustomerId,
+          name: shortenName(customer.legalName)
+        }));
+
+      // Usar la función existente en menu.view.js
       await ctx.reply(
         'Seleccione el cliente para generar la factura:',
-        Markup.inlineKeyboard([
-          ...clientButtons,
-          // Si CHUBB está en los clientes disponibles, no agregar el botón extra para CHUBB
-          ...(!availableCustomers.some(c => c.legalName.includes('CHUBB')) ? 
-            [[Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')]] : [])
-        ])
+        clientSelectionMenu(clientsForMenu, true) // `true` para incluir siempre la opción CHUBB
       );
     } catch (error) {
       console.error('Error al verificar clientes:', error);
