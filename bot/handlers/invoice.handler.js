@@ -533,9 +533,22 @@ export function registerInvoiceHandler(bot) {
           console.log('Intentando consultar folio:', folioConsulta);
         
           try {
-            const apiUrl = `${config.apiBaseUrl}/facturas/by-folio/${folioConsulta}`;
+            const apiUrl = `${config.apiBaseUrl}/api/facturas/by-folio/${folioConsulta}`;
             console.log('URL de consulta:', apiUrl);
-            const response = await axios.get(apiUrl);
+            
+            // Obtener el tenant ID del contexto del usuario
+            const tenantId = ctx.getTenantId();
+            if (!tenantId) {
+              throw new Error('No se encontró el tenant ID en el contexto del usuario');
+            }
+            
+            // Incluir el header X-Tenant-ID en la solicitud
+            const response = await axios.get(apiUrl, {
+              headers: {
+                'X-Tenant-ID': tenantId
+              }
+            });
+            
             const factura = response.data;
             console.log('Respuesta del backend:', factura);
         
