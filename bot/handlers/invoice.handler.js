@@ -48,7 +48,7 @@ function ensureTempDirExists() {
  * @returns {Promise<string>} - Ruta al archivo descargado
  */
 async function descargarFactura(facturaId, formato, folio, clienteNombre) {
-  const apiUrl = `${config.apiBaseUrl}/facturas/${facturaId}/${formato}`;
+  const apiUrl = `${config.apiBaseUrl}/api/facturas/${facturaId}/${formato}`;
   console.log('Descargando desde URL:', apiUrl);
 
   const tempDir = ensureTempDirExists();

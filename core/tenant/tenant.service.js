@@ -24,18 +24,12 @@ class TenantService {
     if (!data.rfc) throw new Error('El RFC es requerido');
     if (!data.email) throw new Error('El correo electrónico es requerido');
 
-    // Encriptar la API key si existe
-    let encryptedApiKey = null;
-    if (data.facturapiApiKey) {
-      try {
-        encryptedApiKey = await encryptApiKey(data.facturapiApiKey);
-        tenantLogger.debug(`API key encriptada para tenant ${data.businessName} (${data.rfc})`);
-      } catch (error) {
-        tenantLogger.error({ error }, 'Error al encriptar API key');
-        throw new Error(`Error al encriptar la API key: ${error.message}`);
-      }
-    } else {
+    // Usar la API key directamente sin encriptar
+    let facturapiApiKey = data.facturapiApiKey;
+    if (!facturapiApiKey) {
       tenantLogger.warn(`Creando tenant ${data.businessName} sin API key de FacturAPI - esto causará problemas al facturar.`);
+    } else {
+      tenantLogger.debug(`API key preparada para tenant ${data.businessName} (${data.rfc})`);
     }
 
     return withTransaction(async (tx) => {
@@ -50,7 +44,7 @@ class TenantService {
             address: data.address,
             contactName: data.contactName,
             facturapiOrganizationId: data.facturapiOrganizationId,
-            facturapiApiKey: encryptedApiKey,
+            facturapiApiKey: facturapiApiKey, // Usar directamente la API key
             facturapiEnv: data.facturapiEnv || 'test',
             // Crear automáticamente un contador de folios para este tenant
             folios: {
@@ -66,19 +60,19 @@ class TenantService {
           { 
             tenantId: tenant.id, 
             businessName: tenant.businessName, 
-            hasApiKey: !!encryptedApiKey,
+            hasApiKey: !!facturapiApiKey,
             organizationId: tenant.facturapiOrganizationId || 'No configurada'
           }, 
           'Tenant creado con éxito'
         );
-
+        
         // Verificar que la API Key se haya guardado correctamente
         const createdTenant = await tx.tenant.findUnique({
           where: { id: tenant.id },
           select: { facturapiApiKey: true }
         });
-
-        if (!createdTenant.facturapiApiKey && encryptedApiKey) {
+        
+        if (!createdTenant.facturapiApiKey && facturapiApiKey) {
           tenantLogger.warn(`ADVERTENCIA: La API key no se guardó correctamente para el tenant ${tenant.id}`);
         }
 
@@ -579,8 +573,8 @@ class TenantService {
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<string>} - API key desencriptada
    */
-  static async getDecryptedApiKey(tenantId) {
-    tenantLogger.debug({ tenantId }, 'Obteniendo API key desencriptada');
+  static async getApiKey(tenantId) {
+    tenantLogger.debug({ tenantId }, 'Obteniendo API key');
     
     try {
       const tenant = await prisma.tenant.findUnique({
@@ -601,18 +595,28 @@ class TenantService {
         throw new Error('El tenant no tiene una API key configurada');
       }
       
-      try {
-        // Intentar desencriptar con el nuevo método
-        return await decryptApiKey(tenant.facturapiApiKey);
-      } catch (error) {
-        tenantLogger.warn(
-          { error: error.message, tenantId }, 
-          'Error al desencriptar con método actual, intentando método legacy'
-        );
-        
-        // Si falla, intentar con el método legacy
-        return await legacyDecryptApiKey(tenant.facturapiApiKey);
-      }
+      // Devolver la API key directamente sin desencriptar
+      return tenant.facturapiApiKey;
+    } catch (error) {
+      tenantLogger.error({ error, tenantId }, 'Error al obtener API key');
+      throw error;
+    }
+  }
+
+    /**
+   * Obtiene una API key desencriptada para un tenant
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<string>} - API key desencriptada
+   */
+  static async getDecryptedApiKey(tenantId) {
+    tenantLogger.debug({ tenantId }, 'Obteniendo API key desencriptada');
+    
+    try {
+      // Simplemente usamos el método getApiKey que ya tenemos
+      // Dado que ya no estamos encriptando la API key, solo la devolvemos directamente
+      const apiKey = await this.getApiKey(tenantId);
+      tenantLogger.debug({ tenantId }, 'API key obtenida correctamente');
+      return apiKey;
     } catch (error) {
       tenantLogger.error({ error, tenantId }, 'Error al obtener API key desencriptada');
       throw error;

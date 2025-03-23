@@ -1,4 +1,3 @@
-// services/facturapi.service.js
 import prisma from '../lib/prisma.js';
 import { decryptApiKey } from '../core/utils/encryption.js';
 
@@ -33,28 +32,16 @@ class FacturapiService {
     
       console.log(`Obteniendo API key para tenant: ${tenant.businessName} (${tenantId})`);
       
-      let apiKey;
-      try {
-        apiKey = await decryptApiKey(tenant.facturapiApiKey);
-        
-        console.log(`✅ API key desencriptada correctamente para tenant ${tenant.businessName} (ID: ${tenantId}). Longitud: ${apiKey?.length || 0}. Primeros caracteres: ${apiKey ? apiKey.substring(0, 5) + '...' : 'null o undefined'}`);
-
-        if (apiKey && apiKey.startsWith('sk_')) {
-          console.log(`🔑 API key del tenant ${tenantId} tiene formato válido.`);
-        } else {
-          console.warn(`⚠️ La API key del tenant ${tenantId} NO tiene formato válido. Valor actual: ${apiKey ? apiKey.substring(0, 10) + '...' : 'nulo o indefinido'}`);
-        }
-        
-        if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
-          console.error(`API key desencriptada inválida para tenant ${tenantId}:`, apiKey?.substring(0,5));
-          throw new Error('La API key del tenant es inválida después de desencriptar');
-        }
-        
-      } catch (error) {
-        console.error(`Error al desencriptar API key para tenant ${tenantId}:`, error);
-        throw new Error(`Error al desencriptar la API key del tenant: ${error.message}`);
+      // Usar la API key directamente sin desencriptar
+      let apiKey = tenant.facturapiApiKey;
+      
+      console.log(`✅ API key obtenida para tenant ${tenant.businessName} (ID: ${tenantId}). Longitud: ${apiKey?.length || 0}. Primeros caracteres: ${apiKey ? apiKey.substring(0, 5) + '...' : 'null o undefined'}`);
+  
+      if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
+        console.error(`API key inválida para tenant ${tenantId}:`, apiKey?.substring(0,5));
+        throw new Error('La API key del tenant es inválida');
       }
-    
+      
       try {
         // Importar Facturapi solo una vez
         if (!FacturapiModule) {
@@ -62,7 +49,7 @@ class FacturapiService {
           console.log('Módulo Facturapi importado correctamente');
         }
         
-        // Usar la estructura correcta para el constructor (anidación doble)
+        // Usar la estructura correcta para el constructor
         const FacturapiConstructor = FacturapiModule.default.default;
         if (typeof FacturapiConstructor !== 'function') {
           console.error('El constructor de Facturapi no es una función:', typeof FacturapiConstructor);
@@ -166,3 +153,73 @@ class FacturapiService {
 }
 
 export default FacturapiService;
+
+import { TenantService } from '../core/tenant/tenant.service.js';
+
+async function testFacturapiDirect() {
+  console.log('\n=== TEST DIRECTO DE FACTURAPI ===');
+  
+  try {
+    // Obtener la API key del tenant
+    console.log(`Obteniendo API key para tenant: ${TENANT_ID}`);
+    const apiKey = await TenantService.getDecryptedApiKey(TENANT_ID);
+    
+    if (!apiKey) {
+      console.error('❌ No se pudo obtener la API key del tenant');
+      return;
+    }
+    
+    console.log(`API key obtenida (primeros 5 caracteres): ${apiKey.substring(0, 5)}...`);
+    
+    // Probar descarga directa de FacturAPI
+    console.log(`Probando descarga directa desde FacturAPI para factura: ${FACTURA_ID}`);
+    
+    const response = await axios({
+      method: 'GET',
+      url: `https://www.facturapi.io/v2/invoices/${FACTURA_ID}/pdf`,
+      responseType: 'stream',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    });
+    
+    // Guardar el archivo para verificar
+    const writer = fs.createWriteStream(`./test-factura-direct.pdf`);
+    response.data.pipe(writer);
+    
+    writer.on('finish', () => {
+      console.log('✅ Descarga DIRECTA EXITOSA - Archivo guardado como test-factura-direct.pdf');
+    });
+    
+    writer.on('error', (err) => {
+      console.error('❌ Error al escribir el archivo:', err);
+    });
+  } catch (error) {
+    console.error('❌ Error en la solicitud directa a FacturAPI:');
+    
+    if (error.response) {
+      console.error(`  Status: ${error.response.status}`);
+      console.error(`  Mensaje: ${error.response.statusText}`);
+      
+      if (error.response.data) {
+        // Para capturar el cuerpo del error
+        const chunks = [];
+        error.response.data.on('data', (chunk) => chunks.push(chunk));
+        error.response.data.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          console.error(`  Respuesta: ${body}`);
+        });
+      }
+    } else {
+      console.error(`  Error: ${error.message}`);
+    }
+  }
+}
+
+// Ejecutamos ambos tests
+async function runAllTests() {
+  await testDownloadEndpoint();
+  await testFacturapiDirect();
+}
+
+runAllTests();

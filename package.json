@@ -15,9 +15,7 @@
         "migrate": "prisma migrate dev",
         "studio": "prisma studio",
         "lint": "eslint .",
-        "format": "prettier --write .",
-        "test:phase2": "NODE_ENV=development node test-phase2.js",
-        "test:phase3": "node test-phase3.js"
+        "format": "prettier --write ."
     },
     "dependencies": {
         "@prisma/client": "^6.5.0",

@@ -646,16 +646,11 @@ export function registerOnboardingHandler(bot) {
             );
         }
         
-        // Encriptar la API Key
-        let encryptedApiKey = null;
+        // Usar la API key directamente sin encriptar
+        let facturapiApiKey = null;
         if (apiKeyTest) {
-            try {
-                encryptedApiKey = await encryptApiKey(apiKeyTest);
-                console.log('API Key encriptada correctamente');
-            } catch (encryptError) {
-                console.error('Error al encriptar API key:', encryptError);
-                throw new Error(`Error al encriptar la API key: ${encryptError.message}`);
-            }
+            facturapiApiKey = apiKeyTest;
+            console.log('API Key preparada correctamente');
         } else {
             throw new Error('No se pudo obtener una API Key válida para este tenant');
         }
@@ -670,12 +665,12 @@ export function registerOnboardingHandler(bot) {
             phone: data.phone,
             contactName: data.contactName,
             facturapiOrganizationId: organizationId,
-            facturapiApiKey: encryptedApiKey,
+            facturapiApiKey: facturapiApiKey, // Usar directamente la API key
             facturapiEnv: 'test',
             address: JSON.stringify(address)
         });
         
-        console.log('Tenant creado con ID:', tenant.id, 'y API Key configurada:', !!encryptedApiKey);
+        console.log('Tenant creado con ID:', tenant.id, 'y API Key configurada:', !!facturapiApiKey);
 
         // Crear un usuario para el tenant
         await TenantService.createTenantUser({

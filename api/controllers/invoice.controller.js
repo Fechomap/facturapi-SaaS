@@ -355,13 +355,52 @@ class InvoiceController {
           message: 'Se requiere el ID de la factura'
         });
       }
-      
-      // En una implementación real, aquí conectaríamos con el servicio
-      // Por ahora, simulamos una respuesta básica
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.pdf`);
-      res.send('Simulación de PDF');
+  
+      // Obtener la API key del tenant
+      const apiKey = await req.getApiKey();
+      if (!apiKey) {
+        return res.status(500).json({
+          error: 'ApiKeyError',
+          message: 'No se pudo obtener la API key para este tenant'
+        });
+      }
+  
+      // Hacer la solicitud a FacturAPI
+      try {
+        const response = await axios({
+          method: 'GET',
+          url: `https://www.facturapi.io/v2/invoices/${invoiceId}/pdf`,
+          responseType: 'arraybuffer', // Cambiado a arraybuffer en lugar de stream
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          }
+        });
+  
+        // Configurar encabezados de respuesta
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.pdf`);
+        
+        // Enviar el buffer directamente
+        return res.send(response.data);
+      } catch (facturapierror) {
+        console.error('Error al obtener PDF de FacturAPI:', facturapierror);
+        
+        if (facturapierror.response) {
+          return res.status(facturapierror.response.status).json({
+            error: 'FacturAPIError',
+            message: 'Error al obtener el PDF de FacturAPI',
+            details: facturapierror.response.data
+          });
+        }
+        
+        return res.status(500).json({
+          error: 'FacturAPIError',
+          message: 'Error de conexión con FacturAPI',
+          details: facturapierror.message
+        });
+      }
     } catch (error) {
+      console.error('Error en downloadInvoicePdf:', error);
       next(error);
     }
   }
@@ -390,12 +429,52 @@ class InvoiceController {
           message: 'Se requiere el ID de la factura'
         });
       }
-      
-      // Simulación de XML
-      res.setHeader('Content-Type', 'application/xml');
-      res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.xml`);
-      res.send(`<xml><factura id="${invoiceId}"></factura></xml>`);
+
+      // Obtener la API key del tenant
+      const apiKey = await req.getApiKey();
+      if (!apiKey) {
+        return res.status(500).json({
+          error: 'ApiKeyError',
+          message: 'No se pudo obtener la API key para este tenant'
+        });
+      }
+
+      // Hacer la solicitud a FacturAPI
+      try {
+        const response = await axios({
+          method: 'GET',
+          url: `https://www.facturapi.io/v2/invoices/${invoiceId}/xml`,
+          responseType: 'arraybuffer', // Cambiado a arraybuffer en lugar de stream
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          }
+        });
+
+        // Configurar encabezados de respuesta
+        res.setHeader('Content-Type', 'application/xml');
+        res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.xml`);
+        
+        // Enviar el buffer directamente
+        return res.send(response.data);
+      } catch (facturapierror) {
+        console.error('Error al obtener XML de FacturAPI:', facturapierror);
+        
+        if (facturapierror.response) {
+          return res.status(facturapierror.response.status).json({
+            error: 'FacturAPIError',
+            message: 'Error al obtener el XML de FacturAPI',
+            details: facturapierror.response.data
+          });
+        }
+        
+        return res.status(500).json({
+          error: 'FacturAPIError',
+          message: 'Error de conexión con FacturAPI',
+          details: facturapierror.message
+        });
+      }
     } catch (error) {
+      console.error('Error en downloadInvoiceXml:', error);
       next(error);
     }
   }
