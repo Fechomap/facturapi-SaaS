@@ -178,6 +178,52 @@ class TenantService {
       throw error;
     }
   }
+  
+    /**
+   * Incrementa el contador de facturas usadas en la suscripción actual
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<Object>} - Suscripción actualizada
+   */
+  static async incrementInvoiceCount(tenantId) {
+    console.log(`Incrementando contador de facturas para tenant ${tenantId}`);
+    
+    try {
+      // Obtener la suscripción activa
+      const subscription = await prisma.tenantSubscription.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { status: 'active' },
+            { status: 'trial' }
+          ]
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (!subscription) {
+        console.warn(`No se encontró suscripción activa para tenant ${tenantId}`);
+        return null;
+      }
+
+      // Incrementar el contador
+      const updatedSubscription = await prisma.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          invoicesUsed: {
+            increment: 1
+          }
+        }
+      });
+
+      console.log(`Contador incrementado para tenant ${tenantId}: ${updatedSubscription.invoicesUsed} facturas`);
+      return updatedSubscription;
+    } catch (error) {
+      console.error(`Error al incrementar contador de facturas para tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
 }
 
 export default TenantService;

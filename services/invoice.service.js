@@ -12,7 +12,6 @@ class InvoiceService {
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<Object>} - Factura generada
    */
-  // En invoice.service.js - Corregir la estructura de datos
   static async generateInvoice(data, tenantId) {
     if (!tenantId) {
       throw new Error('Se requiere un ID de tenant para generar la factura');
@@ -75,39 +74,23 @@ class InvoiceService {
         data.userId || null
       );
       
-      // FORZAR el incremento directamente para mayor seguridad
-      console.log('Realizando incremento forzado del contador...');
+      // Incrementar el contador de facturas de forma segura
       try {
-        // Buscar la suscripción activa
-        const subscription = await prisma.tenantSubscription.findFirst({
-          where: {
-            tenantId,
-            OR: [
-              { status: 'active' },
-              { status: 'trial' }
-            ]
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        });
-        
-        if (!subscription) {
-          console.error('No se encontró suscripción activa para incrementar contador');
-        } else {
-          // Incrementar el contador directamente
-          const updated = await prisma.tenantSubscription.update({
-            where: { id: subscription.id },
-            data: {
-              invoicesUsed: {
-                increment: 1
-              }
-            }
-          });
-          console.log('Contador incrementado correctamente:', updated.invoicesUsed);
-        }
+        await this.incrementInvoiceCount(tenantId);
+        console.log('Contador de facturas incrementado correctamente');
       } catch (incrementError) {
-        console.error('Error al incrementar contador:', incrementError);
+        console.error('Error al incrementar contador de facturas:', incrementError);
+        // No lanzamos el error para no interrumpir el flujo principal
+      }
+      
+      // Verificación de registro (opcional, puedes comentar o eliminar después)
+      try {
+        const invoiceCount = await prisma.tenantInvoice.count({
+          where: { tenantId }
+        });
+        console.log(`Total de facturas registradas para tenant ${tenantId}: ${invoiceCount}`);
+      } catch (e) {
+        console.error('Error al contar facturas:', e);
       }
       
       return factura;
@@ -116,6 +99,53 @@ class InvoiceService {
       throw error;
     }
   }
+
+  /**
+   * Incrementa el contador de facturas usadas en la suscripción actual
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<Object|null>} - Suscripción actualizada o null si no hay suscripción
+   */
+  static async incrementInvoiceCount(tenantId) {
+    console.log(`Incrementando contador de facturas para tenant ${tenantId}`);
+    
+    try {
+      // Obtener la suscripción activa
+      const subscription = await prisma.tenantSubscription.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { status: 'active' },
+            { status: 'trial' }
+          ]
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+
+      if (!subscription) {
+        console.warn(`No se encontró suscripción activa para tenant ${tenantId}`);
+        return null;
+      }
+
+      // Incrementar el contador
+      const updatedSubscription = await prisma.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          invoicesUsed: {
+            increment: 1
+          }
+        }
+      });
+
+      console.log(`Contador incrementado para tenant ${tenantId}: ${updatedSubscription.invoicesUsed} facturas`);
+      return updatedSubscription;
+    } catch (error) {
+      console.error(`Error al incrementar contador de facturas para tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
   /**
    * Busca facturas según criterios
    * @param {Object} criteria - Criterios de búsqueda

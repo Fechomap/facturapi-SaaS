@@ -671,6 +671,41 @@ export function registerOnboardingHandler(bot) {
         });
         
         console.log('Tenant creado con ID:', tenant.id, 'y API Key configurada:', !!facturapiApiKey);
+        
+        // Crear suscripción de prueba para el tenant
+        try {
+            await ctx.reply('⏳ Activando período de prueba de 14 días...');
+            
+            // Obtener el primer plan activo disponible
+            const SubscriptionService = await import('../../core/subscription/subscription.service.js').then(m => m.default);
+            const plans = await SubscriptionService.getPlans(true);
+            
+            if (plans && plans.length > 0) {
+                // Crear la suscripción usando el primer plan disponible
+                const subscription = await SubscriptionService.createSubscription(
+                    tenant.id,
+                    plans[0].id,
+                    { trialDays: 14, status: 'trial' }
+                );
+                
+                console.log(`Suscripción de prueba creada con ID: ${subscription.id}, vence: ${subscription.trialEndsAt}`);
+                
+                // Informar al usuario
+                await ctx.reply(
+                    `✅ Período de prueba activado. Tienes 14 días para probar todas las funcionalidades.`
+                );
+            } else {
+                console.error('No se encontraron planes de suscripción activos');
+                await ctx.reply(
+                    `⚠️ No se pudo activar el período de prueba. Por favor, contacta al administrador.`
+                );
+            }
+        } catch (subscriptionError) {
+            console.error('Error al crear suscripción:', subscriptionError);
+            await ctx.reply(
+                `⚠️ No se pudo activar el período de prueba automáticamente. Esto no afectará tu registro, pero deberás contactar al soporte.`
+            );
+        }
 
         // Crear un usuario para el tenant
         await TenantService.createTenantUser({
@@ -711,17 +746,38 @@ export function registerOnboardingHandler(bot) {
         ctx.userState.tenantName = tenant.businessName;
         ctx.userState.userStatus = 'authorized';
         ctx.userState.newRegistration = true; // Marcar como nuevo registro para activar la configuración
-        
+
         // Limpiar datos de registro pero mantener el ID de la organización
         delete ctx.userState.registrationData;
         delete ctx.userState.esperando;
-        
+
+        // Variables para controlar el estado de la suscripción
+        let subscriptionCreated = false;
+        let subscriptionEndDate = null;
+
+        // Intentar obtener la suscripción recién creada
+        try {
+            const SubscriptionService = await import('../../core/subscription/subscription.service.js').then(m => m.default);
+            const subscription = await SubscriptionService.getCurrentSubscription(tenant.id);
+            
+            if (subscription && subscription.trialEndsAt) {
+                subscriptionCreated = true;
+                subscriptionEndDate = subscription.trialEndsAt.toLocaleDateString();
+            }
+        } catch (error) {
+            console.error('Error al obtener información de suscripción:', error);
+        }
+
         // Mensaje de éxito
-        await ctx.reply(
-            `✅ *¡Registro completado exitosamente!*\n\n` +
+        let finalMessage = `✅ *¡Registro completado exitosamente!*\n\n` +
             `Tu empresa "${tenant.businessName}" ha sido registrada correctamente y tu cuenta está configurada como administrador.\n\n` +
-            `*Plan de prueba:* Se ha activado tu período de prueba de 14 días con todas las funcionalidades disponibles.\n\n` +
-            `Puedes comenzar a utilizar el sistema ahora mismo.`,
+            (subscriptionCreated 
+                ? `*Plan de prueba:* Se ha activado tu período de prueba de 14 días, el cual vence el ${subscriptionEndDate}.\n\n` 
+                : `*Plan de prueba:* No se pudo activar el período de prueba automáticamente. Por favor, contacta al soporte para activarlo.\n\n`) +
+            `Puedes comenzar a utilizar el sistema ahora mismo.`;
+
+        await ctx.reply(
+            finalMessage,
             {
                 parse_mode: 'Markdown',
                 ...Markup.inlineKeyboard([
