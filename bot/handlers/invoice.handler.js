@@ -45,9 +45,10 @@ function ensureTempDirExists() {
  * @param {string} formato - Formato (pdf/xml)
  * @param {string} folio - Número de folio
  * @param {string} clienteNombre - Nombre del cliente
+ * @param {Object} ctx - Contexto del usuario
  * @returns {Promise<string>} - Ruta al archivo descargado
  */
-async function descargarFactura(facturaId, formato, folio, clienteNombre) {
+async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   const apiUrl = `${config.apiBaseUrl}/api/facturas/${facturaId}/${formato}`;
   console.log('Descargando desde URL:', apiUrl);
 
@@ -63,10 +64,21 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre) {
 
   try {
     console.log('Enviando solicitud a:', apiUrl);
+    
+    // Obtener el tenant ID del contexto del usuario
+    const tenantId = ctx.userState?.tenantId;
+    if (!tenantId) {
+      throw new Error('No se encontró el tenant ID en el estado del usuario');
+    }
+    
     const response = await axios({
       method: 'GET',
       url: apiUrl,
-      responseType: 'stream'
+      responseType: 'stream',
+      headers: {
+        // Añadir el header X-Tenant-ID
+        'X-Tenant-ID': tenantId
+      }
     });
 
     response.data.pipe(writer);
@@ -90,6 +102,26 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre) {
     });
   } catch (error) {
     console.error('Error en la petición de descarga:', error.message);
+    
+    // Capturar y mostrar más detalles del error
+    if (error.response) {
+      console.error('Respuesta de error:', error.response.status, error.response.data);
+      
+      // Si la respuesta es un stream, extraer el contenido
+      if (error.response.data && typeof error.response.data.on === 'function') {
+        try {
+          const chunks = [];
+          error.response.data.on('data', chunk => chunks.push(chunk));
+          error.response.data.on('end', () => {
+            const body = Buffer.concat(chunks).toString('utf8');
+            console.error('Contenido de la respuesta de error:', body);
+          });
+        } catch (e) {
+          console.error('Error al leer respuesta del error:', e);
+        }
+      }
+    }
+    
     try {
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
@@ -97,6 +129,7 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre) {
     } catch (e) {
       console.error('Error al eliminar archivo parcial:', e);
     }
+    
     throw error;
   }
 }
@@ -370,7 +403,7 @@ export function registerInvoiceHandler(bot) {
       await ctx.reply('⏳ Descargando PDF, por favor espere...');
 
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
-      const filePath = await descargarFactura(facturaId, 'pdf', folioFactura, clienteStr);
+      const filePath = await descargarFactura(facturaId, 'pdf', folioFactura, clienteStr, ctx);
 
       if (fs.existsSync(filePath)) {
         await ctx.replyWithDocument({ source: filePath });
@@ -414,7 +447,7 @@ export function registerInvoiceHandler(bot) {
       await ctx.reply('⏳ Descargando XML, por favor espere...');
 
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
-      const filePath = await descargarFactura(facturaId, 'xml', folioFactura, clienteStr);
+      const filePath = await descargarFactura(facturaId, 'xml', folioFactura, clienteStr, ctx);
 
       if (fs.existsSync(filePath)) {
         await ctx.replyWithDocument({ source: filePath });
