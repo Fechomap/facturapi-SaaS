@@ -13,7 +13,6 @@ class InvoiceService {
    * @returns {Promise<Object>} - Factura generada
    */
   // En invoice.service.js - Corregir la estructura de datos
-
   static async generateInvoice(data, tenantId) {
     if (!tenantId) {
       throw new Error('Se requiere un ID de tenant para generar la factura');
@@ -40,7 +39,7 @@ class InvoiceService {
         items: [
           {
             quantity: 1,
-            product: {  // Aquí es donde se debe agrupar la información del producto
+            product: {
               description: `ARRASTRE DE GRUA PEDIDO DE COMPRA ${data.numeroPedido}`,
               product_key: data.claveProducto,
               unit_key: "E48",
@@ -66,19 +65,50 @@ class InvoiceService {
       console.log('Factura creada en FacturAPI:', factura.id);
       
       // Registrar la factura en la base de datos
-      await prisma.tenantInvoice.create({
-        data: {
-          tenantId,
-          facturapiInvoiceId: factura.id, // Guardar el ID real de FacturAPI
-          series: factura.series,
-          folioNumber: factura.folio_number,
-          total: factura.total,
-          status: 'valid',
-          createdAt: new Date(),
-          updatedAt: new Date()
-          // otros campos necesarios...
+      const registeredInvoice = await TenantService.registerInvoice(
+        tenantId,
+        factura.id,
+        factura.series,
+        factura.folio_number,
+        null, // customerId (en un caso real se obtendría)
+        factura.total,
+        data.userId || null
+      );
+      
+      // FORZAR el incremento directamente para mayor seguridad
+      console.log('Realizando incremento forzado del contador...');
+      try {
+        // Buscar la suscripción activa
+        const subscription = await prisma.tenantSubscription.findFirst({
+          where: {
+            tenantId,
+            OR: [
+              { status: 'active' },
+              { status: 'trial' }
+            ]
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+        
+        if (!subscription) {
+          console.error('No se encontró suscripción activa para incrementar contador');
+        } else {
+          // Incrementar el contador directamente
+          const updated = await prisma.tenantSubscription.update({
+            where: { id: subscription.id },
+            data: {
+              invoicesUsed: {
+                increment: 1
+              }
+            }
+          });
+          console.log('Contador incrementado correctamente:', updated.invoicesUsed);
         }
-      });
+      } catch (incrementError) {
+        console.error('Error al incrementar contador:', incrementError);
+      }
       
       return factura;
     } catch (error) {
@@ -86,7 +116,7 @@ class InvoiceService {
       throw error;
     }
   }
-    /**
+  /**
    * Busca facturas según criterios
    * @param {Object} criteria - Criterios de búsqueda
    * @returns {Promise<Array>} - Facturas encontradas

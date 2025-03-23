@@ -422,7 +422,8 @@ class SubscriptionService {
           tenantId, 
           subscriptionId: subscription.id,
           status: subscription.status,
-          planName: subscription.plan.name
+          planName: subscription.plan.name,
+          invoicesUsed: subscription.invoicesUsed // Asegúrate que este valor se está registrando
         }, 
         'Suscripción obtenida correctamente'
       );

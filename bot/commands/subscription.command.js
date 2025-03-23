@@ -1,4 +1,3 @@
-// bot/commands/subscription.command.js
 import { Markup } from 'telegraf';
 import TenantService from '../../services/tenant.service.js';
 import prisma from '../../lib/prisma.js';
@@ -15,56 +14,43 @@ export function registerSubscriptionCommand(bot) {
         'Para ver información de suscripción, primero debes registrar tu empresa.\n\nUsa /registro para comenzar.'
       );
     }
-    
+
     try {
       // Obtener información del tenant y su suscripción
       const tenantData = await TenantService.findTenantWithSubscription(ctx.userState.tenantId);
-      
-      if (!tenantData) {
+
+      if (!tenantData || !tenantData.subscriptions || tenantData.subscriptions.length === 0) {
         return ctx.reply(
-          `❌ No se encontró información para tu empresa con ID: ${ctx.userState.tenantId}.\n\n` +
+          `❌ No se encontró información de suscripción para tu empresa: ${tenantData?.businessName || 'Desconocida'}.\n\n` +
           `Contacta a soporte para solucionar este problema.`
         );
       }
-      
-      if (!tenantData.subscriptions || tenantData.subscriptions.length === 0) {
-        return ctx.reply(
-          `❌ No se encontró información de suscripción para tu empresa: ${tenantData.businessName}.\n\n` +
-          `Contacta a soporte para solucionar este problema.`
-        );
-      }
-      
+
       const subscription = tenantData.subscriptions[0];
-      
-      // Verificar que el plan existe
-      if (!subscription.plan) {
-        return ctx.reply(
-          `❌ No se encontró información del plan para tu suscripción.\n\n` +
-          `Contacta a soporte para solucionar este problema.`
-        );
-      }
-      
-      const plan = subscription.plan;
-      
+      const plan = subscription.plan || { name: 'Desconocido', price: 0, currency: 'MXN', billingPeriod: 'monthly' };
+
+      console.log('Datos de suscripción recuperados:', {
+        tenantId: tenantData.id,
+        subscriptionCount: tenantData.subscriptions?.length || 0,
+        invoicesUsed: subscription.invoicesUsed || 0
+      });
+
       // Formatear fechas
       const today = new Date();
       const trialEndsDate = subscription.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
-      const currentPeriodEndsDate = subscription.currentPeriodEndsAt 
-        ? new Date(subscription.currentPeriodEndsAt) 
-        : null;
-      
-      // Calcular días restantes
+      const currentPeriodEndsDate = subscription.currentPeriodEndsAt ? new Date(subscription.currentPeriodEndsAt) : null;
+
       const daysLeft = trialEndsDate && trialEndsDate > today
         ? Math.ceil((trialEndsDate - today) / (1000 * 60 * 60 * 24))
         : (currentPeriodEndsDate && currentPeriodEndsDate > today
             ? Math.ceil((currentPeriodEndsDate - today) / (1000 * 60 * 60 * 24))
             : 0);
-      
-      // Determinar estado y mensaje
+
+      // Determinar estado de la suscripción
       let statusEmoji = '✅';
       let statusMsg = 'Activa';
       let periodMsg = '';
-      
+
       switch (subscription.status) {
         case 'trial':
           statusEmoji = '🔍';
@@ -95,16 +81,15 @@ export function registerSubscriptionCommand(bot) {
           statusMsg = subscription.status || 'Desconocido';
           periodMsg = 'Estado de suscripción no reconocido';
       }
-      
-      // Crear mensaje de suscripción
+
+      // Construcción del mensaje con valores corregidos
       await ctx.reply(
         `📊 Información de Suscripción\n\n` +
         `Empresa: ${tenantData.businessName}\n` +
         `Plan: ${plan.name}\n` +
         `Estado: ${statusEmoji} ${statusMsg}\n` +
         `${periodMsg}\n\n` +
-        `Facturas generadas: ${subscription.invoicesUsed} / ${plan.invoiceLimit}\n` +
-        `Porcentaje usado: ${Math.round((subscription.invoicesUsed / plan.invoiceLimit) * 100)}%\n\n` +
+        `Facturas generadas: ${subscription.invoicesUsed || 0}\n` + 
         `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod === 'monthly' ? 'mes' : 'año'}\n\n` +
         `Tenant ID: ${tenantData.id}\n` +
         `API Key configurada: ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
@@ -114,9 +99,10 @@ export function registerSubscriptionCommand(bot) {
           [Markup.button.callback('↩️ Volver al Menú', 'menu_principal')]
         ])
       );
+
     } catch (error) {
       console.error('Error al obtener información de suscripción:', error);
-      
+
       ctx.reply(
         `❌ Ocurrió un error al obtener la información de tu suscripción: ${error.message}\n\n` +
         `Por favor, intenta nuevamente más tarde o contacta a soporte.`

@@ -158,27 +158,25 @@ class TenantService {
    * @returns {Promise<Object>} - Tenant con suscripción
    */
   static async findTenantWithSubscription(id) {
-    // En un caso real, aquí se consultaría la base de datos
-    return {
-      id,
-      businessName: "Empresa de Ejemplo",
-      facturapiOrganizationId: "org_example",
-      facturapiApiKey: "encrypted_key",
-      subscriptions: [
-        {
-          status: 'trial',
-          trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-          invoicesUsed: 0,
-          plan: {
-            name: "Plan Básico",
-            price: 299.00,
-            currency: "MXN",
-            billingPeriod: "monthly",
-            invoiceLimit: 100
+    try {
+      return await prisma.tenant.findUnique({
+        where: { id },
+        include: {
+          subscriptions: {
+            include: {
+              plan: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 1
           }
         }
-      ]
-    };
+      });
+    } catch (error) {
+      console.error(`Error al buscar tenant con suscripción: ${error.message}`);
+      throw error;
+    }
   }
 }
 
