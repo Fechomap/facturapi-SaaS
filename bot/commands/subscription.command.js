@@ -98,24 +98,21 @@ export function registerSubscriptionCommand(bot) {
       
       // Crear mensaje de suscripción
       await ctx.reply(
-        `📊 *Información de Suscripción*\n\n` +
-        `*Empresa:* ${tenantData.businessName}\n` +
-        `*Plan:* ${plan.name}\n` +
-        `*Estado:* ${statusEmoji} ${statusMsg}\n` +
-        `*${periodMsg}*\n\n` +
-        `*Facturas generadas:* ${subscription.invoicesUsed} / ${plan.invoiceLimit}\n` +
-        `*Porcentaje usado:* ${Math.round((subscription.invoicesUsed / plan.invoiceLimit) * 100)}%\n\n` +
-        `*Precio del plan:* $${plan.price} ${plan.currency} / ${plan.billingPeriod === 'monthly' ? 'mes' : 'año'}\n\n` +
-        `*Tenant ID:* ${tenantData.id}\n` +
-        `*API Key configurada:* ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
-        `*Organización FacturAPI:* ${tenantData.facturapiOrganizationId || 'No configurada'}`,
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('💳 Actualizar Plan', 'update_subscription')],
-            [Markup.button.callback('↩️ Volver al Menú', 'menu_principal')]
-          ])
-        }
+        `📊 Información de Suscripción\n\n` +
+        `Empresa: ${tenantData.businessName}\n` +
+        `Plan: ${plan.name}\n` +
+        `Estado: ${statusEmoji} ${statusMsg}\n` +
+        `${periodMsg}\n\n` +
+        `Facturas generadas: ${subscription.invoicesUsed} / ${plan.invoiceLimit}\n` +
+        `Porcentaje usado: ${Math.round((subscription.invoicesUsed / plan.invoiceLimit) * 100)}%\n\n` +
+        `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod === 'monthly' ? 'mes' : 'año'}\n\n` +
+        `Tenant ID: ${tenantData.id}\n` +
+        `API Key configurada: ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
+        `Organización FacturAPI: ${tenantData.facturapiOrganizationId || 'No configurada'}`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('💳 Actualizar Plan', 'update_subscription')],
+          [Markup.button.callback('↩️ Volver al Menú', 'menu_principal')]
+        ])
       );
     } catch (error) {
       console.error('Error al obtener información de suscripción:', error);
