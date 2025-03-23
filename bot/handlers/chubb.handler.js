@@ -21,49 +21,42 @@ const __dirname = path.dirname(__filename);
  * @param {Object} bot - Instancia del bot de Telegram
  */
 export function registerChubbHandler(bot) {
-  // Agregar la opción CHUBB al menú principal
   bot.action('menu_chubb', async (ctx) => {
     await ctx.answerCbQuery();
     
-    // Verificar si el usuario tiene un tenant asociado
-    if (!ctx.hasTenant()) {
-      return ctx.reply('⛔ No estás registrado en el sistema. Usa /registro para comenzar.');
-    }
-    
-    // Verificar si el usuario está autorizado
-    if (!ctx.isUserAuthorized()) {
-      return ctx.reply('⛔ Tu cuenta está pendiente de autorización por el administrador.');
-    }
-    
-    // MODIFICAR ESTA PARTE: buscar el cliente CHUBB en la base de datos
     try {
+      // Obtener el ID del tenant actual
+      const tenantId = ctx.getTenantId();
+      
+      if (!tenantId) {
+        return ctx.reply('❌ Error: No se pudo obtener la información de tu empresa.');
+      }
+      
+      // Buscar el cliente CHUBB en la base de datos para este tenant
       const chubbClient = await prisma.tenantCustomer.findFirst({
         where: {
-          tenantId: ctx.getTenantId(),
-          legalName: { contains: 'CHUBB' }
+          tenantId,
+          legalName: { contains: 'CHUBB' } // Busca un cliente cuyo nombre contenga "CHUBB"
         }
       });
       
       if (!chubbClient) {
-        return ctx.reply(
-          '❌ Cliente CHUBB no encontrado. Por favor, asegúrate de que este cliente está configurado.',
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'menu_principal')]])
-        );
+        return ctx.reply('❌ Error de configuración: Cliente CHUBB no encontrado para tu empresa. Por favor, configura primero los clientes.');
       }
       
-      // Guardar el ID del cliente CHUBB en el estado para usarlo después
+      // Guardar el ID del cliente CHUBB en el estado del usuario
       ctx.userState.chubbClientId = chubbClient.facturapiCustomerId;
+      ctx.userState.clienteNombre = chubbClient.legalName;
+      console.log(`Cliente CHUBB encontrado: ${chubbClient.legalName} (ID: ${chubbClient.facturapiCustomerId})`);
+      
+      // Continuar con el procesamiento normal
+      ctx.userState.esperando = 'archivo_excel_chubb';
+      await ctx.reply('Por favor, sube el archivo Excel con los datos de CHUBB para generar las facturas.');
       
     } catch (error) {
       console.error('Error al buscar cliente CHUBB:', error);
-      return ctx.reply(
-        '❌ Error al verificar cliente CHUBB. Por favor, contacta al administrador.',
-        Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'menu_principal')]])
-      );
+      await ctx.reply('❌ Error al buscar cliente CHUBB: ' + error.message);
     }
-    
-    ctx.userState.esperando = 'archivo_excel_chubb';
-    await ctx.reply('Por favor, sube el archivo Excel con los datos de CHUBB para generar las facturas.');
   });
   
   // Manejador para confirmar la generación de facturas CHUBB
@@ -546,7 +539,7 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     }
     
     // Descripción para cada ítem individual
-    const descripcion = `No. Caso ${numeroCaso} Proveedor 2233-GRUAS CRK Servicio ${tipoServicio} | Subtotal: $${subtotal.toFixed(2)}${retencionTexto}`;
+    const descripcion = `No. Caso ${numeroCaso} Proveedor ${item.Proveedor || '2233-GRUAS CRK'} Servicio ${tipoServicio} | Subtotal: $${subtotal.toFixed(2)}${retencionTexto}`;
     
     return {
       quantity: 1,
@@ -577,8 +570,7 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     payment_form: "99",  // Forma de pago
     payment_method: "PPD",  // Método de pago
     currency: "MXN",
-    exchange: 1,
-    date: moment().tz('America/Mexico_City').format('YYYY-MM-DDTHH:mm:ss')
+    exchange: 1
   };
   
   // Mostrar resumen detallado de la factura antes de generarla
@@ -592,27 +584,60 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     { parse_mode: 'Markdown' }
   );
 
-  // Llamar a la API para generar la factura
+  // Llamar directamente a FacturAPI para generar la factura
   try {
     await ctx.reply(`⏳ Generando factura para: ${claveSAT} (${conRetencion ? 'Con' : 'Sin'} retención)...`);
     
-    const apiUrl = `${config.apiBaseUrl}/api/facturas`;
-    console.log('Enviando solicitud a API con datos:', JSON.stringify(facturaData, null, 2));
-    
-    // Obtener el tenant ID del contexto del usuario
+    // Obtener el ID del tenant actual
     const tenantId = ctx.getTenantId();
     if (!tenantId) {
-      throw new Error('No se encontró el tenant ID en el contexto del usuario');
+      throw new Error('No se pudo obtener el ID del tenant');
     }
     
-    const response = await axios.post(apiUrl, facturaData, {
-      headers: {
-        // Añadir el header X-Tenant-ID para que la API pueda identificar el tenant
-        'X-Tenant-ID': tenantId
-      }
-    });
+    console.log(`Tenant ID obtenido: ${tenantId}`);
     
-    const factura = response.data;
+    // Importar facturapIService
+    const facturapIService = await import('../../services/facturapi.service.js').then(m => m.default);
+    
+    // Obtener cliente de FacturAPI
+    const facturapi = await facturapIService.getFacturapiClient(tenantId);
+    console.log('Cliente FacturAPI obtenido correctamente');
+    
+    // Obtener el siguiente folio disponible
+    const TenantService = await import('../../services/tenant.service.js').then(m => m.default);
+    const folio = await TenantService.getNextFolio(tenantId, 'A');
+    
+    // Asignar el folio explícitamente
+    facturaData.folio_number = folio;
+    
+    console.log('Enviando solicitud a FacturAPI con datos:', JSON.stringify(facturaData, null, 2));
+    
+    // Crear la factura directamente en FacturAPI
+    const factura = await facturapi.invoices.create(facturaData);
+    console.log('Factura creada en FacturAPI:', factura);
+    
+    // Registrar la factura en la base de datos
+    try {
+      const registeredInvoice = await TenantService.registerInvoice(
+        tenantId,
+        factura.id,
+        factura.series || 'A',
+        factura.folio_number,
+        null, // customerId, podríamos buscar el ID del cliente en la base de datos si es necesario
+        factura.total,
+        ctx.from?.id ? BigInt(ctx.from.id) : null // ID del usuario que creó la factura
+      );
+      
+      console.log('Factura registrada en la base de datos:', registeredInvoice);
+    } catch (registerError) {
+      // Si hay un error al registrar, lo registramos pero continuamos
+      console.error('Error al registrar factura en la base de datos:', registerError);
+    }
+    
+    // Guardar el ID de la factura en el estado del usuario para usarlo posteriormente
+    ctx.userState.facturaId = factura.id;
+    ctx.userState.folioFactura = factura.folio_number;
+    ctx.userState.facturaGenerada = true;
     
     // Mostrar información de la factura generada
     await ctx.reply(
@@ -640,8 +665,8 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     
     if (error.response && error.response.data) {
       console.log('Respuesta de error completa:', JSON.stringify(error.response.data, null, 2));
-      if (typeof error.response.data.error === 'string') {
-        errorMsg = `Error de API: ${error.response.data.error}`;
+      if (typeof error.response.data.message === 'string') {
+        errorMsg = `Error de FacturAPI: ${error.response.data.message}`;
       } else if (error.response.data.details) {
         errorMsg = `Error de validación: ${JSON.stringify(error.response.data.details)}`;
       }
