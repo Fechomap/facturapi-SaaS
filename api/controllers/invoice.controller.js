@@ -298,29 +298,67 @@ class InvoiceController {
           message: `No se encontró la factura con ID ${invoiceId}`
         });
       }
+
+      // Obtener la API key del tenant
+      const apiKey = await req.getApiKey();
+      if (!apiKey) {
+        return res.status(500).json({
+          error: 'ApiKeyError',
+          message: 'No se pudo obtener la API key para este tenant'
+        });
+      }
       
-      // Aquí se realizaría la llamada real a FacturAPI para cancelar la factura
-      // Por ahora, actualizamos directamente el estado en nuestra base de datos
+      console.log(`Intentando cancelar factura ${invoiceId} con motivo ${motive} en FacturAPI`);
+      console.log(`API Key: ${apiKey.substring(0, 8)}...`);
       
-      // Actualizar el estado en la base de datos
-      await prisma.tenantInvoice.update({
-        where: {
-          id: invoice.id
-        },
-        data: {
-          status: 'canceled',
-          updatedAt: new Date()
+      try {
+        // Realizar la cancelación en FacturAPI
+        // IMPORTANTE: Para FacturAPI, el motivo debe enviarse como query param, no como JSON body
+        const facturapResponse = await axios({
+          method: 'DELETE',
+          url: `https://www.facturapi.io/v2/invoices/${invoiceId}?motive=${motive}`,
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('Respuesta de FacturAPI al cancelar:', facturapResponse.data);
+        
+        // Actualizar estado en la base de datos local
+        await prisma.tenantInvoice.update({
+          where: {
+            id: invoice.id
+          },
+          data: {
+            status: 'canceled',
+            updatedAt: new Date()
+          }
+        });
+        
+        res.json({ 
+          success: true, 
+          message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}` 
+        });
+        
+      } catch (facturapierror) {
+        console.error('Error al cancelar factura en FacturAPI:', facturapierror);
+        
+        if (facturapierror.response) {
+          return res.status(facturapierror.response.status).json({
+            error: 'FacturAPIError',
+            message: 'Error al cancelar la factura en FacturAPI',
+            details: facturapierror.response.data
+          });
         }
-      });
+        
+        return res.status(500).json({
+          error: 'FacturAPIError',
+          message: 'Error de conexión con FacturAPI',
+          details: facturapierror.message
+        });
+      }
       
-      // Registrar la cancelación
-      // (en una implementación real, también se registraría el motivo)
-      
-      // Respuesta exitosa
-      res.json({ 
-        success: true, 
-        message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}` 
-      });
     } catch (error) {
       console.error('Error en cancelInvoice:', error);
       next(error);
