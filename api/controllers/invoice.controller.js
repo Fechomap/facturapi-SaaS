@@ -284,12 +284,45 @@ class InvoiceController {
         });
       }
       
-      // Simulación de cancelación
+      // Buscar la factura en la base de datos
+      const invoice = await prisma.tenantInvoice.findFirst({
+        where: {
+          tenantId,
+          facturapiInvoiceId: invoiceId
+        }
+      });
+      
+      if (!invoice) {
+        return res.status(404).json({
+          error: 'NotFoundError',
+          message: `No se encontró la factura con ID ${invoiceId}`
+        });
+      }
+      
+      // Aquí se realizaría la llamada real a FacturAPI para cancelar la factura
+      // Por ahora, actualizamos directamente el estado en nuestra base de datos
+      
+      // Actualizar el estado en la base de datos
+      await prisma.tenantInvoice.update({
+        where: {
+          id: invoice.id
+        },
+        data: {
+          status: 'canceled',
+          updatedAt: new Date()
+        }
+      });
+      
+      // Registrar la cancelación
+      // (en una implementación real, también se registraría el motivo)
+      
+      // Respuesta exitosa
       res.json({ 
         success: true, 
         message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}` 
       });
     } catch (error) {
+      console.error('Error en cancelInvoice:', error);
       next(error);
     }
   }
@@ -523,14 +556,14 @@ class InvoiceController {
           folioNumber
         },
         include: {
-          customer: true // Incluir información del cliente si está relacionada
+          customer: true
         }
       });
   
       if (invoiceRecord) {
         // Si encontramos el registro en nuestra base de datos
         const facturapiId = invoiceRecord.facturapiInvoiceId;
-        console.log(`Factura encontrada en BD local, ID FacturAPI: ${facturapiId}`);
+        console.log(`Factura encontrada en BD local, ID FacturAPI: ${facturapiId}, Estado: ${invoiceRecord.status}`);
   
         // Construir respuesta con todos los campos necesarios
         const invoice = {
@@ -548,6 +581,9 @@ class InvoiceController {
             tax_id: 'AAA010101AAA'
           },
           status: invoiceRecord.status || 'valid',
+          // Si está cancelada, añadir información de cancelación
+          cancellation_status: invoiceRecord.status === 'canceled' ? 'accepted' : undefined,
+          cancellation_date: invoiceRecord.status === 'canceled' ? invoiceRecord.updatedAt?.toISOString() : undefined,
           subtotal: invoiceRecord.total ? (invoiceRecord.total / 1.16).toFixed(2) : 0,
           total: invoiceRecord.total || 0,
           created_at: invoiceRecord.createdAt?.toISOString() || new Date().toISOString()

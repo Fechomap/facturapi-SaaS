@@ -49,34 +49,37 @@ export function invoiceCreatedView(invoice) {
  * @param {boolean} estaCancelada - Si la factura está cancelada
  */
 export function invoiceDetailsView(invoice, estadoFactura, estaCancelada) {
-  // Asegurarnos que todos los valores existan o usar valores por defecto
-  const series = invoice.series || 'A';
-  const folioNumber = invoice.folio_number || '?';
-  const total = typeof invoice.total === 'number' ? invoice.total.toFixed(2) : '0.00';
+  // Determinar si la factura está cancelada basándonos en el estado o cancellation_status
+  const cancelada = estaCancelada || 
+                   invoice.status === 'canceled' || 
+                   invoice.cancellation_status === 'accepted';
+  
+  // Ajustar el estado a mostrar según la condición de cancelación
+  const estadoMostrar = cancelada ? '⛔ CANCELADA' : (estadoFactura || '✅ VIGENTE');
   
   let mensaje = `✅ *Factura encontrada*\n\n` +
-    `Folio: ${series}-${folioNumber}\n` +
-    `Total: $${total} MXN\n` +
-    `Estado: ${estadoFactura || 'Desconocido'}\n`;
+    `Folio: ${invoice.series || 'A'}-${invoice.folio_number}\n` +
+    `Total: $${typeof invoice.total === 'number' ? invoice.total.toFixed(2) : invoice.total || '0.00'} MXN\n` +
+    `Estado: ${estadoMostrar}\n`;
   
-  if (invoice.cancellation_status === 'canceled' && invoice.cancellation_date) {
+  if (cancelada && invoice.cancellation_date) {
     mensaje += `Fecha de cancelación: ${invoice.cancellation_date}\n`;
   }
   
   mensaje += `\nSeleccione una opción:`;
   
-  // Usar el ID de FacturAPI para los botones (facturapiInvoiceId o id)
+  // Usar el ID de FacturAPI para los botones
   const facturaId = invoice.facturapiInvoiceId || invoice.id;
   
   // Botones diferentes según si la factura está cancelada o no
   let botonesFactura = [
-    [Markup.button.callback('📄 Descargar PDF', `pdf_${facturaId}_${folioNumber}`)],
-    [Markup.button.callback('🔠 Descargar XML', `xml_${facturaId}_${folioNumber}`)]
+    [Markup.button.callback('📄 Descargar PDF', `pdf_${facturaId}_${invoice.folio_number}`)],
+    [Markup.button.callback('🔠 Descargar XML', `xml_${facturaId}_${invoice.folio_number}`)]
   ];
   
   // Solo mostramos el botón de cancelación si la factura NO está cancelada
-  if (!estaCancelada) {
-    botonesFactura.push([Markup.button.callback('❌ Cancelar Factura', `iniciar_cancelacion_${facturaId}_${folioNumber}`)]);
+  if (!cancelada) {
+    botonesFactura.push([Markup.button.callback('❌ Cancelar Factura', `iniciar_cancelacion_${facturaId}_${invoice.folio_number}`)]);
   }
   
   return { message: mensaje, keyboard: Markup.inlineKeyboard(botonesFactura), parse_mode: 'Markdown' };

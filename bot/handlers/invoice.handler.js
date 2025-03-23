@@ -749,13 +749,16 @@ function registerCancellationHandlers(bot) {
       
       // Llamar a la API para cancelar la factura
       try {
-        const apiUrl = `${config.apiBaseUrl}/facturas/${facturaId}`;
+      const apiUrl = `${config.apiBaseUrl}/api/facturas/${facturaId}`;
         console.log(`Enviando solicitud de cancelación a: ${apiUrl} con motivo: ${motivoCancelacion}`);
         
         const response = await axios.delete(apiUrl, { 
           data: { 
             motive: motivoCancelacion 
-          } 
+          },
+          headers: {
+            'X-Tenant-ID': ctx.getTenantId() // Añadir el header del tenant
+          }
         });
         
         console.log('Respuesta de cancelación:', response.data);
