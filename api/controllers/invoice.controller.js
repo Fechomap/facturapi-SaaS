@@ -1,6 +1,7 @@
 // api/controllers/invoice.controller.js
 // Importaciones (temporales hasta que los servicios estén completamente implementados)
 import axios from 'axios';
+import prisma from '../../lib/prisma.js';
 
 /**
  * Controlador para operaciones relacionadas con facturas
@@ -504,24 +505,64 @@ class InvoiceController {
         });
       }
       
-      // Simulación de búsqueda por folio
-      const invoice = {
-        id: `inv_${folio}`,
-        series: 'A',
-        folio_number: parseInt(folio),
-        customer: {
-          id: 'client_1',
-          legal_name: 'Cliente Ejemplo',
-          tax_id: 'AAA010101AAA'
-        },
-        subtotal: 1000,
-        total: 1160,
-        status: 'valid',
-        created_at: '2023-01-01T12:00:00Z'
-      };
+      // Convertir el folio a número entero
+      const folioNumber = parseInt(folio);
+      if (isNaN(folioNumber)) {
+        return res.status(400).json({
+          error: 'ValidationError',
+          message: 'El folio debe ser un número válido'
+        });
+      }
       
-      res.json(invoice);
+      console.log(`Buscando factura con folio ${folioNumber} para tenant ${tenantId}`);
+      
+      // Buscar en la base de datos primero
+      const invoiceRecord = await prisma.tenantInvoice.findFirst({
+        where: {
+          tenantId,
+          folioNumber
+        },
+        include: {
+          customer: true // Incluir información del cliente si está relacionada
+        }
+      });
+  
+      if (invoiceRecord) {
+        // Si encontramos el registro en nuestra base de datos
+        const facturapiId = invoiceRecord.facturapiInvoiceId;
+        console.log(`Factura encontrada en BD local, ID FacturAPI: ${facturapiId}`);
+  
+        // Construir respuesta con todos los campos necesarios
+        const invoice = {
+          id: facturapiId,
+          facturapiInvoiceId: facturapiId,
+          series: invoiceRecord.series || 'A',
+          folio_number: invoiceRecord.folioNumber,
+          customer: invoiceRecord.customer ? {
+            id: invoiceRecord.customer.id.toString(),
+            legal_name: invoiceRecord.customer.legalName,
+            tax_id: invoiceRecord.customer.rfc
+          } : {
+            id: 'unknown',
+            legal_name: 'Cliente Desconocido',
+            tax_id: 'AAA010101AAA'
+          },
+          status: invoiceRecord.status || 'valid',
+          subtotal: invoiceRecord.total ? (invoiceRecord.total / 1.16).toFixed(2) : 0,
+          total: invoiceRecord.total || 0,
+          created_at: invoiceRecord.createdAt?.toISOString() || new Date().toISOString()
+        };
+  
+        return res.json(invoice);
+      }
+  
+      // Si no lo encontramos en la BD, devolvemos un error 404
+      return res.status(404).json({
+        error: 'NotFoundError',
+        message: `No se encontró factura con folio ${folio}`
+      });
     } catch (error) {
+      console.error('Error en getInvoiceByFolio:', error);
       next(error);
     }
   }

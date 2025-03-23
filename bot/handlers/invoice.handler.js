@@ -552,10 +552,12 @@ export function registerInvoiceHandler(bot) {
             const factura = response.data;
             console.log('Respuesta del backend:', factura);
         
-            if (factura && factura.id) {
+            if (factura && (factura.id || factura.facturapiInvoiceId)) {
               // Guardamos información de la factura en el estado del usuario
-              ctx.userState.facturaId = factura.id;
+              ctx.userState.facturaId = factura.facturapiInvoiceId || factura.id; // Usar el ID de FacturAPI
               ctx.userState.folioFactura = factura.folio_number;
+              // Depuración: confirmar que se guarda el ID correcto
+              console.log('Guardando ID de factura en el estado:', ctx.userState.facturaId);
               
               // Determinar el estado de la factura
               let estadoFactura = '';

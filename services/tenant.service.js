@@ -1,4 +1,3 @@
-// services/tenant.service.js
 import prisma from '../lib/prisma.js';
 
 /**
@@ -90,21 +89,47 @@ class TenantService {
     total, 
     createdById
   ) {
-    // Simular el registro de la factura en la base de datos
-    console.log(`Registrando factura: ${series}-${folioNumber} para tenant ${tenantId}`);
+    console.log(
+      `Registrando factura: ${series}-${folioNumber} para tenant ${tenantId}`
+    );
     
-    // En un caso real, aquí se guardaría en la base de datos
-    return {
-      tenantId,
-      facturapiInvoiceId,
-      series,
-      folioNumber,
-      customerId,
-      total,
-      createdById,
-      status: 'valid',
-      createdAt: new Date()
-    };
+    try {
+      // Guardar realmente en la base de datos usando Prisma
+      const invoice = await prisma.tenantInvoice.create({
+        data: {
+          tenantId,
+          facturapiInvoiceId,
+          series,
+          folioNumber,
+          customerId, // Si es null, Prisma lo manejará adecuadamente
+          total,
+          status: 'valid',
+          createdById, // Si es null, Prisma lo manejará
+          invoiceDate: new Date()
+        }
+      });
+      
+      console.log(`Factura guardada en base de datos con ID: ${invoice.id}`);
+      
+      // Incrementar el contador de facturas (mantener esta funcionalidad)
+      await this.incrementInvoiceCount(tenantId);
+      
+      return invoice;
+    } catch (error) {
+      console.error(`Error al registrar factura en base de datos: ${error.message}`);
+      // En caso de error, devolver un objeto con los datos básicos para mantener compatibilidad
+      return {
+        tenantId,
+        facturapiInvoiceId,
+        series,
+        folioNumber,
+        customerId,
+        total,
+        createdById,
+        status: 'valid',
+        createdAt: new Date()
+      };
+    }
   }
   
   /**

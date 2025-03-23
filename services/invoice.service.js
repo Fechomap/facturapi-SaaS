@@ -1,4 +1,3 @@
-// services/invoice.service.js
 import prisma from '../lib/prisma.js';
 import TenantService from './tenant.service.js';
 import facturapIService from './facturapi.service.js';
@@ -67,15 +66,19 @@ class InvoiceService {
       console.log('Factura creada en FacturAPI:', factura.id);
       
       // Registrar la factura en la base de datos
-      await TenantService.registerInvoice(
-        tenantId,
-        factura.id,
-        factura.series,
-        factura.folio_number,
-        null, // customerId (en un caso real se obtendría)
-        factura.total,
-        data.userId || null
-      );
+      await prisma.tenantInvoice.create({
+        data: {
+          tenantId,
+          facturapiInvoiceId: factura.id, // Guardar el ID real de FacturAPI
+          series: factura.series,
+          folioNumber: factura.folio_number,
+          total: factura.total,
+          status: 'valid',
+          createdAt: new Date(),
+          updatedAt: new Date()
+          // otros campos necesarios...
+        }
+      });
       
       return factura;
     } catch (error) {
