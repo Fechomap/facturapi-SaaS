@@ -672,6 +672,38 @@ export function registerOnboardingHandler(bot) {
         
         console.log('Tenant creado con ID:', tenant.id, 'y API Key configurada:', !!facturapiApiKey);
         
+        // Después de crear el tenant, configurar los datos legales en FacturAPI
+        try {
+          const facturapIService = await import('../../services/facturapi.service.js').then(m => m.default);
+          
+          // Construir los datos legales
+          const legalData = {
+            legal_name: data.businessName,
+            tax_id: data.rfc,
+            tax_system: "601", // General de Ley Personas Morales
+            address: {
+              street: data.street,
+              exterior: data.exterior,
+              interior: data.interior || "",
+              neighborhood: data.neighborhood,
+              zip: data.zip,
+              city: data.city,
+              municipality: data.municipality,
+              state: data.state,
+              country: "MEX"
+            },
+            phone: data.phone || "",
+            email: data.email
+          };
+          
+          await ctx.reply('⏳ Configurando datos fiscales en FacturAPI...');
+          await facturapIService.updateOrganizationLegal(organizationId, legalData);
+          await ctx.reply('✅ Datos fiscales configurados correctamente');
+        } catch (legalError) {
+          console.error('Error al configurar datos fiscales:', legalError);
+          await ctx.reply('⚠️ Hubo un problema al configurar los datos fiscales. Podrás configurarlos más tarde desde el menú.');
+        }
+        
         // Crear suscripción de prueba para el tenant
         try {
             await ctx.reply('⏳ Activando período de prueba de 14 días...');

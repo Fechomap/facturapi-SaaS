@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { decryptApiKey } from '../core/utils/encryption.js';
+import axios from 'axios';
 
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;
@@ -148,6 +149,78 @@ class FacturapiService {
         message: `Error de conexión: ${error.message}`,
         error: error
       };
+    }
+  }
+  
+  /**
+   * Actualiza la información legal de una organización
+   * @param {string} organizationId - ID de la organización en FacturAPI
+   * @param {Object} legalData - Datos legales a actualizar
+   * @returns {Promise<Object>} - Datos actualizados
+   */
+  static async updateOrganizationLegal(organizationId, legalData) {
+    try {
+      // Verificamos que el campo organizationId esté presente
+      if (!organizationId) {
+        throw new Error('Se requiere el ID de la organización en FacturAPI');
+      }
+  
+      // Verificamos que legalData sea un objeto
+      if (!legalData || typeof legalData !== 'object') {
+        throw new Error('Los datos legales deben ser un objeto válido');
+      }
+      
+      // Creamos un objeto nuevo con solo los campos permitidos
+      const dataToSend = {
+        name: legalData.name || legalData.legal_name,
+        legal_name: legalData.legal_name,
+        tax_system: legalData.tax_system || "601", // Valor por defecto
+        phone: legalData.phone || "",
+        website: legalData.website || "",
+        address: {}
+      };
+      
+      // Campos de dirección permitidos
+      if (legalData.address) {
+        dataToSend.address = {
+          street: legalData.address.street || "",
+          exterior: legalData.address.exterior || "",
+          interior: legalData.address.interior || "",
+          neighborhood: legalData.address.neighborhood || "",
+          zip: legalData.address.zip || "",
+          city: legalData.address.city || "",
+          municipality: legalData.address.municipality || "",
+          state: legalData.address.state || ""
+        };
+      }
+      
+      console.log('Actualizando datos legales en FacturAPI:', dataToSend);
+  
+      // Obtener el cliente de Facturapi usando FACTURAPI_USER_KEY
+      const FACTURAPI_USER_KEY = process.env.FACTURAPI_USER_KEY;
+      if (!FACTURAPI_USER_KEY) {
+        throw new Error('FACTURAPI_USER_KEY no está configurada en las variables de entorno');
+      }
+  
+      const response = await axios({
+        method: 'PUT',
+        url: `https://www.facturapi.io/v2/organizations/${organizationId}/legal`,
+        headers: {
+          'Authorization': `Bearer ${FACTURAPI_USER_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        data: dataToSend
+      });
+  
+      return response.data;
+    } catch (error) {
+      console.error('Error al actualizar datos legales en FacturAPI:', error);
+      
+      if (error.response) {
+        console.error('Detalles del error:', error.response.status, error.response.data);
+      }
+      
+      throw error;
     }
   }
 }
