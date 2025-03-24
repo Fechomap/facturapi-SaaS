@@ -32,6 +32,44 @@ class InvoiceService {
       // Obtener el próximo folio
       const folio = await TenantService.getNextFolio(tenantId, 'A');
       
+      // Verificar si el cliente requiere retención (SOS, INFOASIST, ARSA)
+      let requiresWithholding = false;
+      try {
+        // Intentar obtener el cliente para verificar si requiere retención
+        const cliente = await facturapi.customers.retrieve(data.clienteId);
+        const clientName = cliente.legal_name || '';
+        
+        // Verificar si es uno de los clientes que requieren retención
+        requiresWithholding = 
+          clientName.includes('INFOASIST') || 
+          clientName.includes('ARSA') || 
+          clientName.includes('S.O.S') || 
+          clientName.includes('SOS');
+        
+        console.log(`Cliente: ${clientName}, Requiere retención: ${requiresWithholding}`);
+      } catch (error) {
+        console.warn(`No se pudo verificar si el cliente requiere retención: ${error.message}`);
+        // Si hay problema con la obtención del cliente, verificamos por clienteNombre en data
+        if (data.clienteNombre) {
+          requiresWithholding = 
+            data.clienteNombre.includes('INFOASIST') || 
+            data.clienteNombre.includes('ARSA') || 
+            data.clienteNombre.includes('S.O.S') || 
+            data.clienteNombre.includes('SOS');
+          console.log(`Usando nombre alternativo: ${data.clienteNombre}, Requiere retención: ${requiresWithholding}`);
+        }
+      }
+      
+      // Configurar los impuestos según corresponda
+      const taxes = requiresWithholding ? 
+        [
+          { type: "IVA", rate: 0.16, factor: "Tasa" },
+          { type: "IVA", rate: 0.04, factor: "Tasa", withholding: true }
+        ] : 
+        [
+          { type: "IVA", rate: 0.16, factor: "Tasa" }
+        ];
+      
       // Crear la factura en FacturAPI
       const facturaData = {
         customer: data.clienteId,
@@ -44,9 +82,8 @@ class InvoiceService {
               unit_key: "E48",
               unit_name: "SERVICIO",
               price: parseFloat(data.monto),
-              taxes: [
-                { type: "IVA", rate: 0.16, factor: "Tasa" }
-              ]
+              tax_included: false,
+              taxes: taxes
             }
           }
         ],
@@ -64,7 +101,6 @@ class InvoiceService {
       console.log('Factura creada en FacturAPI:', factura.id);
       
       // Registrar la factura en la base de datos
-      // NOTA: TenantService.registerInvoice ya incrementa el contador internamente
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
@@ -75,24 +111,39 @@ class InvoiceService {
         data.userId || null
       );
       
-      // Verificación de registro (opcional, puedes comentar o eliminar después)
+      // FORZAR el incremento directamente para mayor seguridad
+      console.log('Realizando incremento forzado del contador...');
       try {
-        const invoiceCount = await prisma.tenantInvoice.count({
-          where: { tenantId }
-        });
-        
+        // Buscar la suscripción activa
         const subscription = await prisma.tenantSubscription.findFirst({
           where: {
             tenantId,
-            OR: [{ status: 'active' }, { status: 'trial' }]
+            OR: [
+              { status: 'active' },
+              { status: 'trial' }
+            ]
           },
-          orderBy: { createdAt: 'desc' }
+          orderBy: {
+            createdAt: 'desc'
+          }
         });
         
-        console.log(`Total de facturas registradas para tenant ${tenantId}: ${invoiceCount}`);
-        console.log(`Contador actual en suscripción: ${subscription?.invoicesUsed || 'No encontrado'}`);
-      } catch (e) {
-        console.error('Error al verificar contadores:', e);
+        if (!subscription) {
+          console.error('No se encontró suscripción activa para incrementar contador');
+        } else {
+          // Incrementar el contador directamente
+          const updated = await prisma.tenantSubscription.update({
+            where: { id: subscription.id },
+            data: {
+              invoicesUsed: {
+                increment: 1
+              }
+            }
+          });
+          console.log('Contador incrementado correctamente:', updated.invoicesUsed);
+        }
+      } catch (incrementError) {
+        console.error('Error al incrementar contador:', incrementError);
       }
       
       return factura;
@@ -101,7 +152,7 @@ class InvoiceService {
       throw error;
     }
   }
-
+  
   /**
    * Busca facturas según criterios
    * @param {Object} criteria - Criterios de búsqueda
