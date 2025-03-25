@@ -24,6 +24,7 @@
         "dotenv": "^16.4.7",
         "express": "^4.21.2",
         "facturapi": "^4.6.0",
+        "form-data": "^4.0.2",
         "moment-timezone": "^0.5.45",
         "pino": "^8.17.0",
         "pino-pretty": "^10.3.1",

@@ -1,4 +1,4 @@
-// bot/index.js - ALTERNATIVA
+// bot/index.js
 import { Telegraf } from 'telegraf';
 import { config } from '../config/index.js';
 import { sessionMiddleware } from '../core/auth/session.service.js';
@@ -11,6 +11,8 @@ import { registerClientHandler } from './handlers/client.handler.js';
 import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
+import { registerProductionSetupHandler } from './handlers/production-setup.handler.js'; 
+import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
 
 export function createBot(logger) {
   // Verificar que el token está configurado
@@ -46,14 +48,18 @@ export function createBot(logger) {
     ctx.reply('❌ Ha ocurrido un error inesperado. Por favor, intenta de nuevo más tarde.');
   });
   
+  // Registrar los handlers de prueba primero (para diagnóstico)
+  registerTestHandlers(bot);
+  
   // Registrar todos los comandos
   registerAllCommands(bot);
-  
-  // Registrar cada handler individualmente
+
+  // Registrar handlers en orden: primero los específicos, último el de producción
   registerClientHandler(bot);
   registerInvoiceHandler(bot);
-  registerChubbHandler(bot);
+  registerChubbHandler(bot);         // Ahora antes del Production
   registerOnboardingHandler(bot);
+  registerProductionSetupHandler(bot); // Este debe ser el último
   
   logger.info('Bot configurado correctamente');
   return bot;

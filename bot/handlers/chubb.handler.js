@@ -168,17 +168,27 @@ export function registerChubbHandler(bot) {
   });
 
   // Manejar la recepción del archivo Excel
-  bot.on('document', async (ctx) => {
+  // Manejar la recepción del archivo Excel
+  bot.on('document', async (ctx, next) => {
+    console.log('=========== INICIO HANDLER CHUBB EXCEL ===========');
+    console.log('Documento recibido:', ctx.message.document.file_name);
+    console.log('Estado esperando:', ctx.userState?.esperando);
+    
     // Solo procesar si estamos esperando un archivo Excel para CHUBB
     if (!ctx.userState || ctx.userState.esperando !== 'archivo_excel_chubb') {
-      return;
+      console.log('No estamos esperando archivo Excel para CHUBB, pasando al siguiente handler');
+      console.log('=========== FIN HANDLER CHUBB EXCEL (PASANDO) ===========');
+      return next();
     }
 
     const document = ctx.message.document;
     
     // Verificar que sea un archivo Excel
     if (!document.file_name.match(/\.(xlsx|xls)$/i)) {
-      return ctx.reply('❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.');
+      console.log('Documento no es Excel, informando al usuario');
+      await ctx.reply('❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.');
+      console.log('=========== FIN HANDLER CHUBB EXCEL (NO ES EXCEL) ===========');
+      return; // No pasamos al siguiente handler porque es nuestro contexto pero formato incorrecto
     }
 
     await ctx.reply('⏳ Recibiendo archivo, por favor espere...');
@@ -208,10 +218,13 @@ export function registerChubbHandler(bot) {
         ctx.userState.esperando = null;
       }
       
+      console.log('=========== FIN HANDLER CHUBB EXCEL (PROCESADO) ===========');
+      
     } catch (error) {
       console.error('Error al procesar el archivo Excel:', error);
       ctx.reply(`❌ Error al procesar el archivo: ${error.message}`);
       ctx.userState.esperando = null;
+      console.log('=========== FIN HANDLER CHUBB EXCEL (ERROR) ===========');
     }
   });
 }
