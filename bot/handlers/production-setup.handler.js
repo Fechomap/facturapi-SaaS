@@ -476,6 +476,27 @@ export function registerProductionSetupHandler(bot) {
         }
       });
       
+      // NUEVA SECCIÓN: Eliminar los clientes existentes y volver a crearlos con la API key de producción
+      await ctx.reply('⏳ Reconfigurando clientes con tu nueva API key de producción...');
+      
+      try {
+        // 1. Eliminar todos los clientes actuales del tenant
+        await prisma.tenantCustomer.deleteMany({
+          where: { tenantId }
+        });
+        
+        // 2. Volver a configurar los clientes con la nueva API key
+        const CustomerSetupService = await import('../../services/customer-setup.service.js');
+        const setupResults = await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+        
+        // 3. Contar éxitos para informar al usuario
+        const successCount = setupResults.filter(r => r.success).length;
+        await ctx.reply(`✅ Se han configurado ${successCount} clientes con tu nueva API de producción.`);
+      } catch (clientError) {
+        console.error('Error al reconfigurar clientes:', clientError);
+        await ctx.reply('⚠️ Se produjo un error al configurar los clientes. Por favor, configúralos manualmente desde el menú.');
+      }
+      
       await ctx.reply(
         '🎉 *¡Felicidades!* Tu cuenta ha sido configurada correctamente para facturación real.\n\n' +
         'Ahora puedes emitir facturas válidas ante el SAT.\n\n' +
