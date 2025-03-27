@@ -90,22 +90,23 @@ class InvoiceService {
         use: "G03",
         payment_form: "99",
         payment_method: "PPD",
-        folio_number: folio
+
       };
       
       console.log('Enviando solicitud a FacturAPI para crear factura:', facturaData);
       
       // Llamar a FacturAPI para crear la factura
       const factura = await facturapi.invoices.create(facturaData);
-      
+
       console.log('Factura creada en FacturAPI:', factura.id);
+      console.log('Folio asignado por FacturAPI:', factura.folio_number); // Logging para verificar
       
-      // Registrar la factura en la base de datos
+      // Registrar la factura en la base de datos con el folio asignado por FacturAPI
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
         factura.series,
-        factura.folio_number,
+        factura.folio_number, // Usar el folio devuelto por FacturAPI
         null, // customerId (en un caso real se obtendría)
         factura.total,
         data.userId || null

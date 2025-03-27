@@ -616,26 +616,22 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     const facturapi = await facturapIService.getFacturapiClient(tenantId);
     console.log('Cliente FacturAPI obtenido correctamente');
     
-    // Obtener el siguiente folio disponible
+    // Obtenemos el TenantService pero NO solicitamos ni asignamos el folio
     const TenantService = await import('../../services/tenant.service.js').then(m => m.default);
-    const folio = await TenantService.getNextFolio(tenantId, 'A');
-    
-    // Asignar el folio explícitamente
-    facturaData.folio_number = folio;
     
     console.log('Enviando solicitud a FacturAPI con datos:', JSON.stringify(facturaData, null, 2));
     
-    // Crear la factura directamente en FacturAPI
+    // Crear la factura directamente en FacturAPI (sin enviar folio)
     const factura = await facturapi.invoices.create(facturaData);
-    console.log('Factura creada en FacturAPI:', factura);
+    console.log('Factura creada en FacturAPI, folio asignado automáticamente:', factura.folio_number);
     
-    // Registrar la factura en la base de datos
+    // Registrar la factura en la base de datos con el folio devuelto por FacturAPI
     try {
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
         factura.series || 'A',
-        factura.folio_number,
+        factura.folio_number, // Usamos el folio que FacturAPI asignó
         null, // customerId, podríamos buscar el ID del cliente en la base de datos si es necesario
         factura.total,
         ctx.from?.id ? BigInt(ctx.from.id) : null // ID del usuario que creó la factura
