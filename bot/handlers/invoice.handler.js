@@ -57,8 +57,12 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   const clienteStr = clienteNombre || 'Cliente';
   const folioStr = folio || 'unknown';
 
-  // Por ejemplo: "Cliente-818.pdf"
-  const filePath = `${tempDir}/A${folioStr}.${formato}`;
+  // Intentar obtener la serie del estado del usuario
+  const series = ctx.userState?.series || 'A'; // 'A' como fallback
+  console.log(`Serie utilizada para el archivo: ${series}`);
+  
+  // Construir el nombre del archivo con la serie correcta
+  const filePath = `${tempDir}/${series}${folioStr}.${formato}`;
   console.log('Creando archivo temporal en:', filePath);
 
   const writer = fs.createWriteStream(filePath);
@@ -321,6 +325,7 @@ export function registerInvoiceHandler(bot) {
 
       // Guardar datos de la factura generada
       ctx.userState.facturaId = factura.id;
+      ctx.userState.series = factura.series; // Usar el mismo nombre que se usa en descargarFactura
       ctx.userState.folioFactura = factura.folio_number;
       ctx.userState.facturaGenerada = true;
 
@@ -390,10 +395,11 @@ export function registerInvoiceHandler(bot) {
   // Manejador para descargar PDF
   bot.action(/pdf_(.+)_(\d+)/, async (ctx) => {
     const facturaId = ctx.match[1];
-    const folioFactura = ctx.match[2];
+    const folioNumero = ctx.match[2];  // Extraer el número de folio del regex
 
     console.log('Estado del usuario al descargar PDF:', ctx.userState);
     console.log('ID de factura solicitado:', facturaId);
+    console.log('Serie en estado del usuario:', ctx.userState?.series || 'No disponible');
 
     const processId = `pdf_${facturaId}`;
     if (ctx.isProcessActive(processId)) {
@@ -407,7 +413,7 @@ export function registerInvoiceHandler(bot) {
       await ctx.reply('⏳ Descargando PDF, por favor espere...');
 
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
-      const filePath = await descargarFactura(facturaId, 'pdf', folioFactura, clienteStr, ctx);
+      const filePath = await descargarFactura(facturaId, 'pdf', folioNumero, clienteStr, ctx);
 
       if (fs.existsSync(filePath)) {
         await ctx.replyWithDocument({ source: filePath });
@@ -434,10 +440,11 @@ export function registerInvoiceHandler(bot) {
   // Manejador para descargar XML
   bot.action(/xml_(.+)_(\d+)/, async (ctx) => {
     const facturaId = ctx.match[1];
-    const folioFactura = ctx.match[2];
+    const folioNumero = ctx.match[2];  // Extraer el número de folio del regex
 
     console.log('Estado del usuario al descargar XML:', ctx.userState);
     console.log('ID de factura solicitado:', facturaId);
+    console.log('Serie en estado del usuario:', ctx.userState?.series || 'No disponible');
 
     const processId = `xml_${facturaId}`;
     if (ctx.isProcessActive(processId)) {
@@ -451,7 +458,7 @@ export function registerInvoiceHandler(bot) {
       await ctx.reply('⏳ Descargando XML, por favor espere...');
 
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
-      const filePath = await descargarFactura(facturaId, 'xml', folioFactura, clienteStr, ctx);
+      const filePath = await descargarFactura(facturaId, 'xml', folioNumero, clienteStr, ctx);
 
       if (fs.existsSync(filePath)) {
         await ctx.replyWithDocument({ source: filePath });
