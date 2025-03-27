@@ -485,11 +485,50 @@ export function registerProductionSetupHandler(bot) {
           where: { tenantId }
         });
         
-        // 2. Volver a configurar los clientes con la nueva API key
+        // 2. AÑADIR ESTE BLOQUE: Eliminar facturas y documentos asociados
+        await ctx.reply('⏳ Eliminando facturas y documentos de prueba...');
+        
+        // Obtener IDs de todas las facturas del tenant
+        const facturas = await prisma.tenantInvoice.findMany({
+          where: { tenantId },
+          select: { id: true }
+        });
+        
+        const facturaIds = facturas.map(f => f.id);
+        
+        // Eliminar documentos asociados a estas facturas
+        if (facturaIds.length > 0) {
+          await prisma.tenantDocument.deleteMany({
+            where: {
+              invoiceId: { in: facturaIds }
+            }
+          });
+        }
+        
+        // Eliminar las facturas
+        const deletedInvoices = await prisma.tenantInvoice.deleteMany({
+          where: { tenantId }
+        });
+        
+        // Resetear el contador de folios
+        await prisma.tenantFolio.updateMany({
+          where: { tenantId },
+          data: { currentNumber: 800 } // Reiniciar al valor inicial
+        });
+        
+        // Resetear el contador de facturas usadas
+        await prisma.tenantSubscription.updateMany({
+          where: { tenantId },
+          data: { invoicesUsed: 0 } // Reiniciar a 0 el contador de facturas
+        });
+        
+        console.log(`Se eliminaron ${deletedInvoices.count} facturas de prueba para el tenant ${tenantId}`);
+        
+        // 3. Volver a configurar los clientes con la nueva API key
         const CustomerSetupService = await import('../../services/customer-setup.service.js');
         const setupResults = await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
         
-        // 3. Contar éxitos para informar al usuario
+        // 4. Contar éxitos para informar al usuario
         const successCount = setupResults.filter(r => r.success).length;
         await ctx.reply(`✅ Se han configurado ${successCount} clientes con tu nueva API de producción.`);
       } catch (clientError) {

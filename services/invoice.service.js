@@ -111,41 +111,6 @@ class InvoiceService {
         data.userId || null
       );
       
-      // FORZAR el incremento directamente para mayor seguridad
-      console.log('Realizando incremento forzado del contador...');
-      try {
-        // Buscar la suscripción activa
-        const subscription = await prisma.tenantSubscription.findFirst({
-          where: {
-            tenantId,
-            OR: [
-              { status: 'active' },
-              { status: 'trial' }
-            ]
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        });
-        
-        if (!subscription) {
-          console.error('No se encontró suscripción activa para incrementar contador');
-        } else {
-          // Incrementar el contador directamente
-          const updated = await prisma.tenantSubscription.update({
-            where: { id: subscription.id },
-            data: {
-              invoicesUsed: {
-                increment: 1
-              }
-            }
-          });
-          console.log('Contador incrementado correctamente:', updated.invoicesUsed);
-        }
-      } catch (incrementError) {
-        console.error('Error al incrementar contador:', incrementError);
-      }
-      
       return factura;
     } catch (error) {
       console.error('Error al crear factura en FacturAPI:', error);
