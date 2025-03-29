@@ -6,6 +6,8 @@ import logger from './core/utils/logger.js';
 import routes from './api/routes/index.js';
 import tenantMiddleware from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
+import { startJobs } from './jobs/index.js';
+import NotificationService from './services/notification.service.js';
 
 // Logger específico para el servidor
 const serverLogger = logger.child({ module: 'server' });
@@ -64,6 +66,18 @@ async function startServer() {
       serverLogger.info(`Entorno: ${config.env}`);
       serverLogger.info(`API de Facturación SaaS lista y funcionando`);
       serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
+      
+      // Inicializar servicio de notificaciones
+      const notificationInitialized = NotificationService.initialize();
+      if (notificationInitialized) {
+        serverLogger.info('Servicio de notificaciones inicializado correctamente');
+      } else {
+        serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
+      }
+      
+      // Iniciar sistema de jobs programados
+      startJobs();
+      serverLogger.info('Sistema de jobs programados iniciado');
     });
   } catch (error) {
     serverLogger.error({ error }, 'Error al iniciar el servidor');

@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Rutas para webhooks
 router.post('/stripe', webhookController.handleStripeWebhook);
+router.post('/facturapi', webhookController.handleFacturapiWebhook);
 router.post('/:source', webhookController.handleGenericWebhook);
 
 export default router;

@@ -10,11 +10,11 @@ import tenantMiddleware from './middlewares/tenant.middleware.js';
  * @param {Object} options - Opciones de configuración
  */
 function setupAPI(app, options = {}) {
-  // Registrar middleware de parsing de JSON
-  app.use(express.json());
+  // Configuración especial para webhooks que necesitan el cuerpo raw
+  app.use(['/api/webhooks/stripe', '/api/webhooks/facturapi'], express.raw({ type: 'application/json' }));
   
-  // Configuración especial para webhooks de Stripe (necesita el cuerpo raw)
-  app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+  // Registrar middleware de parsing de JSON para las demás rutas
+  app.use(express.json());
   
   // Middleware para extraer información de tenant
   app.use('/api', tenantMiddleware);

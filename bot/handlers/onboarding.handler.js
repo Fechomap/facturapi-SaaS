@@ -6,7 +6,8 @@ import { config } from '../../config/index.js';
 import { encryptApiKey } from '../../core/utils/encryption.js';
 import TenantService from '../../core/tenant/tenant.service.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
-
+import OnboardingProgressService from '../../services/onboarding-progress.service.js';
+import { OnboardingSteps } from '../../services/onboarding-progress.service.js';
 
 // Estados del proceso de registro
 const RegistrationState = {
@@ -854,6 +855,167 @@ export function registerOnboardingHandler(bot) {
       );
     } catch (error) {
       console.error('Error al cancelar registro:', error);
+    }
+  });
+
+    // Acción para verificar y completar pasos de onboarding
+  bot.action('verify_onboarding_steps', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    if (!ctx.hasTenant()) {
+      return ctx.reply('Para verificar tu progreso, primero debes registrar tu empresa.');
+    }
+    
+    try {
+      const tenantId = ctx.getTenantId();
+      
+      // Comprobar el estado actual del onboarding
+      await ctx.reply('⏳ Verificando tu progreso de configuración...');
+      
+      // Verificar que tenga clientes configurados
+      const hasCustomers = await CustomerSetupService.hasConfiguredCustomers(tenantId);
+      
+      if (hasCustomers) {
+        // Marcar el paso de clientes como completado
+        await OnboardingProgressService.updateProgress(
+          tenantId, 
+          OnboardingSteps.CLIENTS_CONFIGURED,
+          { source: 'verification' }
+        );
+        
+        await ctx.reply('✅ Verificación completada: Tienes clientes configurados correctamente.');
+      } else {
+        await ctx.reply(
+          '⚠️ No tienes clientes configurados. Para completar este paso, usa la opción "Configurar Clientes" en el menú principal.'
+        );
+      }
+      
+      // Verificar si tiene API key de prueba configurada
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          facturapiApiKey: true,
+          facturapiEnv: true
+        }
+      });
+      
+      if (tenant && tenant.facturapiApiKey) {
+        if (tenant.facturapiEnv === 'test') {
+          // Marcar el paso de API key de prueba como completado
+          await OnboardingProgressService.updateProgress(
+            tenantId, 
+            OnboardingSteps.TEST_API_KEY_CONFIGURED,
+            { source: 'verification' }
+          );
+          
+          await ctx.reply('✅ Verificación completada: Tienes API key de prueba configurada correctamente.');
+        } else if (tenant.facturapiEnv === 'production') {
+          // Marcar ambos pasos de API key como completados
+          await OnboardingProgressService.updateProgress(
+            tenantId, 
+            OnboardingSteps.TEST_API_KEY_CONFIGURED,
+            { source: 'verification' }
+          );
+          
+          await OnboardingProgressService.updateProgress(
+            tenantId, 
+            OnboardingSteps.LIVE_API_KEY_CONFIGURED,
+            { source: 'verification' }
+          );
+          
+          await ctx.reply('✅ Verificación completada: Tienes API key de producción configurada correctamente.');
+        }
+      } else {
+        await ctx.reply(
+          '⚠️ No tienes una API key configurada. Para completar este paso, necesitas configurar tu certificado (CSD).'
+        );
+      }
+      
+      // Obtener el progreso actualizado
+      const progress = await OnboardingProgressService.getProgress(tenantId);
+      
+      // Mostrar el resumen del progreso
+      const completedCount = progress.completedSteps.length;
+      const totalRequired = progress.pendingSteps.length + completedCount;
+      const percentage = Math.round((completedCount / totalRequired) * 100);
+      
+      await ctx.reply(
+        `📊 *Resumen de progreso*\n\n` +
+        `Progreso total: ${percentage}% (${completedCount}/${totalRequired} pasos completados)\n\n` +
+        `Para ver el detalle completo de tu progreso, usa el comando /progreso`,
+        { 
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📋 Ver Progreso Detallado', 'view_onboarding_progress')],
+            [Markup.button.callback('🔄 Ver Siguiente Paso', 'next_step')],
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ])
+        }
+      );
+    } catch (error) {
+      console.error('Error al verificar progreso de onboarding:', error);
+      await ctx.reply(
+        '❌ Ocurrió un error al verificar tu progreso. Por favor, intenta nuevamente más tarde.'
+      );
+    }
+  });
+
+    // Acción para iniciar configuración de clientes desde el flujo de onboarding
+  bot.action('onboarding_configure_clients', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    if (!ctx.hasTenant()) {
+      return ctx.reply('Para configurar clientes, primero debes registrar tu empresa.');
+    }
+    
+    try {
+      const tenantId = ctx.getTenantId();
+      
+      await ctx.reply('⏳ Iniciando configuración automática de clientes predefinidos...');
+      
+      // Llamar al servicio para configurar clientes
+      const results = await CustomerSetupService.setupPredefinedCustomers(tenantId, true);
+      
+      // Contar éxitos y fallos
+      const successCount = results.filter(r => r.success).length;
+      const failCount = results.length - successCount;
+      
+      if (successCount > 0) {
+        // Marcar el paso como completado
+        await OnboardingProgressService.updateProgress(
+          tenantId, 
+          OnboardingSteps.CLIENTS_CONFIGURED,
+          { 
+            source: 'automatic_setup',
+            successCount
+          }
+        );
+        
+        await ctx.reply(
+          `✅ Configuración completada exitosamente.\n\n` +
+          `• Clientes configurados: ${successCount}\n` +
+          `• Clientes con error: ${failCount}\n\n` +
+          `Ya puedes empezar a generar facturas para estos clientes.`,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('📋 Ver Progreso', 'view_onboarding_progress')],
+            [Markup.button.callback('🔄 Ver Siguiente Paso', 'next_step')],
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ])
+        );
+      } else {
+        await ctx.reply(
+          `⚠️ No se pudo configurar ningún cliente automáticamente.\n\n` +
+          `Por favor, verifica que tu API key esté configurada correctamente e intenta nuevamente.`,
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ])
+        );
+      }
+    } catch (error) {
+      console.error('Error al configurar clientes:', error);
+      await ctx.reply(
+        '❌ Ocurrió un error durante la configuración de clientes. Por favor, intenta nuevamente más tarde.'
+      );
     }
   });
 }

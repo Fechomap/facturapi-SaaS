@@ -6,10 +6,23 @@ import { Markup } from 'telegraf';
  */
 export function mainMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('Generar Factura', 'menu_generar')],
-    [Markup.button.callback('Consultar Factura', 'menu_consultar')],
-    [Markup.button.callback('Mi Suscripción', 'menu_suscripcion')],
+    [Markup.button.callback('📝 Generar Factura', 'menu_generar')],
+    [Markup.button.callback('🔍 Consultar Factura', 'menu_consultar')],
+    [Markup.button.callback('📊 Reportes', 'menu_reportes')], // Nueva opción
+    [Markup.button.callback('💳 Mi Suscripción', 'menu_suscripcion')],
     [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')]
+  ]);
+}
+
+/**
+ * Genera el menú de reportes
+ */
+export function reportsMenu() {
+  return Markup.inlineKeyboard([
+    [Markup.button.callback('📈 Reporte de Facturación', 'reporte_facturas_action')],
+    [Markup.button.callback('💰 Reporte de Suscripción', 'reporte_suscripcion_action')],
+    [Markup.button.callback('🔄 Estado de Progreso', 'view_onboarding_progress')],
+    [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
   ]);
 }
 

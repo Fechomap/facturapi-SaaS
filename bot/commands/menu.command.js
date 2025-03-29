@@ -68,4 +68,38 @@ export function registerMenuCommand(bot) {
     
     ctx.reply('Seleccione una opción:', mainMenu());
   });
+
+  bot.action('menu_reportes', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    if (!ctx.hasTenant()) {
+      return ctx.reply(
+        'Para ver reportes, primero debes registrar tu empresa.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📝 Registrar empresa', 'start_registration')]
+        ])
+      );
+    }
+    
+    await ctx.reply(
+      '📊 *Reportes y Análisis*\n\n' +
+      'Selecciona el tipo de reporte que deseas consultar:',
+      {
+        parse_mode: 'Markdown',
+        ...reportsMenu()
+      }
+    );
+  });
+  
+  // Acción para generar reporte de facturas
+  bot.action('reporte_facturas_action', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_facturas');
+  });
+  
+  // Acción para generar reporte de suscripción
+  bot.action('reporte_suscripcion_action', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_suscripcion');
+  });
 }

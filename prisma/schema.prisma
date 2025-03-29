@@ -43,6 +43,7 @@ model Tenant {
   documents               TenantDocument[]
   folios                  TenantFolio[]
   invoices                TenantInvoice[]
+  notifications           Notification[]
   payments                TenantPayment[]
   settings                TenantSetting[]
   subscriptions           TenantSubscription[]
@@ -222,4 +223,22 @@ model UserSession {
 
   @@index([telegramId])
   @@map("user_sessions")
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  recipientId String   @map("recipient_id") @db.VarChar(100)
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  channel     String   @db.VarChar(20)
+  message     String
+  status      String   @db.VarChar(20)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notifications")
 }

@@ -428,6 +428,165 @@ async function handleSubscriptionDeleted(subscription) {
 }
 
 /**
+ * Crea un sistema de recordatorios para pagos
+ * @param {string} subscriptionId - ID de la suscripción en Stripe
+ * @param {string} customerId - ID del cliente en Stripe
+ * @returns {Promise<Object>} - Resultado de la operación
+ */
+export async function setupPaymentReminders(subscriptionId, customerId, secretKey) {
+  const stripe = getStripeClient(secretKey);
+  
+  try {
+    // Obtener la suscripción actual
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    
+    // Configurar recordatorios de pago para facturas
+    await stripe.subscriptions.update(subscriptionId, {
+      collection_method: 'send_invoice',
+      days_until_due: 30, // Dar 30 días para pagar
+      metadata: {
+        reminders_enabled: 'true',
+        retry_attempts: '3'
+      }
+    });
+    
+    // Configurar recordatorios por correo electrónico
+    // En un caso real, aquí configurarías las plantillas y programación de correos
+    
+    return {
+      success: true,
+      message: 'Sistema de recordatorios configurado correctamente'
+    };
+  } catch (error) {
+    console.error('Error al configurar recordatorios de pago:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Actualiza el estado de una suscripción en nuestra base de datos
+ * @param {string} tenantId - ID del tenant
+ * @param {string} stripeSubscriptionId - ID de la suscripción en Stripe
+ * @param {string} status - Nuevo estado
+ * @returns {Promise<Object>} - Suscripción actualizada
+ */
+export async function updateSubscriptionStatus(tenantId, stripeSubscriptionId, status) {
+  try {
+    // Buscar la suscripción en nuestra base de datos
+    const subscription = await prisma.tenantSubscription.findFirst({
+      where: {
+        tenantId,
+        stripeSubscriptionId
+      }
+    });
+    
+    if (!subscription) {
+      throw new Error(`No se encontró la suscripción ${stripeSubscriptionId} para el tenant ${tenantId}`);
+    }
+    
+    // Actualizar el estado
+    const updatedSubscription = await prisma.tenantSubscription.update({
+      where: {
+        id: subscription.id
+      },
+      data: {
+        status
+      }
+    });
+    
+    // Si el estado es 'suspended', restringir algunas funcionalidades
+    if (status === 'suspended') {
+      // Aquí podríamos actualizar alguna configuración del tenant para limitar funcionalidad
+      await prisma.tenant.update({
+        where: {
+          id: tenantId
+        },
+        data: {
+          isActive: false
+        }
+      });
+    } else if (status === 'active' && !subscription.tenant.isActive) {
+      // Reactivar el tenant si estaba desactivado
+      await prisma.tenant.update({
+        where: {
+          id: tenantId
+        },
+        data: {
+          isActive: true
+        }
+      });
+    }
+    
+    return updatedSubscription;
+  } catch (error) {
+    console.error(`Error al actualizar estado de suscripción ${stripeSubscriptionId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Maneja el evento de recuperación de pago después de intentos fallidos
+ * @param {Object} invoice - Objeto de factura de Stripe
+ * @returns {Promise<Object>} - Resultado del manejo
+ */
+export async function handlePaymentRecovery(invoice) {
+  if (!invoice.subscription) {
+    return { success: true, action: 'ignored', reason: 'no_subscription' };
+  }
+  
+  try {
+    // Buscar la suscripción en nuestra BD
+    const subscription = await prisma.tenantSubscription.findFirst({
+      where: {
+        stripeSubscriptionId: invoice.subscription
+      },
+      include: {
+        tenant: true
+      }
+    });
+    
+    if (!subscription) {
+      return { success: false, error: 'Suscripción no encontrada' };
+    }
+    
+    // Si estaba en estado de pago pendiente, actualizarla a activa
+    if (subscription.status === 'payment_pending') {
+      await updateSubscriptionStatus(
+        subscription.tenantId, 
+        subscription.stripeSubscriptionId, 
+        'active'
+      );
+      
+      // Enviar notificación de recuperación de pago
+      await NotificationService.notifyTenantAdmins(
+        subscription.tenantId,
+        `✅ *Pago Recuperado*\n\n` +
+        `Nos complace informarle que su pago pendiente ha sido procesado exitosamente. Su suscripción ha sido reactivada.\n\n` +
+        `Monto: $${invoice.amount_paid / 100} ${invoice.currency.toUpperCase()}\n` +
+        `Fecha: ${new Date().toISOString().split('T')[0]}`
+      );
+      
+      return { 
+        success: true, 
+        action: 'payment_recovered', 
+        tenantId: subscription.tenantId,
+        subscriptionId: subscription.id,
+        notifyAdmins: true,
+        details: 'Pago recuperado después de intentos fallidos'
+      };
+    }
+    
+    return { success: true, action: 'no_action_needed' };
+  } catch (error) {
+    console.error('Error al manejar recuperación de pago:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Maneja evento de pago exitoso de factura
  * @param {Object} invoice - Objeto de factura de Stripe
  * @returns {Promise<Object>} - Resultado del manejo
@@ -472,6 +631,11 @@ async function handleInvoicePaymentSucceeded(invoice) {
           updatedAt: new Date()
         }
       });
+    }
+
+    if (subscription.status === 'payment_pending') {
+      const recoveryResult = await handlePaymentRecovery(invoice);
+      return recoveryResult;
     }
     
     return { 

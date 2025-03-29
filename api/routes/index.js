@@ -1,9 +1,10 @@
-// api/routes/index.js
+// api/routes/index.js (actualización)
 import express from 'express';
 import clientRoutes from './client.routes.js';
 import invoiceRoutes from './invoice.routes.js';
 import productRoutes from './product.routes.js';
 import webhookRoutes from './webhook.routes.js';
+import authRoutes from './auth.routes.js'; // Añadir rutas de autenticación
 
 const router = express.Router();
 
@@ -17,6 +18,7 @@ router.get('/', (req, res) => {
 });
 
 // Registrar todas las rutas bajo sus respectivos prefijos
+router.use('/auth', authRoutes); // Añadir rutas de autenticación
 router.use('/clientes', clientRoutes);
 router.use('/facturas', invoiceRoutes);
 router.use('/productos', productRoutes);
