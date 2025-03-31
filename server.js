@@ -58,7 +58,7 @@ async function startServer() {
     const app = await initializeApp();
     
     // Puerto de la aplicación desde la configuración centralizada
-    const PORT = config.port;
+    const PORT = process.env.PORT || config.port || 3000;
     
     // Iniciar el servidor
     app.listen(PORT, () => {
