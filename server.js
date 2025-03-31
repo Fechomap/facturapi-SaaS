@@ -8,6 +8,12 @@ import tenantMiddleware from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
 import { startJobs } from './jobs/index.js';
 import NotificationService from './services/notification.service.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Definir __dirname para módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Logger específico para el servidor
 const serverLogger = logger.child({ module: 'server' });
@@ -32,13 +38,25 @@ async function initializeApp() {
   // Registrar todas las rutas bajo el prefijo /api
   app.use('/api', routes);
   
-  // Ruta principal para probar que el servidor está funcionando
-  app.get('/', (req, res) => {
+  // Configuración para servir archivos estáticos del frontend
+  const frontendPath = path.join(__dirname, 'frontend/build');
+  app.use(express.static(frontendPath));
+  
+  // Ruta API para información básica
+  app.get('/api/info', (req, res) => {
     res.json({
       status: 'API de Facturación activa - FacturAPI SaaS',
       environment: config.env,
       version: '1.0.0'
     });
+  });
+  
+  // Cualquier otra ruta que no sea de API sirve el frontend
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendPath, 'index.html'));
   });
   
   // Middleware para manejo de errores
@@ -66,6 +84,7 @@ async function startServer() {
       serverLogger.info(`Entorno: ${config.env}`);
       serverLogger.info(`API de Facturación SaaS lista y funcionando`);
       serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
+      serverLogger.info(`Frontend disponible en http://localhost:${PORT}`);
       
       // Inicializar servicio de notificaciones
       const notificationInitialized = NotificationService.initialize();
