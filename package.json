@@ -16,7 +16,7 @@
         "studio": "prisma studio",
         "lint": "eslint .",
         "format": "prettier --write .",
-        "heroku-postbuild": "prisma generate",
+        "heroku-postbuild": "prisma generate && cd frontend && npm install && npm run build",
         "init-db": "node scripts/init-db.js"
     },
     "dependencies": {
