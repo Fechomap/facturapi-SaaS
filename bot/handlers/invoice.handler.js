@@ -10,6 +10,8 @@ import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import { clientSelectionMenu } from '../views/menu.view.js';
+import prisma from '../../lib/prisma.js';
+
 
 // Motivos de cancelación del SAT para referencia
 const MOTIVOS_CANCELACION = {
