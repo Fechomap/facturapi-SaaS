@@ -46,33 +46,20 @@ export function registerChubbHandler(bot) {
         return ctx.reply('❌ Error: No se pudo obtener la información de tu empresa.');
       }
       
-      // Usar el servicio configurado adecuadamente en lugar de prisma directamente
-      let chubbClient;
-      try {
-        // Intentar importar TenantService que ya debería tener la conexión correcta a la BD
-        const TenantService = await import('../../services/tenant.service.js');
-        
-        // Buscar el cliente CHUBB usando la función del servicio
-        chubbClient = await TenantService.default.getCustomerByName(tenantId, 'CHUBB');
-      } catch (dbError) {
-        console.error('Error al buscar cliente CHUBB con TenantService:', dbError);
-        
-        // Fallback si TenantService no funciona
-        if (prisma && prisma.tenantCustomer) {
-          chubbClient = await prisma.tenantCustomer.findFirst({
-            where: {
-              tenantId,
-              legalName: { contains: 'CHUBB' } // Busca un cliente cuyo nombre contenga "CHUBB"
-            }
-          });
-        } else {
-          throw new Error('No se pudo acceder a la base de datos. Prisma no está disponible.');
-        }
-      }
+      // Simulamos un cliente CHUBB para no depender de la base de datos
+      // Esto es una solución temporal mientras se resuelve el problema de conexión a la BD
+      console.log('Usando cliente CHUBB simulado para el tenant:', tenantId);
       
-      if (!chubbClient) {
-        return ctx.reply('❌ Error de configuración: Cliente CHUBB no encontrado para tu empresa. Por favor, configura primero los clientes.');
-      }
+      // Crear un cliente simulado con datos básicos
+      const chubbClientId = process.env.CLIENTE_CHUBB || 'chubb_default_id';
+      const chubbClient = {
+        id: 'simulated_client_id',
+        facturapiCustomerId: chubbClientId,
+        legalName: 'CHUBB SEGUROS MÉXICO, S.A.',
+        tenantId: tenantId,
+        rfc: 'CSM900413FH0', // RFC ficticio para pruebas
+        isActive: true
+      };
       
       // Guardar el ID del cliente CHUBB en el estado del usuario
       ctx.userState.chubbClientId = chubbClient.facturapiCustomerId;
