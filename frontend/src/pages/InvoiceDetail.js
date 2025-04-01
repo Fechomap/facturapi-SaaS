@@ -1,7 +1,7 @@
 // frontend/src/pages/InvoiceDetail.js
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { invoiceService } from '../services/api.service';
+import { getInvoiceById, downloadInvoicePdf, downloadInvoiceXml, cancelInvoice } from '../services/invoiceService';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -15,8 +15,8 @@ const InvoiceDetail = () => {
     const fetchInvoiceDetails = async () => {
       try {
         setLoading(true);
-        const response = await invoiceService.getInvoiceById(id);
-        setInvoice(response.data);
+        const data = await getInvoiceById(id);
+        setInvoice(data);
       } catch (error) {
         console.error('Error fetching invoice details:', error);
         alert('Error al cargar los detalles de la factura');
@@ -90,6 +90,45 @@ const InvoiceDetail = () => {
               {invoice.status === 'valid' ? 'Vigente' : 
                invoice.status === 'canceled' ? 'Cancelada' : invoice.status}
             </span>
+            <div className="invoice-actions">
+              <button 
+                onClick={() => downloadInvoicePdf(id)}
+                className="btn btn-primary"
+              >
+                Descargar PDF
+              </button>
+              <button 
+                onClick={() => downloadInvoiceXml(id)}
+                className="btn btn-secondary"
+              >
+                Descargar XML
+              </button>
+              {invoice.status === 'valid' && (
+                <button 
+                  onClick={() => {
+                    if (window.confirm('¿Estás seguro de cancelar esta factura? Esta acción no se puede deshacer.')) {
+                      const motive = prompt('Ingrese el motivo de cancelación (01, 02, 03 o 04):');
+                      if (motive && ['01', '02', '03', '04'].includes(motive)) {
+                        cancelInvoice(id, motive)
+                          .then(() => {
+                            alert('Factura cancelada correctamente');
+                            // Refrescar datos
+                            getInvoiceById(id).then(data => setInvoice(data));
+                          })
+                          .catch(error => {
+                            alert(`Error al cancelar la factura: ${error.message}`);
+                          });
+                      } else if (motive) {
+                        alert('Motivo inválido. Debe ser 01, 02, 03 o 04.');
+                      }
+                    }
+                  }}
+                  className="btn btn-danger"
+                >
+                  Cancelar Factura
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="invoice-content">
