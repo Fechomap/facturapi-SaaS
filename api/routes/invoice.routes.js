@@ -13,8 +13,8 @@ router.get('/', requireTenant, invoiceController.listInvoices);
 router.get('/:id', requireTenant, invoiceController.getInvoice);
 router.delete('/:id', requireTenant, invoiceController.cancelInvoice);
 router.post('/:id/enviar', requireTenant, invoiceController.sendInvoiceByEmail);
-router.get('/:id/pdf', requireTenant, invoiceController.downloadInvoicePdf); // Añadir requireTenant aquí
-router.get('/:id/xml', requireTenant, invoiceController.downloadInvoiceXml); // Añadir requireTenant aquí
+router.get('/:id/pdf', requireTenant, invoiceController.downloadInvoicePdf);
+router.get('/:id/xml', requireTenant, invoiceController.downloadInvoiceXml);
 router.get('/by-folio/:folio', requireTenant, invoiceController.getInvoiceByFolio);
 router.get('/search', requireTenant, invoiceController.searchInvoices);
 

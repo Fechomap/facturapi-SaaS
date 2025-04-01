@@ -21,7 +21,6 @@ if (!prisma) {
   console.error('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
 }
 
-
 // Constantes para las claves SAT
 const CLAVE_SAT_GRUA_CON_RETENCION = '78101803';
 const CLAVE_SAT_SERVICIOS_SIN_RETENCION = '90121800';
