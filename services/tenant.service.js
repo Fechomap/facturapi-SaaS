@@ -5,6 +5,25 @@ import prisma from '../lib/prisma.js';
  */
 class TenantService {
   /**
+   * Busca un cliente por nombre para un tenant específico
+   * @param {string} tenantId - ID del tenant
+   * @param {string} namePattern - Patrón de nombre a buscar (puede ser parcial)
+   * @returns {Promise<Object>} - Cliente encontrado
+   */
+  static async getCustomerByName(tenantId, namePattern) {
+    try {
+      return await prisma.tenantCustomer.findFirst({
+        where: {
+          tenantId,
+          legalName: { contains: namePattern }
+        }
+      });
+    } catch (error) {
+      console.error(`Error al buscar cliente con nombre ${namePattern} para tenant ${tenantId}:`, error);
+      return null;
+    }
+  }
+  /**
    * Busca un usuario por su ID de Telegram
    * @param {number} telegramId - ID de Telegram del usuario
    * @returns {Promise<Object>} - Usuario encontrado con su tenant
