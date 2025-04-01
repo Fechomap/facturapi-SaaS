@@ -109,7 +109,9 @@ function errorMiddleware(err, req, res, next) {
     
     // Para errores críticos, notificar a administradores si están configurados
     try {
-      if (process.env.NODE_ENV === 'production') {
+      const isHeroku = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
+      // Solo notificar si explícitamente se ha activado la notificación de errores
+      if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || isHeroku) {
         // Crear mensaje de notificación para admins
         const adminMessage = `🚨 *Error Crítico en API*\n\n` +
           `*Tipo:* ${normalizedError.type}\n` +
@@ -145,16 +147,18 @@ function errorMiddleware(err, req, res, next) {
     timestamp: new Date().toISOString()
   };
   
-  // Incluir detalles solo para tipos específicos de errores o en desarrollo
+  // Incluir detalles solo para tipos específicos de errores o en desarrollo/debug
+  const isDebug = process.env.DEBUG_ERRORS === 'true';
   if (normalizedError.details && (
     process.env.NODE_ENV === 'development' || 
+    isDebug ||
     ['ValidationError', 'FacturapiError'].includes(normalizedError.type)
   )) {
     clientResponse.details = normalizedError.details;
   }
   
-  // Incluir stack trace solo en desarrollo
-  if (process.env.NODE_ENV === 'development') {
+  // Incluir stack trace solo en desarrollo o modo debug explícito
+  if (process.env.NODE_ENV === 'development' || isDebug) {
     clientResponse.stack = normalizedError.originalError.stack;
   }
   

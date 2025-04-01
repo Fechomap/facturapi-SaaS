@@ -14,33 +14,42 @@ const configLogger = logger.child({ module: 'config' });
 
 // Determinar el entorno actual
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_HEROKU = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
 
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Cargar el archivo .env correspondiente al entorno
-const envFilePath = path.resolve(__dirname, `../.env.${NODE_ENV}`);
-
-// Verificar si existe el archivo específico del entorno
-if (fs.existsSync(envFilePath)) {
-  configLogger.info(`Cargando variables de entorno desde: .env.${NODE_ENV}`);
-  dotenv.config({ path: envFilePath });
-} else {
-  // Si no existe, cargar el .env normal
-  configLogger.info('Archivo .env específico no encontrado, usando .env por defecto');
+// Cargar variables de entorno
+if (IS_HEROKU) {
+  // En Heroku, las variables se configuran en el dashboard
+  configLogger.info('Detectado entorno Heroku, usando variables de entorno configuradas');
+  // dotenv.config() no es necesario en Heroku, pero lo hacemos por si hay un .env local
   dotenv.config();
+} else {
+  // En entorno local, intentar cargar desde archivos .env específicos
+  const envFilePath = path.resolve(__dirname, `../.env.${NODE_ENV}`);
+  
+  if (fs.existsSync(envFilePath)) {
+    configLogger.info(`Cargando variables de entorno desde: .env.${NODE_ENV}`);
+    dotenv.config({ path: envFilePath });
+  } else {
+    // Si no existe, cargar el .env normal
+    configLogger.info('Archivo .env específico no encontrado, usando .env por defecto');
+    dotenv.config();
+  }
 }
 
 // Función para validar variables de entorno críticas
 const validateEnv = () => {
   const requiredVars = [];
   
-  // Variables comunes requeridas
-  if (NODE_ENV === 'production') {
+  // Variables comunes requeridas - solo verificamos la API key apropiada
+  // según el FACTURAPI_ENV, no según NODE_ENV
+  if (process.env.FACTURAPI_ENV === 'production') {
     requiredVars.push('FACTURAPI_LIVE_KEY');
   } else {
-    // En desarrollo al menos necesitamos la clave de prueba
+    // En modo test de Facturapi necesitamos la clave de prueba
     requiredVars.push('FACTURAPI_TEST_KEY');
   }
   
@@ -60,15 +69,57 @@ const validateEnv = () => {
   
   if (missing.length > 0) {
     configLogger.error(`Variables de entorno requeridas no encontradas: ${missing.join(', ')}`);
-    configLogger.error(`Por favor, configura estas variables en tu archivo .env.${NODE_ENV}`);
+    if (IS_HEROKU) {
+      configLogger.error(`Por favor, configura estas variables en el dashboard de Heroku`);
+    } else {
+      configLogger.error(`Por favor, configura estas variables en tu archivo .env.${NODE_ENV}`);
+    }
     process.exit(1); // Terminar la aplicación
   }
 };
 
+// Normalizar la URL base para evitar problemas de slash al final
+function normalizeBaseUrl(url) {
+  if (!url) return '';
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
+// Determinar la URL base según el entorno
+let apiBaseUrlConfig;
+
+if (IS_HEROKU) {
+  // En Heroku usamos la URL de la aplicación
+  const herokuAppName = process.env.HEROKU_APP_NAME;
+  if (herokuAppName) {
+    apiBaseUrlConfig = `https://${herokuAppName}.herokuapp.com`;
+  } else if (process.env.API_BASE_URL) {
+    // Si no se definió el nombre de la app pero sí la URL base
+    apiBaseUrlConfig = process.env.API_BASE_URL;
+  } else {
+    // Fallback para Heroku si no tenemos ninguno de los anteriores
+    configLogger.warn('No se encontró HEROKU_APP_NAME ni API_BASE_URL, usando valor genérico');
+    apiBaseUrlConfig = 'https://app.herokuapp.com'; // El usuario debería configurar esto
+  }
+  configLogger.info(`Entorno Heroku detectado, usando URL base: ${apiBaseUrlConfig}`);
+} else if (process.env.API_BASE_URL) {
+  // Si existe la variable de entorno en desarrollo, usarla (para casos especiales)
+  apiBaseUrlConfig = process.env.API_BASE_URL;
+  configLogger.info(`Usando API_BASE_URL desde variables de entorno: ${apiBaseUrlConfig}`);
+} else {
+  // URL local basada en el puerto para desarrollo
+  apiBaseUrlConfig = `http://localhost:${process.env.PORT || 3000}`;
+  configLogger.info(`API_BASE_URL no definida, usando URL local: ${apiBaseUrlConfig}`);
+}
+
+// Normalizar la URL base (quitar slash final si existe)
+apiBaseUrlConfig = normalizeBaseUrl(apiBaseUrlConfig);
+configLogger.info(`URL base normalizada: ${apiBaseUrlConfig}`);
+
 // Configuración unificada
 const config = {
-  // Entorno de la aplicación: determina qué variables usar
+  // Entorno de la aplicación y plataforma
   env: NODE_ENV,
+  isHeroku: IS_HEROKU,
   
   // Puerto para el servidor
   port: process.env.PORT || 3000,
@@ -83,7 +134,7 @@ const config = {
   },
   
   // URL base para las solicitudes del bot a la API
-  apiBaseUrl: process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
+  apiBaseUrl: apiBaseUrlConfig,
   
   // IDs de clientes
   clientes: clientesIds,
@@ -103,14 +154,23 @@ const config = {
   
   // Configuración de almacenamiento
   storage: {
-    basePath: path.resolve(__dirname, '../storage'),
+    basePath: IS_HEROKU 
+      ? '/tmp/storage' // En Heroku usamos /tmp porque el filesystem normal es efímero
+      : path.resolve(__dirname, '../storage'),
     maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10)
+  },
+  
+  // Helper para construir URLs de API
+  buildApiUrl: function(path) {
+    const pathWithLeadingSlash = path.startsWith('/') ? path : `/${path}`;
+    return `${this.apiBaseUrl}${pathWithLeadingSlash}`;
   },
   
   // Función para obtener una representación segura de la configuración (sin claves)
   getSafeConfig: function() {
     return {
       env: this.env,
+      isHeroku: this.isHeroku,
       port: this.port,
       apiBaseUrl: this.apiBaseUrl,
       facturapi: {
@@ -135,6 +195,10 @@ const config = {
       database: {
         // No mostrar la URL completa de la base de datos
         url: this.database.url ? 'configurada' : 'no configurada'
+      },
+      storage: {
+        basePath: this.storage.basePath,
+        maxFileSizeMB: this.storage.maxFileSizeMB
       }
     };
   }

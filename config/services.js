@@ -4,16 +4,13 @@ import logger from '../core/utils/logger.js';
 // Logger específico para servicios externos
 const servicesLogger = logger.child({ module: 'external-services' });
 
-// Determinar el entorno actual
-const ENV = process.env.NODE_ENV || 'development';
-const IS_PRODUCTION = ENV === 'production';
-
 // Configuración de FacturAPI
 const facturapiConfig = {
   // Determina si usamos el entorno de producción o pruebas
+  // Esto SOLO depende de la variable FACTURAPI_ENV, no de NODE_ENV
   isProduction: process.env.FACTURAPI_ENV === 'production',
   
-  // Clave API (dependiendo del entorno)
+  // Clave API (dependiendo del entorno FacturAPI)
   apiKey: process.env.FACTURAPI_ENV === 'production'
     ? process.env.FACTURAPI_LIVE_KEY
     : process.env.FACTURAPI_TEST_KEY,
