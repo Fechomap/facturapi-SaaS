@@ -32,6 +32,9 @@ export function registerChubbHandler(bot) {
         return ctx.reply('❌ Error: No se pudo obtener la información de tu empresa.');
       }
       
+      // Importar módulo de prisma
+      const { default: prisma } = await import('../../lib/prisma.js');
+      
       // Buscar el cliente CHUBB en la base de datos para este tenant
       const chubbClient = await prisma.tenantCustomer.findFirst({
         where: {
