@@ -10,7 +10,19 @@ import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import { clientSelectionMenu } from '../views/menu.view.js';
-import prisma from '../../lib/prisma.js';
+
+// Importar prisma de manera segura
+import { prisma as configPrisma } from '../../config/database.js';
+// También intentar importar desde lib
+import libPrisma from '../../lib/prisma.js';
+
+// Usar la instancia que esté disponible
+const prisma = libPrisma || configPrisma;
+
+// Verificación de seguridad
+if (!prisma) {
+  console.error('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
+}
 
 
 // Motivos de cancelación del SAT para referencia
