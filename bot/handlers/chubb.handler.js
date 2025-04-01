@@ -7,6 +7,8 @@ import XLSX from 'xlsx';
 import moment from 'moment-timezone';
 import { config } from '../../config/index.js';
 import { fileURLToPath } from 'url';
+import { PrismaClient } from '@prisma/client';
+
 
 // Constantes para las claves SAT
 const CLAVE_SAT_GRUA_CON_RETENCION = '78101803';
@@ -33,7 +35,7 @@ export function registerChubbHandler(bot) {
       }
       
       // Importar módulo de prisma
-      const { default: prisma } = await import('../../lib/prisma.js');
+      const prisma = new PrismaClient();
       
       // Buscar el cliente CHUBB en la base de datos para este tenant
       const chubbClient = await prisma.tenantCustomer.findFirst({
