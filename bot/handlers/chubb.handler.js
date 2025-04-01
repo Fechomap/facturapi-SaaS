@@ -7,6 +7,7 @@ import XLSX from 'xlsx';
 import moment from 'moment-timezone';
 import { config } from '../../config/index.js';
 import { fileURLToPath } from 'url';
+import prisma from '../../lib/prisma.js';
 
 // Constantes para las claves SAT
 const CLAVE_SAT_GRUA_CON_RETENCION = '78101803';
