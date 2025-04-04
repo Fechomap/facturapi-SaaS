@@ -45,7 +45,6 @@ class TenantService {
             contactName: data.contactName,
             facturapiOrganizationId: data.facturapiOrganizationId,
             facturapiApiKey: facturapiApiKey, // Usar directamente la API key
-            facturapiEnv: data.facturapiEnv || 'test',
             // Crear automáticamente un contador de folios para este tenant
             folios: {
               create: {

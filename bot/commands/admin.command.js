@@ -39,7 +39,7 @@ export function registerAdminCommands(bot) {
         `*ID:* \`${tenant.id}\`\n` +
         `*Nombre:* ${tenant.businessName}\n` +
         `*RFC:* ${tenant.rfc}\n` +
-        `*Entorno:* ${tenant.facturapiEnv}\n` +
+        `*Entorno:* ${tenant.facturapiApiKey && tenant.facturapiApiKey.startsWith('sk_live_') ? 'production' : 'test'}\n` +
         `*Organización:* ${tenant.facturapiOrganizationId || 'No configurada'}\n` +
         `*API Key:* ${tenant.facturapiApiKey ? '✅ Configurada' : '❌ No configurada'}\n\n` +
         `*Suscripción:* ${tenant.subscriptions[0]?.status || 'No tiene'}\n` +
@@ -144,7 +144,9 @@ export function registerAdminCommands(bot) {
         return ctx.reply(`❌ No se encontró tenant con ID: ${tenantId}`);
       }
       
-      if (tenant.facturapiEnv === 'production') {
+      // Verificar si ya está en modo producción basado en el formato de la API key
+      const isLiveKey = tenant.facturapiApiKey && tenant.facturapiApiKey.startsWith('sk_live_');
+      if (isLiveKey) {
         return ctx.reply(`⚠️ El tenant ya está en modo producción. ¿Deseas reconfigurar los clientes?`, 
           Markup.inlineKeyboard([
             [Markup.button.callback('🔄 Reconfigurar Clientes', `admin_reset_customers_${tenantId}`)]
@@ -173,8 +175,7 @@ export function registerAdminCommands(bot) {
       await prisma.tenant.update({
         where: { id: tenantId },
         data: {
-          facturapiApiKey: apiKeyLive,
-          facturapiEnv: 'production'
+          facturapiApiKey: apiKeyLive
         }
       });
       

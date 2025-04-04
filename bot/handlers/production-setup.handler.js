@@ -64,12 +64,21 @@ export function registerProductionSetupHandler(bot) {
         return ctx.reply('❌ No se pudo obtener la información de tu empresa.');
       }
       
-      // Verificar si ya está en modo producción
-      if (tenant.facturapiEnv === 'production') {
-        return ctx.reply(
-          '✅ Tu cuenta ya está configurada en modo producción.\n\n' +
-          'Puedes generar facturas reales.'
-        );
+      // Verificar si ya tiene un certificado configurado
+      // Nota: Ya no verificamos el formato de la API key, solo si tiene un certificado configurado
+      try {
+        const facturapIService = await import('../../services/facturapi.service.js').then(m => m.default);
+        const orgInfo = await facturapIService.getOrganizationInfo(tenantId);
+        
+        if (orgInfo && orgInfo.legal && orgInfo.legal.certificate && orgInfo.legal.certificate.expires_at) {
+          return ctx.reply(
+            '✅ Tu cuenta ya tiene un certificado configurado.\n\n' +
+            'Puedes generar facturas reales.'
+          );
+        }
+      } catch (error) {
+        console.log('Error al verificar certificado:', error);
+        // Continuamos con el proceso si hay error al verificar
       }
       
       // Verificar si tiene suscripción activa
@@ -250,12 +259,21 @@ export function registerProductionSetupHandler(bot) {
         return ctx.reply('❌ No se pudo obtener la información de tu empresa.');
       }
       
-      // Verificar si ya está en modo producción
-      if (tenant.facturapiEnv === 'production') {
-        return ctx.reply(
-          '✅ Tu cuenta ya está configurada en modo producción.\n\n' +
-          'Puedes generar facturas reales.'
-        );
+      // Verificar si ya tiene un certificado configurado
+      // Nota: Ya no verificamos el formato de la API key, solo si tiene un certificado configurado
+      try {
+        const facturapIService = await import('../../services/facturapi.service.js').then(m => m.default);
+        const orgInfo = await facturapIService.getOrganizationInfo(tenantId);
+        
+        if (orgInfo && orgInfo.legal && orgInfo.legal.certificate && orgInfo.legal.certificate.expires_at) {
+          return ctx.reply(
+            '✅ Tu cuenta ya tiene un certificado configurado.\n\n' +
+            'Puedes generar facturas reales.'
+          );
+        }
+      } catch (error) {
+        console.log('Error al verificar certificado:', error);
+        // Continuamos con el proceso si hay error al verificar
       }
       
       // Iniciar el proceso de configuración
@@ -458,8 +476,7 @@ export function registerProductionSetupHandler(bot) {
       await prisma.tenant.update({
         where: { id: tenantId },
         data: {
-          facturapiApiKey: apiKeyLive,
-          facturapiEnv: 'production'
+          facturapiApiKey: apiKeyLive
         }
       });
       

@@ -45,25 +45,60 @@ export function registerChubbHandler(bot) {
         return ctx.reply('❌ Error: No se pudo obtener la información de tu empresa.');
       }
       
-      // Simulamos un cliente CHUBB para no depender de la base de datos
-      // Esto es una solución temporal mientras se resuelve el problema de conexión a la BD
-      console.log('Usando cliente CHUBB simulado para el tenant:', tenantId);
+      // Obtener todos los clientes del tenant
+      console.log('Buscando cliente CHUBB para el tenant:', tenantId);
       
-      // Crear un cliente simulado con datos básicos
-      const chubbClientId = process.env.CLIENTE_CHUBB || 'chubb_default_id';
-      const chubbClient = {
-        id: 'simulated_client_id',
-        facturapiCustomerId: chubbClientId,
-        legalName: 'CHUBB SEGUROS MÉXICO, S.A.',
-        tenantId: tenantId,
-        rfc: 'CSM900413FH0', // RFC ficticio para pruebas
-        isActive: true
-      };
+      // Buscar el cliente CHUBB por nombre en la base de datos
+      const chubbClient = await prisma.tenantCustomer.findFirst({
+        where: {
+          tenantId: tenantId,
+          legalName: {
+            contains: 'CHUBB'
+          },
+          isActive: true
+        }
+      });
       
-      // Guardar el ID del cliente CHUBB en el estado del usuario
-      ctx.userState.chubbClientId = chubbClient.facturapiCustomerId;
-      ctx.userState.clienteNombre = chubbClient.legalName;
-      console.log(`Cliente CHUBB encontrado: ${chubbClient.legalName} (ID: ${chubbClient.facturapiCustomerId})`);
+      if (!chubbClient) {
+        // Si no se encuentra, intentar configurar los clientes predefinidos
+        await ctx.reply('⚠️ No se encontró el cliente CHUBB. Intentando configurar clientes predefinidos...');
+        
+        try {
+          // Importar el servicio de configuración de clientes
+          const CustomerSetupService = await import('../../services/customer-setup.service.js');
+          
+          // Configurar los clientes predefinidos
+          const setupResult = await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+          
+          // Buscar nuevamente el cliente CHUBB
+          const chubbClientAfterSetup = await prisma.tenantCustomer.findFirst({
+            where: {
+              tenantId: tenantId,
+              legalName: {
+                contains: 'CHUBB'
+              },
+              isActive: true
+            }
+          });
+          
+          if (!chubbClientAfterSetup) {
+            return ctx.reply('❌ Error: No se pudo encontrar o configurar el cliente CHUBB. Por favor, contacta al administrador.');
+          }
+          
+          // Usar el cliente recién configurado
+          ctx.userState.chubbClientId = chubbClientAfterSetup.facturapiCustomerId;
+          ctx.userState.clienteNombre = chubbClientAfterSetup.legalName;
+          console.log(`Cliente CHUBB configurado y encontrado: ${chubbClientAfterSetup.legalName} (ID: ${chubbClientAfterSetup.facturapiCustomerId})`);
+        } catch (setupError) {
+          console.error('Error al configurar clientes predefinidos:', setupError);
+          return ctx.reply('❌ Error: No se pudo configurar el cliente CHUBB. Por favor, contacta al administrador.');
+        }
+      } else {
+        // Usar el cliente encontrado
+        ctx.userState.chubbClientId = chubbClient.facturapiCustomerId;
+        ctx.userState.clienteNombre = chubbClient.legalName;
+        console.log(`Cliente CHUBB encontrado: ${chubbClient.legalName} (ID: ${chubbClient.facturapiCustomerId})`);
+      }
       
       // Continuar con el procesamiento normal
       ctx.userState.esperando = 'archivo_excel_chubb';

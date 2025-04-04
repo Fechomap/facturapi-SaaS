@@ -37,13 +37,13 @@ class FacturapiService {
       let apiKey = tenant.facturapiApiKey;
       
       // Registrar el entorno para depuración
-      console.log(`Usando API key almacenada para el tenant en entorno: ${tenant.facturapiEnv || 'production'}`);
+      console.log(`Usando API key almacenada para el tenant: ${tenant.businessName} (${tenantId})`);
       
-      // Verificar que la API key tenga el formato correcto para depuración
-      if (apiKey && apiKey.startsWith('sk_') && apiKey.length >= 30) {
+      // Verificar que la API key tenga un formato válido
+      if (apiKey && apiKey.length >= 30) {
         console.log(`La API key parece tener un formato válido`);
       } else {
-        console.log(`La API key no tiene el formato esperado (debería comenzar con 'sk_' y tener al menos 30 caracteres)`);
+        console.log(`La API key no tiene la longitud esperada (debería tener al menos 30 caracteres)`);
       }
       
       console.log(`✅ API key obtenida para tenant ${tenant.businessName} (ID: ${tenantId}). Longitud: ${apiKey?.length || 0}. Primeros caracteres: ${apiKey ? apiKey.substring(0, 5) + '...' : 'null o undefined'}`);

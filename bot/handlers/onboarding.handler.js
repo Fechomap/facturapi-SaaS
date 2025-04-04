@@ -667,7 +667,6 @@ export function registerOnboardingHandler(bot) {
             contactName: data.contactName,
             facturapiOrganizationId: organizationId,
             facturapiApiKey: facturapiApiKey, // Usar directamente la API key
-            facturapiEnv: 'test',
             address: JSON.stringify(address)
         });
         
@@ -894,22 +893,14 @@ export function registerOnboardingHandler(bot) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
         select: {
-          facturapiApiKey: true,
-          facturapiEnv: true
+          facturapiApiKey: true
         }
       });
       
       if (tenant && tenant.facturapiApiKey) {
-        if (tenant.facturapiEnv === 'test') {
-          // Marcar el paso de API key de prueba como completado
-          await OnboardingProgressService.updateProgress(
-            tenantId, 
-            OnboardingSteps.TEST_API_KEY_CONFIGURED,
-            { source: 'verification' }
-          );
-          
-          await ctx.reply('✅ Verificación completada: Tienes API key de prueba configurada correctamente.');
-        } else if (tenant.facturapiEnv === 'production') {
+        const isLiveKey = tenant.facturapiApiKey.startsWith('sk_live_');
+        
+        if (isLiveKey) {
           // Marcar ambos pasos de API key como completados
           await OnboardingProgressService.updateProgress(
             tenantId, 
@@ -924,6 +915,15 @@ export function registerOnboardingHandler(bot) {
           );
           
           await ctx.reply('✅ Verificación completada: Tienes API key de producción configurada correctamente.');
+        } else {
+          // Marcar el paso de API key de prueba como completado
+          await OnboardingProgressService.updateProgress(
+            tenantId, 
+            OnboardingSteps.TEST_API_KEY_CONFIGURED,
+            { source: 'verification' }
+          );
+          
+          await ctx.reply('✅ Verificación completada: Tienes API key de prueba configurada correctamente.');
         }
       } else {
         await ctx.reply(

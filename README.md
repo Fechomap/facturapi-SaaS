@@ -32,20 +32,28 @@ Sistema de facturación en modo multitenancy basado en FacturAPI.
 
 ### Operaciones en Heroku
 
-#### Gestión de recursos (dynos)
+#### Gestión de Dynos
 
+#### Detener aplicaciones:
 ```bash
-# Ver estado actual de dynos
-heroku ps -a facturapi-saas
+# Producción
+heroku ps:scale web=0 bot=0 --app facturapi-saas
 
-# Escalar dynos (ejemplo: aumentar a 2 web dynos)
-heroku ps:scale web=2 -a facturapi-saas
+# Staging
+heroku ps:scale web=0 bot=0 --app facturapi-staging
 
-# Detener temporalmente la aplicación (sin eliminarla)
-heroku ps:scale web=0 -a facturapi-saas
+#### Iniciar aplicaciones:
+```bash
+# Producción
+heroku ps:scale web=1 bot=1 --app facturapi-saas
 
-# Reiniciar los dynos
-heroku restart -a facturapi-saas
+# Staging
+heroku ps:scale web=1 bot=1 --app facturapi-staging
+
+#### Reinicio completo:
+```bash
+heroku restart --app facturapi-saas    # Producción
+heroku restart --app facturapi-staging # Staging
 ```
 
 #### Despliegue en Heroku
@@ -59,6 +67,8 @@ git push heroku main
 
 # Ver los últimos logs después del despliegue
 heroku logs --tail -a facturapi-saas
+heroku logs --tail -a facturapi-staging
+
 ```
 
 ### Diagnóstico y Logs
@@ -148,6 +158,10 @@ Esto permite ejecutar pruebas con datos reales usando el API key de producción 
 
 ## Base de datos
 
+### Estructura de Entornos:
+- **Producción**: Base de datos dedicada (facturapi-saas)
+- **Staging**: Comparte base de datos con entorno local (facturapi-staging)
+
 Se recomienda mantener bases de datos separadas para desarrollo y producción. En Heroku, la base de datos se configura automáticamente mediante el add-on de PostgreSQL.
 
 Para desarrollo local, configura una base de datos PostgreSQL y establece la URL en `DATABASE_URL`.
@@ -159,6 +173,14 @@ Para desarrollo local, configura una base de datos PostgreSQL y establece la URL
 - `NOTIFY_CRITICAL_ERRORS=true`: Envía notificaciones de errores críticos
 
 ## Mantenimiento del sistema
+
+### Script de Mantenimiento de Base de Datos
+Ejecutar con: `node cleanup-database.js`
+
+Opciones disponibles:
+1. **Limpieza completa**: Elimina todos los datos excepto planes de suscripción
+2. **Limpiar facturas y clientes**: Elimina solo facturas, clientes y documentos
+3. **Limpiar tenant específico**: Elimina un tenant concreto y todos sus datos
 
 ### Limpieza de datos
 

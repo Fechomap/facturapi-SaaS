@@ -44,15 +44,6 @@ if (IS_HEROKU) {
 const validateEnv = () => {
   const requiredVars = [];
   
-  // Variables comunes requeridas - solo verificamos la API key apropiada
-  // según el FACTURAPI_ENV, no según NODE_ENV
-  if (process.env.FACTURAPI_ENV === 'production') {
-    requiredVars.push('FACTURAPI_LIVE_KEY');
-  } else {
-    // En modo test de Facturapi necesitamos la clave de prueba
-    requiredVars.push('FACTURAPI_TEST_KEY');
-  }
-  
   // Si estamos ejecutando el bot, necesitamos el token de Telegram
   const executedFile = process.argv[1];
   if (executedFile && executedFile.includes('bot.js')) {
@@ -64,6 +55,9 @@ const validateEnv = () => {
   
   // Para cualquier entorno, necesitamos los IDs de clientes
   requiredVars.push('CLIENTE_INFOASIST', 'CLIENTE_SOS', 'CLIENTE_ARSA', 'CLIENTE_CHUBB');
+  
+  // Para operaciones administrativas de FacturAPI
+  requiredVars.push('FACTURAPI_USER_KEY');
   
   const missing = requiredVars.filter(varName => !process.env[varName]);
   
@@ -174,10 +168,9 @@ const config = {
       port: this.port,
       apiBaseUrl: this.apiBaseUrl,
       facturapi: {
-        isProduction: this.facturapi.isProduction,
         apiVersion: this.facturapi.apiVersion,
-        // Mostramos solo los primeros 4 caracteres de la clave
-        apiKey: this.facturapi.apiKey ? `${this.facturapi.apiKey.substring(0, 4)}...` : 'no configurada'
+        // Mostramos solo los primeros 4 caracteres de la clave de usuario
+        userKey: this.facturapi.userKey ? `${this.facturapi.userKey.substring(0, 4)}...` : 'no configurada'
       },
       telegram: {
         // No mostrar el token completo

@@ -6,15 +6,6 @@ const servicesLogger = logger.child({ module: 'external-services' });
 
 // Configuración de FacturAPI
 const facturapiConfig = {
-  // Determina si usamos el entorno de producción o pruebas
-  // Esto SOLO depende de la variable FACTURAPI_ENV, no de NODE_ENV
-  isProduction: process.env.FACTURAPI_ENV === 'production',
-  
-  // Clave API (dependiendo del entorno FacturAPI)
-  apiKey: process.env.FACTURAPI_ENV === 'production'
-    ? process.env.FACTURAPI_LIVE_KEY
-    : process.env.FACTURAPI_TEST_KEY,
-  
   // Clave de usuario para operaciones administrativas
   userKey: process.env.FACTURAPI_USER_KEY,
   
@@ -57,9 +48,8 @@ function validateServicesConfig() {
   const warnings = [];
 
   // Validar FacturAPI
-  if (!facturapiConfig.apiKey) {
-    const envVar = facturapiConfig.isProduction ? 'FACTURAPI_LIVE_KEY' : 'FACTURAPI_TEST_KEY';
-    warnings.push(`${envVar} no está configurada. La integración con FacturAPI no funcionará.`);
+  if (!facturapiConfig.userKey) {
+    warnings.push(`FACTURAPI_USER_KEY no está configurada. Algunas operaciones administrativas con FacturAPI no funcionarán.`);
   }
   
   // Validar Stripe
