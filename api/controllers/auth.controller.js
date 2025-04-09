@@ -1,6 +1,6 @@
 // api/controllers/auth.controller.js
 import jwt from 'jsonwebtoken';
-import { prisma } from '../../config/database.js';
+import prisma from '../../lib/prisma.js';
 import { config } from '../../config/index.js';
 
 // Clave secreta para JWT
@@ -11,60 +11,87 @@ const JWT_SECRET = process.env.JWT_SECRET || 'facturapi-saas-secret-dev';
  * @param {Object} req - Request de Express
  * @param {Object} res - Response de Express
  */
-export function login(req, res) {
-  const { email, password } = req.body;
+export async function login(req, res) {
+  const { email, tenantId } = req.body;
 
-  // Modo desarrollo: acepta cualquier credencial
-  if (process.env.NODE_ENV === 'development') {
-    const token = jwt.sign(
-      { 
-        email: email || 'dev-user@example.com',
-        role: 'admin',
-        isDev: true,
-        tenantId: '56838cf6-6073-4118-92fb-0cf2abbd9b59' // Tenant fijo
-      },
-      JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-    return res.json({
-      success: true,
-      token,
-      user: {
-        email: email || 'dev-user@example.com',
-        role: 'admin'
-      },
-      tenant: {
-        id: '56838cf6-6073-4118-92fb-0cf2abbd9b59',
-        name: 'Tenant de Desarrollo'
-      }
+  // Validar que se proporcionaron email y tenantId
+  if (!email || !tenantId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email y Tenant ID son requeridos'
     });
   }
 
   // Modo producción: validación real
-  if (email && password) {
+  try {
+    // Buscar el tenant por ID
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId }
+    });
+
+    if (!tenant) {
+      return res.status(401).json({
+        success: false,
+        message: 'Tenant ID no encontrado'
+      });
+    }
+
+    // Verificar que el email coincide con el email del tenant
+    if (tenant.email !== email) {
+      return res.status(401).json({
+        success: false,
+        message: 'Email no coincide con el Tenant ID proporcionado'
+      });
+    }
+
+    // Buscar un usuario asociado a este tenant
+    const user = await prisma.tenantUser.findFirst({
+      where: {
+        tenantId: tenantId
+      }
+    });
+
+    // Si no hay usuario, creamos uno básico para el token
+    const userData = user || {
+      id: 0,
+      role: 'admin',
+      firstName: tenant.contactName || '',
+      lastName: ''
+    };
+
+    // Generar token JWT
     const token = jwt.sign(
       { 
-        email,
-        role: 'admin'
+        userId: userData.id,
+        email: tenant.email,
+        role: userData.role || 'admin',
+        tenantId: tenant.id
       }, 
       JWT_SECRET, 
-      { expiresIn: '1h' }
+      { expiresIn: '8h' }
     );
     
     return res.json({
       success: true,
       token,
       user: {
-        email,
-        role: 'admin'
+        id: userData.id,
+        email: tenant.email,
+        name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+        role: userData.role || 'admin'
+      },
+      tenant: {
+        id: tenant.id,
+        name: tenant.businessName
       }
     });
+  } catch (error) {
+    console.error('Error en login:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
   }
-  
-  return res.status(401).json({
-    success: false,
-    message: 'Credenciales inválidas'
-  });
 }
 
 /**

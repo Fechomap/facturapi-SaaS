@@ -1,5 +1,6 @@
 // server.js - Punto de entrada para la API
 import express from 'express';
+import cors from 'cors';
 import { config, initConfig } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
@@ -23,8 +24,16 @@ async function initializeApp() {
   // Inicializar configuración
   await initConfig();
   
+  
   // Inicializar la aplicación Express
   const app = express();
+  
+  // Configurar CORS para permitir peticiones desde el frontend
+  app.use(cors({
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID']
+  }));
   
   // Configuración especial para webhooks de Stripe (necesita el cuerpo raw)
   app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
@@ -78,8 +87,8 @@ async function startServer() {
     // Puerto de la aplicación desde la configuración centralizada
     const PORT = process.env.PORT || config.port || 3000;
     
-    // Iniciar el servidor
-    app.listen(PORT, () => {
+    // Iniciar el servidor con manejo de errores para puerto en uso
+    const server = app.listen(PORT, () => {
       serverLogger.info(`Servidor corriendo en http://localhost:${PORT}`);
       serverLogger.info(`Entorno: ${config.env}`);
       serverLogger.info(`API de Facturación SaaS lista y funcionando`);
@@ -97,6 +106,35 @@ async function startServer() {
       // Iniciar sistema de jobs programados
       startJobs();
       serverLogger.info('Sistema de jobs programados iniciado');
+    }).on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        // Si el puerto está en uso, intentar con otro puerto
+        const newPort = PORT + 1;
+        serverLogger.warn(`Puerto ${PORT} en uso, intentando con puerto ${newPort}`);
+        server.close();
+        app.listen(newPort, () => {
+          serverLogger.info(`Servidor corriendo en http://localhost:${newPort}`);
+          serverLogger.info(`Entorno: ${config.env}`);
+          serverLogger.info(`API de Facturación SaaS lista y funcionando`);
+          serverLogger.info(`Rutas API disponibles en http://localhost:${newPort}/api`);
+          serverLogger.info(`Frontend disponible en http://localhost:${newPort}`);
+          
+          // Inicializar servicio de notificaciones
+          const notificationInitialized = NotificationService.initialize();
+          if (notificationInitialized) {
+            serverLogger.info('Servicio de notificaciones inicializado correctamente');
+          } else {
+            serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
+          }
+          
+          // Iniciar sistema de jobs programados
+          startJobs();
+          serverLogger.info('Sistema de jobs programados iniciado');
+        });
+      } else {
+        serverLogger.error({ error: err }, 'Error al iniciar el servidor');
+        process.exit(1);
+      }
     });
   } catch (error) {
     serverLogger.error({ error }, 'Error al iniciar el servidor');

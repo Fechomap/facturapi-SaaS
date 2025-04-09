@@ -1,5 +1,5 @@
 // core/tenant/tenant.service.js
-import { prisma } from '../../config/database.js';
+import prisma from '../../lib/prisma.js';
 import logger from '../utils/logger.js';
 import { withTransaction, auditLog } from '../utils/transaction.js';
 import { encryptApiKey, decryptApiKey, legacyDecryptApiKey } from '../utils/encryption.js';

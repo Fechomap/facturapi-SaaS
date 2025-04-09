@@ -23,9 +23,15 @@ apiClient.interceptors.request.use(
     // Tenant ID - requerido para todas las peticiones API
     const tenantId = localStorage.getItem('tenant_id') || 
                      JSON.parse(localStorage.getItem('user_info'))?.tenant?.id;
-    if (!tenantId && process.env.NODE_ENV !== 'production') {
-      console.warn('Tenant ID no encontrado - usando valor por defecto para desarrollo');
-      config.headers['X-Tenant-ID'] = 'default-tenant-id';
+    if (!tenantId) {
+      console.error('Tenant ID no encontrado - no se puede proceder sin un tenant válido');
+      // Redirigir al login si no hay tenant ID
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_info');
+        localStorage.removeItem('tenant_id');
+        window.location.href = '/login';
+      }
     } else {
       config.headers['X-Tenant-ID'] = tenantId;
     }
@@ -42,21 +48,18 @@ apiClient.interceptors.request.use(
 
 // Servicios de autenticación
 export const authService = {
-  login: async (email, password) => {
+  login: async (email, tenantId) => {
     try {
       console.log('Iniciando sesión');
       const response = await apiClient.post('auth/login', { 
-        email: email || 'dev@tenant.com', 
-        password: password || '123456' 
+        email, 
+        tenantId 
       });
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user_info', JSON.stringify(response.data.user));
-        // Guardar tenant ID fijo para desarrollo
-        const tenantId = process.env.NODE_ENV === 'development' 
-          ? '56838cf6-6073-4118-92fb-0cf2abbd9b59'
-          : response.data.tenant?.id;
-        localStorage.setItem('tenant_id', tenantId);
+        // Guardar tenant ID
+        localStorage.setItem('tenant_id', response.data.tenant?.id);
       }
       return response.data;
     } catch (error) {

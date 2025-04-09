@@ -1,6 +1,7 @@
 // core/tenant/tenant.middleware.js
 import TenantService from './tenant.service.js';
 import logger from '../utils/logger.js';
+import prisma from '../../lib/prisma.js';
 
 // Logger específico para middleware de tenant
 const middlewareLogger = logger.child({ module: 'tenant-middleware' });
@@ -77,23 +78,33 @@ async function tenantContextMiddleware(ctx, next) {
  */
 async function requireTenant(req, res, next) {
   try {
-    // Obtener el tenant ID del header o del cuerpo de la solicitud
-    const tenantId = req.headers['x-tenant-id'] || req.body?.tenantId;
+    // Obtener el tenant ID del header o del cuerpo de la solicitud o query parameter
+    const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || req.body?.tenantId;
     
     if (!tenantId) {
       middlewareLogger.warn({ path: req.path }, 'Solicitud sin tenant ID');
       return res.status(400).json({ 
-        error: 'Tenant ID requerido', 
-        message: 'Debe proporcionar un tenant ID en el header X-Tenant-ID o en el cuerpo de la solicitud'
+        error: 'TenantRequired', 
+        message: 'Debe proporcionar un tenant ID en el header X-Tenant-ID, query parameter o en el cuerpo de la solicitud'
       });
     }
     
-    // Verificar que el tenant existe
-    const tenant = await TenantService.findTenantWithSubscription(tenantId);
+    // Verificar que el tenant existe directamente en la base de datos
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        businessName: true,
+        email: true,
+        isActive: true,
+        facturapiApiKey: true
+      }
+    });
+    
     if (!tenant) {
       middlewareLogger.warn({ tenantId, path: req.path }, 'Tenant no encontrado');
       return res.status(404).json({ 
-        error: 'Tenant no encontrado', 
+        error: 'TenantNotFound', 
         message: 'El tenant especificado no existe'
       });
     }
@@ -102,7 +113,7 @@ async function requireTenant(req, res, next) {
     if (!tenant.isActive) {
       middlewareLogger.warn({ tenantId, path: req.path }, 'Tenant inactivo');
       return res.status(403).json({ 
-        error: 'Tenant inactivo', 
+        error: 'TenantInactive', 
         message: 'El tenant especificado está desactivado'
       });
     }
