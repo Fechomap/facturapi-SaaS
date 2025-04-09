@@ -5,6 +5,8 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Recomendado para conexiones externas:
+  directUrl = env("DATABASE_URL")
 }
 
 model SubscriptionPlan {
