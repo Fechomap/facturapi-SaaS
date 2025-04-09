@@ -13,9 +13,34 @@ const JWT_SECRET = process.env.JWT_SECRET || 'facturapi-saas-secret-dev';
  */
 export function login(req, res) {
   const { email, password } = req.body;
-  
-  // Aquí implementarías la lógica real de autenticación
-  // Por ahora, devolvemos un token de ejemplo
+
+  // Modo desarrollo: acepta cualquier credencial
+  if (process.env.NODE_ENV === 'development') {
+    const token = jwt.sign(
+      { 
+        email: email || 'dev-user@example.com',
+        role: 'admin',
+        isDev: true,
+        tenantId: '56838cf6-6073-4118-92fb-0cf2abbd9b59' // Tenant fijo
+      },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+    return res.json({
+      success: true,
+      token,
+      user: {
+        email: email || 'dev-user@example.com',
+        role: 'admin'
+      },
+      tenant: {
+        id: '56838cf6-6073-4118-92fb-0cf2abbd9b59',
+        name: 'Tenant de Desarrollo'
+      }
+    });
+  }
+
+  // Modo producción: validación real
   if (email && password) {
     const token = jwt.sign(
       { 

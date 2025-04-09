@@ -1,7 +1,8 @@
 // api/controllers/invoice.controller.js
-// Importaciones (temporales hasta que los servicios estén completamente implementados)
+// Importaciones
 import axios from 'axios';
 import prisma from '../../lib/prisma.js';
+import InvoiceService from '../../services/invoice.service.js';
 
 /**
  * Controlador para operaciones relacionadas con facturas
@@ -148,30 +149,47 @@ class InvoiceController {
       const endDate = req.query.end_date;
       const status = req.query.status;
       
-      // Simulación de listado de facturas
-      const invoices = [
-        {
-          id: 'inv_1',
-          series: 'A',
-          folio_number: 1001,
-          customer: 'client_1',
-          total: 1160,
-          status: 'valid',
-          created_at: '2023-01-01T12:00:00Z'
+      console.log(`Buscando facturas para tenant ${tenantId} (página ${page}, límite ${limit})`);
+      
+      // Crear objeto de criterios para la búsqueda
+      const criteria = {
+        tenantId,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+        status
+      };
+      
+      // Usar el servicio para obtener facturas reales de la base de datos
+      const invoices = await InvoiceService.searchInvoices(criteria);
+      
+      console.log(`Se encontraron ${invoices.length} facturas para el tenant ${tenantId}`);
+      
+      // Aplicar paginación manual si es necesario
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      const paginatedInvoices = invoices.slice(startIndex, endIndex);
+      
+      // Transformar datos para mantener compatibilidad con el frontend
+      const formattedInvoices = paginatedInvoices.map(invoice => ({
+        id: invoice.facturapiInvoiceId || `inv_${invoice.id}`,
+        series: invoice.series || 'A',
+        folio_number: invoice.folioNumber,
+        customer: invoice.customer ? {
+          id: invoice.customer.id.toString(),
+          legal_name: invoice.customer.legalName,
+          tax_id: invoice.customer.rfc
+        } : {
+          id: 'unknown',
+          legal_name: 'Cliente',
+          tax_id: 'XAXX010101000'
         },
-        {
-          id: 'inv_2',
-          series: 'A',
-          folio_number: 1002,
-          customer: 'client_2',
-          total: 580,
-          status: 'valid',
-          created_at: '2023-01-02T14:30:00Z'
-        }
-      ];
+        total: parseFloat(invoice.total) || 0, // Convertir a número
+        status: invoice.status || 'valid',
+        created_at: invoice.createdAt?.toISOString() || new Date().toISOString()
+      }));
       
       res.json({
-        data: invoices,
+        data: formattedInvoices,
         pagination: {
           total: invoices.length,
           page,

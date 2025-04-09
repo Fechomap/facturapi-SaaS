@@ -11,19 +11,27 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor para añadir token de autenticación si existe
+// Interceptor para añadir headers comunes
 apiClient.interceptors.request.use(
   (config) => {
+    // Token de autenticación
     const token = localStorage.getItem('auth_token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
     
-    // Añadir tenant-id si está guardado
-    const tenantId = localStorage.getItem('tenant_id');
-    if (tenantId) {
+    // Tenant ID - requerido para todas las peticiones API
+    const tenantId = localStorage.getItem('tenant_id') || 
+                     JSON.parse(localStorage.getItem('user_info'))?.tenant?.id;
+    if (!tenantId && process.env.NODE_ENV !== 'production') {
+      console.warn('Tenant ID no encontrado - usando valor por defecto para desarrollo');
+      config.headers['X-Tenant-ID'] = 'default-tenant-id';
+    } else {
       config.headers['X-Tenant-ID'] = tenantId;
     }
+    
+    // Asegurar que Accept es application/json para todas las peticiones
+    config.headers['Accept'] = 'application/json';
     
     return config;
   },
@@ -36,13 +44,19 @@ apiClient.interceptors.request.use(
 export const authService = {
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/auth/login', { email, password });
+      console.log('Iniciando sesión');
+      const response = await apiClient.post('auth/login', { 
+        email: email || 'dev@tenant.com', 
+        password: password || '123456' 
+      });
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user_info', JSON.stringify(response.data.user));
-        if (response.data.tenant) {
-          localStorage.setItem('tenant_id', response.data.tenant.id);
-        }
+        // Guardar tenant ID fijo para desarrollo
+        const tenantId = process.env.NODE_ENV === 'development' 
+          ? '56838cf6-6073-4118-92fb-0cf2abbd9b59'
+          : response.data.tenant?.id;
+        localStorage.setItem('tenant_id', tenantId);
       }
       return response.data;
     } catch (error) {
@@ -65,46 +79,48 @@ export const authService = {
 // Servicios de facturas
 export const invoiceService = {
   getInvoices: async (page = 1, limit = 10) => {
-    return apiClient.get(`/facturas?page=${page}&limit=${limit}`);
+    console.log('Obteniendo facturas:', `facturas?page=${page}&limit=${limit}`);
+    return apiClient.get(`facturas?page=${page}&limit=${limit}`);
   },
   
   getInvoiceById: async (id) => {
-    return apiClient.get(`/facturas/${id}`);
+    return apiClient.get(`facturas/${id}`);
   },
   
   getInvoiceByFolio: async (folio) => {
-    return apiClient.get(`/facturas/by-folio/${folio}`);
+    return apiClient.get(`facturas/by-folio/${folio}`);
   },
   
   createInvoice: async (invoiceData) => {
-    return apiClient.post('/facturas', invoiceData);
+    return apiClient.post('facturas', invoiceData);
   },
   
   cancelInvoice: async (id, motive) => {
-    return apiClient.delete(`/facturas/${id}`, { data: { motive } });
+    return apiClient.delete(`facturas/${id}`, { data: { motive } });
   }
 };
 
 // Servicios de clientes
 export const clientService = {
   getClients: async () => {
-    return apiClient.get('/clientes');
+    console.log('Obteniendo clientes');
+    return apiClient.get('clientes');
   },
   
   getClientById: async (id) => {
-    return apiClient.get(`/clientes/${id}`);
+    return apiClient.get(`clientes/${id}`);
   },
   
   createClient: async (clientData) => {
-    return apiClient.post('/clientes', clientData);
+    return apiClient.post('clientes', clientData);
   },
   
   updateClient: async (id, clientData) => {
-    return apiClient.put(`/clientes/${id}`, clientData);
+    return apiClient.put(`clientes/${id}`, clientData);
   },
   
   deleteClient: async (id) => {
-    return apiClient.delete(`/clientes/${id}`);
+    return apiClient.delete(`clientes/${id}`);
   }
 };
 

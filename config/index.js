@@ -27,17 +27,9 @@ if (IS_HEROKU) {
   // dotenv.config() no es necesario en Heroku, pero lo hacemos por si hay un .env local
   dotenv.config();
 } else {
-  // En entorno local, intentar cargar desde archivos .env específicos
-  const envFilePath = path.resolve(__dirname, `../.env.${NODE_ENV}`);
-  
-  if (fs.existsSync(envFilePath)) {
-    configLogger.info(`Cargando variables de entorno desde: .env.${NODE_ENV}`);
-    dotenv.config({ path: envFilePath });
-  } else {
-    // Si no existe, cargar el .env normal
-    configLogger.info('Archivo .env específico no encontrado, usando .env por defecto');
-    dotenv.config();
-  }
+  // En entorno local, cargar siempre desde .env
+  configLogger.info('Cargando variables de entorno desde: .env');
+  dotenv.config(); // Carga .env por defecto
 }
 
 // Función para validar variables de entorno críticas
