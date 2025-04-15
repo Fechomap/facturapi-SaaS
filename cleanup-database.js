@@ -29,6 +29,7 @@ async function cleanupDatabase() {
     console.log('\n📊 Estadísticas actuales de la base de datos:');
     displayStats(stats);
 
+    
     // Opciones de limpieza
     console.log('\n🔄 Opciones de limpieza:');
     console.log('1. Limpieza completa (mantiene planes de suscripción)');
