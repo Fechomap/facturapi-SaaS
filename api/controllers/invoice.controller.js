@@ -17,24 +17,24 @@ class InvoiceController {
   async createInvoice(req, res, next) {
     try {
       const tenantId = req.tenant?.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       // Validar datos básicos
       const { customer, items } = req.body;
-      
+
       if (!customer || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requieren campos customer e items (array no vacío)'
         });
       }
-      
+
       // Simulación de creación de factura
       const invoice = {
         id: `inv_${Date.now()}`,
@@ -47,7 +47,7 @@ class InvoiceController {
         created_at: new Date().toISOString(),
         status: 'valid'
       };
-      
+
       // Calcular impuestos y total
       let taxes = 0;
       for (const item of items) {
@@ -61,9 +61,9 @@ class InvoiceController {
           }
         }
       }
-      
+
       invoice.total = invoice.subtotal + taxes;
-      
+
       // Responder con la factura creada
       res.status(201).json(invoice);
     } catch (error) {
@@ -80,24 +80,24 @@ class InvoiceController {
   async createSimpleInvoice(req, res, next) {
     try {
       const tenantId = req.tenant?.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       // Extraer datos del request
       const { cliente_id, producto_id, cantidad = 1 } = req.body;
-      
+
       if (!cliente_id || !producto_id) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requieren cliente_id y producto_id'
         });
       }
-      
+
       // Simulación de creación de factura simplificada
       const invoice = {
         id: `inv_${Date.now()}`,
@@ -117,7 +117,7 @@ class InvoiceController {
         created_at: new Date().toISOString(),
         status: 'valid'
       };
-      
+
       // Responder con la factura creada
       res.status(201).json(invoice);
     } catch (error) {
@@ -134,23 +134,23 @@ class InvoiceController {
   async listInvoices(req, res, next) {
     try {
       const tenantId = req.tenant?.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       // Parámetros de paginación y filtrado
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const startDate = req.query.start_date;
       const endDate = req.query.end_date;
       const status = req.query.status;
-      
+
       console.log(`Buscando facturas para tenant ${tenantId} (página ${page}, límite ${limit})`);
-      
+
       // Crear objeto de criterios para la búsqueda
       const criteria = {
         tenantId,
@@ -158,17 +158,17 @@ class InvoiceController {
         endDate: endDate ? new Date(endDate) : undefined,
         status
       };
-      
+
       // Usar el servicio para obtener facturas reales de la base de datos
       const invoices = await InvoiceService.searchInvoices(criteria);
-      
+
       console.log(`Se encontraron ${invoices.length} facturas para el tenant ${tenantId}`);
-      
+
       // Aplicar paginación manual si es necesario
       const startIndex = (page - 1) * limit;
       const endIndex = page * limit;
       const paginatedInvoices = invoices.slice(startIndex, endIndex);
-      
+
       // Transformar datos para mantener compatibilidad con el frontend
       const formattedInvoices = paginatedInvoices.map(invoice => ({
         id: invoice.facturapiInvoiceId || `inv_${invoice.id}`,
@@ -187,7 +187,7 @@ class InvoiceController {
         status: invoice.status || 'valid',
         created_at: invoice.createdAt?.toISOString() || new Date().toISOString()
       }));
-      
+
       res.json({
         data: formattedInvoices,
         pagination: {
@@ -211,21 +211,21 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const invoiceId = req.params.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el ID de la factura'
         });
       }
-      
+
       // Simulación de factura
       const invoice = {
         id: invoiceId,
@@ -251,7 +251,7 @@ class InvoiceController {
         status: 'valid',
         created_at: '2023-01-01T12:00:00Z'
       };
-      
+
       res.json(invoice);
     } catch (error) {
       next(error);
@@ -268,31 +268,31 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const invoiceId = req.params.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el ID de la factura'
         });
       }
-      
+
       // Extraer motivo de cancelación
       const { motive } = req.body;
-      
+
       if (!motive) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el motivo de cancelación'
         });
       }
-      
+
       // Validar que el motivo sea válido (01, 02, 03, 04)
       const validMotives = ['01', '02', '03', '04'];
       if (!validMotives.includes(motive)) {
@@ -301,7 +301,7 @@ class InvoiceController {
           message: 'Motivo de cancelación inválido. Debe ser 01, 02, 03 o 04'
         });
       }
-      
+
       // Buscar la factura en la base de datos
       const invoice = await prisma.tenantInvoice.findFirst({
         where: {
@@ -309,7 +309,7 @@ class InvoiceController {
           facturapiInvoiceId: invoiceId
         }
       });
-      
+
       if (!invoice) {
         return res.status(404).json({
           error: 'NotFoundError',
@@ -325,10 +325,10 @@ class InvoiceController {
           message: 'No se pudo obtener la API key para este tenant'
         });
       }
-      
+
       console.log(`Intentando cancelar factura ${invoiceId} con motivo ${motive} en FacturAPI`);
       console.log(`API Key: ${apiKey.substring(0, 8)}...`);
-      
+
       try {
         // Realizar la cancelación en FacturAPI
         // IMPORTANTE: Para FacturAPI, el motivo debe enviarse como query param, no como JSON body
@@ -340,9 +340,9 @@ class InvoiceController {
             'Content-Type': 'application/json'
           }
         });
-        
+
         console.log('Respuesta de FacturAPI al cancelar:', facturapResponse.data);
-        
+
         // Actualizar estado en la base de datos local
         await prisma.tenantInvoice.update({
           where: {
@@ -353,15 +353,15 @@ class InvoiceController {
             updatedAt: new Date()
           }
         });
-        
-        res.json({ 
-          success: true, 
-          message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}` 
+
+        res.json({
+          success: true,
+          message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}`
         });
-        
+
       } catch (facturapierror) {
         console.error('Error al cancelar factura en FacturAPI:', facturapierror);
-        
+
         if (facturapierror.response) {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
@@ -369,14 +369,14 @@ class InvoiceController {
             details: facturapierror.response.data
           });
         }
-        
+
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
           details: facturapierror.message
         });
       }
-      
+
     } catch (error) {
       console.error('Error en cancelInvoice:', error);
       next(error);
@@ -393,27 +393,27 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const invoiceId = req.params.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el ID de la factura'
         });
       }
-      
+
       // Extraer email del request (opcional)
       const { email } = req.body;
-      
+
       // Simulación de envío
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: `Factura ${invoiceId} enviada por email exitosamente` + (email ? ` a ${email}` : '')
       });
     } catch (error) {
@@ -431,21 +431,21 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const invoiceId = req.params.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el ID de la factura'
         });
       }
-  
+
       // Obtener la API key del tenant
       const apiKey = await req.getApiKey();
       if (!apiKey) {
@@ -454,7 +454,7 @@ class InvoiceController {
           message: 'No se pudo obtener la API key para este tenant'
         });
       }
-  
+
       // Hacer la solicitud a FacturAPI
       try {
         const response = await axios({
@@ -465,16 +465,16 @@ class InvoiceController {
             'Authorization': `Bearer ${apiKey}`
           }
         });
-  
+
         // Configurar encabezados de respuesta
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.pdf`);
-        
+
         // Enviar el buffer directamente
         return res.send(response.data);
       } catch (facturapierror) {
         console.error('Error al obtener PDF de FacturAPI:', facturapierror);
-        
+
         if (facturapierror.response) {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
@@ -482,7 +482,7 @@ class InvoiceController {
             details: facturapierror.response.data
           });
         }
-        
+
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
@@ -505,14 +505,14 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const invoiceId = req.params.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
@@ -543,12 +543,12 @@ class InvoiceController {
         // Configurar encabezados de respuesta
         res.setHeader('Content-Type', 'application/xml');
         res.setHeader('Content-Disposition', `attachment; filename=factura-${invoiceId}.xml`);
-        
+
         // Enviar el buffer directamente
         return res.send(response.data);
       } catch (facturapierror) {
         console.error('Error al obtener XML de FacturAPI:', facturapierror);
-        
+
         if (facturapierror.response) {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
@@ -556,7 +556,7 @@ class InvoiceController {
             details: facturapierror.response.data
           });
         }
-        
+
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
@@ -579,21 +579,21 @@ class InvoiceController {
     try {
       const tenantId = req.tenant?.id;
       const { folio } = req.params;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       if (!folio) {
         return res.status(400).json({
           error: 'ValidationError',
           message: 'Se requiere el número de folio'
         });
       }
-      
+
       // Convertir el folio a número entero
       const folioNumber = parseInt(folio);
       if (isNaN(folioNumber)) {
@@ -602,9 +602,9 @@ class InvoiceController {
           message: 'El folio debe ser un número válido'
         });
       }
-      
+
       console.log(`Buscando factura con folio ${folioNumber} para tenant ${tenantId}`);
-      
+
       // Buscar en la base de datos primero
       const invoiceRecord = await prisma.tenantInvoice.findFirst({
         where: {
@@ -615,12 +615,12 @@ class InvoiceController {
           customer: true
         }
       });
-  
+
       if (invoiceRecord) {
         // Si encontramos el registro en nuestra base de datos
         const facturapiId = invoiceRecord.facturapiInvoiceId;
         console.log(`Factura encontrada en BD local, ID FacturAPI: ${facturapiId}, Estado: ${invoiceRecord.status}`);
-  
+
         // Construir respuesta con todos los campos necesarios
         const invoice = {
           id: facturapiId,
@@ -644,10 +644,10 @@ class InvoiceController {
           total: invoiceRecord.total || 0,
           created_at: invoiceRecord.createdAt?.toISOString() || new Date().toISOString()
         };
-  
+
         return res.json(invoice);
       }
-  
+
       // Si no lo encontramos en la BD, devolvemos un error 404
       return res.status(404).json({
         error: 'NotFoundError',
@@ -667,24 +667,24 @@ class InvoiceController {
   async searchInvoices(req, res, next) {
     try {
       const tenantId = req.tenant?.id;
-      
+
       if (!tenantId) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           error: 'UnauthorizedError',
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
-      
+
       // Extraer parámetros de búsqueda
-      const { 
-        startDate, 
-        endDate, 
-        customerId, 
+      const {
+        startDate,
+        endDate,
+        customerId,
         status,
         minAmount,
-        maxAmount 
+        maxAmount
       } = req.query;
-      
+
       // Crear objeto de criterios
       const criteria = {
         tenantId,
@@ -695,10 +695,10 @@ class InvoiceController {
         minAmount: minAmount ? parseFloat(minAmount) : undefined,
         maxAmount: maxAmount ? parseFloat(maxAmount) : undefined
       };
-      
+
       // Llamar al servicio para buscar
       const invoices = await InvoiceService.searchInvoices(criteria);
-      
+
       res.json({
         data: invoices,
         count: invoices.length
