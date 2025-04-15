@@ -70,26 +70,47 @@ git push heroku main
 
 ## Troubleshooting Migration Issues
 
-If you encounter migration issues during deployment, the application includes a fix-migration.js script that will automatically run during the build process to resolve common migration problems.
+If you encounter migration issues during deployment, you have several options to resolve them:
 
-If you need to manually fix migration issues:
+### Option 1: Reset the Database (Recommended for Development/Staging)
 
-1. Run the fix-migration script directly on Heroku:
+The application includes scripts to completely reset the database and run migrations from scratch:
+
+1. Use the provided shell script:
 
 ```bash
-heroku run node fix-migration.js --app your-app-name
+./reset-heroku-db.sh your-app-name
 ```
 
-2. If specific migrations are failing, you can use the Heroku PostgreSQL console to inspect the database:
+2. Or run the reset script directly on Heroku:
+
+```bash
+heroku run npm run reset-heroku-db --app your-app-name
+```
+
+This approach is recommended for development or staging environments where you can safely drop all data.
+
+### Option 2: Manual Inspection and Fixes
+
+If you need to preserve data or want to manually fix migration issues:
+
+1. Use the Heroku PostgreSQL console to inspect the database:
 
 ```bash
 heroku pg:psql --app your-app-name
 ```
 
-3. Check the status of Prisma migrations:
+2. Check the status of Prisma migrations:
 
 ```sql
 SELECT * FROM _prisma_migrations ORDER BY started_at DESC;
+```
+
+3. If needed, manually mark problematic migrations as applied:
+
+```sql
+INSERT INTO _prisma_migrations (migration_name, started_at, applied, finished_at)
+VALUES ('migration_name', NOW(), 1, NOW());
 ```
 
 ## Scaling

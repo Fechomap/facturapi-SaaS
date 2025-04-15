@@ -25,8 +25,9 @@
         "studio:prod": "DATABASE_URL=\"postgres://uevg5uanv9qbbq:pce6ccd9538c636892c1d1c4b852cc2ad40f202101176e6e798de72b2287bf42f@c3cj4hehegopde.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/dmbe4ekvsb6ed\" npx prisma studio",
         "lint": "eslint .",
         "format": "prettier --write .",
-        "heroku-postbuild": "node fix-migration.js && prisma migrate deploy && prisma generate && cd frontend && npm install && npm run build",
-        "init-db": "node scripts/init-db.js"
+        "heroku-postbuild": "prisma migrate deploy && prisma generate && cd frontend && npm install && npm run build",
+        "init-db": "node scripts/init-db.js",
+        "reset-heroku-db": "node reset-heroku-db.js"
     },
     "dependencies": {
         "@prisma/client": "^6.6.0",
@@ -40,6 +41,7 @@
         "jsonwebtoken": "^9.0.2",
         "moment-timezone": "^0.5.45",
         "node-cron": "^3.0.3",
+        "pg": "^8.11.3",
         "pino": "^8.17.0",
         "pino-pretty": "^10.3.1",
         "stripe": "^17.7.0",
