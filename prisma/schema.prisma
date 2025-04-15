@@ -16,6 +16,8 @@ model SubscriptionPlan {
   billingPeriod String               @default("monthly") @db.VarChar(20)
   invoiceLimit  Int
   isActive      Boolean              @default(true)
+  stripeProductId String?            @map("stripe_product_id") @db.VarChar(100)
+  stripePriceId String?              @map("stripe_price_id") @db.VarChar(100)
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @default(now()) @map("updated_at")
   subscriptions TenantSubscription[]
@@ -36,7 +38,7 @@ model Tenant {
   isActive                Boolean              @default(true) @map("is_active")
   createdAt               DateTime             @default(now()) @map("created_at")
   updatedAt               DateTime             @default(now()) @map("updated_at")
-  stripeCustomerId        String?              @map("stripe_customer_id") @db.VarChar(100)
+  stripeCustomerId        String?              @unique @map("stripe_customer_id") @db.VarChar(100) // Añadido @unique
   auditLogs               AuditLog[]
   customers               TenantCustomer[]
   documents               TenantDocument[]

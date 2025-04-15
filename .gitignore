@@ -10,6 +10,7 @@ node_modules/
 logs/*
 *.log
 npm-debug.log*
+mcp-server.log
 
 # Directorios de compilación
 dist/
@@ -35,7 +36,8 @@ storage/**/
 !storage/**/.gitkeep
 
 # Archivos de Prisma generados
-prisma/migrations/
+# ¡IMPORTANTE! Las migraciones DEBEN estar en control de versiones
+# prisma/migrations/ 
 prisma/generated/
 
 # Cache
@@ -48,3 +50,6 @@ coverage/
 # Archivos personales
 TODO.md
 NOTES.md
+
+# Archivos específicos de Cline/MCP local
+cline_mcp_settings.json
