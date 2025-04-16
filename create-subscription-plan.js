@@ -35,11 +35,13 @@ async function createSubscriptionPlan() {
       data: {
         name: 'Plan Básico',
         description: 'Plan mensual de facturación para pequeñas empresas',
-        price: 299.00,
+        price: 599.00,
         currency: 'MXN',
         billingPeriod: 'monthly',
         invoiceLimit: 100, // Ajusta este valor según sea necesario
-        isActive: true
+        isActive: true,
+        stripeProductId: 'prod_S8DMoG02MoBqXg',
+        stripePriceId: 'price_1RDww1P4Me2WA9wKONkcrai4',
       }
     });
     
