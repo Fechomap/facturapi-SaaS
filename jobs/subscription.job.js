@@ -2,55 +2,10 @@
 import { prisma } from '../config/database.js';
 import logger from '../core/utils/logger.js';
 import NotificationService from '../services/notification.service.js';
-// Import a conceptual MCP client/wrapper is needed here
-// For example: import { callStripeMcpTool } from '../lib/mcpClient.js'; 
-// Since I cannot directly implement the MCP client call, 
-// I will assume 'callStripeMcpTool' exists and works as expected.
-// In a real implementation, you'd use the actual mechanism 
-// to communicate with the running MCP server process.
+import StripeService from '../services/stripe.service.js';
 
 // Logger específico para jobs de suscripción
 const subscriptionLogger = logger.child({ module: 'subscription-jobs' });
-
-/**
- * Placeholder for calling the Stripe MCP tool.
- * In a real scenario, this would interact with the running MCP server.
- * @param {string} toolName - The name of the MCP tool (e.g., 'create_customer', 'create_payment_link').
- * @param {object} args - The arguments for the tool.
- * @returns {Promise<object>} - The result from the MCP tool.
- */
-async function callStripeMcpTool(toolName, args) {
-  subscriptionLogger.info({ toolName, args }, `Calling Stripe MCP tool: ${toolName}`);
-  // This is a placeholder. Replace with actual MCP client implementation.
-  // Example: Use axios, gRPC, or another method to call the MCP server endpoint/process.
-  // Throwing an error here to indicate it needs implementation.
-  // You would need to replace this with your actual MCP communication logic.
-  
-  // --- Mock Implementation (REMOVE IN PRODUCTION) ---
-  if (toolName === 'create_customer') {
-      // Ensure email is passed if available, Stripe uses it for matching
-      const customerData = { id: `cus_mock_${Date.now()}`, object: 'customer', name: args.name };
-      if (args.email) {
-          customerData.email = args.email;
-      }
-      return customerData;
-  }
-  if (toolName === 'create_payment_link') {
-      // Note: The real MCP tool might not support associating a customer directly.
-      // The webhook needs to handle customer matching/creation robustly.
-      // It only takes price and quantity per the known schema.
-      return { id: `pl_mock_${Date.now()}`, object: 'payment_link', url: `https://mock-stripe-payment-link.com/${args.price}/${Date.now()}` };
-  }
-  // --- End Mock Implementation ---
-
-  throw new Error(`MCP tool call not implemented in placeholder: ${toolName}`);
-  // If implemented, it should return the actual response object from Stripe via MCP.
-}
-
-// Exportar la función dentro de un objeto para poder mockearla
-const mcpUtils = {
-  callStripeMcpTool
-};
 
 /**
  * Verifica suscripciones que están por expirar y envía notificaciones
@@ -163,6 +118,19 @@ async function checkExpiringSubscriptions() {
 async function processExpiredSubscriptions() {
   subscriptionLogger.info('Procesando suscripciones expiradas para generar link de pago');
   const now = new Date();
+  
+  // Verificar conexión con Stripe antes de proceder
+  try {
+    const isStripeConnected = await StripeService.verifyApiKey();
+    if (!isStripeConnected) {
+      subscriptionLogger.error('No se pudo conectar a Stripe. Abortando procesamiento de suscripciones expiradas.');
+      return;
+    }
+    subscriptionLogger.info('Conexión con Stripe verificada. Continuando con el procesamiento.');
+  } catch (error) {
+    subscriptionLogger.error({ error: error.message }, 'Error al verificar conexión con Stripe. Abortando procesamiento.');
+    return;
+  }
 
   try {
     // 1. Encontrar suscripciones candidatas (trial expirado o active expirado) que AÚN NO están 'payment_pending'
@@ -222,11 +190,12 @@ async function processExpiredSubscriptions() {
         continue; 
       }
 
-      // Usar el stripePriceId del plan o uno mock si no existe (para pruebas)
-      const stripePriceIdToUse = plan.stripePriceId || 'price_mock_default';
+      // Verificar que el plan tenga un stripePriceId válido
       if (!plan.stripePriceId) {
-          subscriptionLogger.warn({ tenantId: tenant.id, planId: plan.id }, 'Plan sin stripePriceId, usando mock: price_mock_default');
+          subscriptionLogger.error({ tenantId: tenant.id, planId: plan.id }, 'Plan sin stripePriceId. No se puede generar link de pago.');
+          continue; // Saltar este tenant y continuar con el siguiente
       }
+      const stripePriceIdToUse = plan.stripePriceId;
 
       let stripeCustomerId = tenant.stripeCustomerId;
 
@@ -235,7 +204,7 @@ async function processExpiredSubscriptions() {
         if (!stripeCustomerId) {
           subscriptionLogger.info({ tenantId: tenant.id }, 'Stripe Customer ID no encontrado, creando uno nuevo.');
           // Ensure email is provided if available, as Stripe uses it for matching/communication
-          const customerArgs = {
+          const customerData = {
             name: tenant.businessName,
             // Add email if it exists on the tenant model
             ...(tenant.email && { email: tenant.email }),
@@ -243,9 +212,9 @@ async function processExpiredSubscriptions() {
             metadata: { tenant_id: tenant.id } 
           };
           // Remove email from args if it's null/undefined to avoid sending empty value
-          if (!customerArgs.email) delete customerArgs.email; 
+          if (!customerData.email) delete customerData.email; 
 
-          const newStripeCustomer = await callStripeMcpTool('create_customer', customerArgs);
+          const newStripeCustomer = await StripeService.createCustomer(customerData);
           stripeCustomerId = newStripeCustomer.id;
           
           // Guardar el nuevo ID en la base de datos
@@ -258,15 +227,21 @@ async function processExpiredSubscriptions() {
 
         // 4. Crear Stripe Payment Link
         subscriptionLogger.info({ tenantId: tenant.id, priceId: stripePriceIdToUse }, 'Creando Stripe Payment Link.');
-        // El schema del MCP tool 'create_payment_link' SÓLO acepta 'price' y 'quantity'.
-        const paymentLinkArgs = {
-            price: stripePriceIdToUse, // Usar el ID real o el mock
-            quantity: 1
+        
+        const paymentLinkData = {
+          priceId: stripePriceIdToUse,
+          quantity: 1,
+          metadata: {
+            tenant_id: tenant.id,
+            subscription_id: subscription.id,
+            plan_name: plan.name
+          }
         };
-        const paymentLink = await mcpUtils.callStripeMcpTool('create_payment_link', paymentLinkArgs); // Usar mcpUtils
+        
+        const paymentLink = await StripeService.createPaymentLink(paymentLinkData);
         
         if (!paymentLink || !paymentLink.url) {
-           throw new Error('No se pudo generar la URL del link de pago desde el MCP.');
+           throw new Error('No se pudo generar la URL del link de pago desde Stripe.');
         }
         subscriptionLogger.info({ tenantId: tenant.id, paymentLinkId: paymentLink.id }, 'Stripe Payment Link creado.');
 
@@ -326,5 +301,5 @@ export const subscriptionJobs = {
   // se ha integrado y mejorado en 'processExpiredSubscriptions'.
 };
 
-// Exportar las funciones y el objeto mockeable
-export { mcpUtils, processExpiredSubscriptions, checkExpiringSubscriptions };
+// Exportar las funciones
+export { processExpiredSubscriptions, checkExpiringSubscriptions };

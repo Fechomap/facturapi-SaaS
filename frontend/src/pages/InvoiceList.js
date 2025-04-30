@@ -1,16 +1,19 @@
 // frontend/src/pages/InvoiceList.js
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { getInvoices, downloadInvoicePdf, downloadInvoiceXml, cancelInvoice, searchInvoices } from '../services/invoiceService';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const InvoiceList = () => {
+  const navigate = useNavigate(); // Initialize useNavigate
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(true); // Assume active by default
+  const [subscriptionInfo, setSubscriptionInfo] = useState(null); // Store subscription details
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCriteria, setSearchCriteria] = useState({});
 
@@ -70,10 +73,38 @@ const InvoiceList = () => {
   };
 
   useEffect(() => {
-    if (Object.keys(searchCriteria).length === 0) {
-      fetchInvoices();
+    // Check subscription status from localStorage
+    const userInfoString = localStorage.getItem('user_info');
+    if (userInfoString) {
+      try {
+        const userInfo = JSON.parse(userInfoString);
+        // --- Attempt to find subscription status ---
+        // Adjust the path based on the actual structure in your localStorage
+        const status = userInfo?.tenant?.subscriptionStatus || userInfo?.subscription?.status || 'active'; // Default to active if not found
+        const isActive = status === 'active' || status === 'trial'; // Consider 'trial' as active for button functionality
+        setIsSubscriptionActive(isActive);
+        
+        // Store relevant subscription info for the alert message
+        setSubscriptionInfo({
+          planName: userInfo?.tenant?.plan?.name || 'Basic Plan', // Example path, adjust as needed
+          status: status, // The raw status
+          paymentLink: userInfo?.tenant?.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125' // Example path or default
+        });
+        
+      } catch (e) {
+        console.error("Error parsing user_info from localStorage", e);
+        // Keep default active state or handle error appropriately
+      }
+    } else {
+      // Handle case where user_info is not in localStorage (e.g., redirect to login)
+      // For now, assume active or handle as needed
     }
-  }, [page]);
+
+    // Fetch invoices if not searching
+    if (Object.keys(searchCriteria).length === 0) {
+      fetchInvoices(page); // Pass page here
+    }
+  }, [page, searchCriteria]); // Add searchCriteria dependency
   
   const handlePrevPage = () => {
     if (page > 1) setPage(page - 1);
@@ -82,10 +113,38 @@ const InvoiceList = () => {
   const handleNextPage = () => {
     if (page < totalPages) setPage(page + 1);
   };
+
+  const handleNewInvoiceClick = () => {
+    if (isSubscriptionActive) {
+      navigate('/facturas/nueva');
+    } else {
+      // Show the alert with dynamic info if available
+      const planName = subscriptionInfo?.planName || 'Basic Plan';
+      const statusText = subscriptionInfo?.status === 'pending_payment' ? 'Pago pendiente' : 'Vencida';
+      const paymentLink = subscriptionInfo?.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Fallback link
+
+      alert(
+        `🚨 Suscripción Vencida\n\n` +
+        `Tu período de prueba o suscripción para Pego ha vencido.\n\n` +
+        `Plan: ${planName}\n` +
+        `Estado: ${statusText}\n\n` +
+        `Para reactivar tu servicio y continuar usándolo, por favor realiza tu pago a través del siguiente enlace:\n\n` +
+        `${paymentLink}\n\n` +
+        `Si tienes alguna duda, contáctanos.`
+      );
+    }
+  };
   
   return (
     <div>
       <Navbar />
+      {/* Subscription Status Banner */}
+      {!isSubscriptionActive && subscriptionInfo && (
+        <div className="subscription-status-banner error"> {/* Use 'error' or a specific class for styling */}
+          🚨 **Suscripción Inactiva:** Tu plan '{subscriptionInfo.planName}' está {subscriptionInfo.status === 'pending_payment' ? 'pendiente de pago' : 'vencido'}. 
+          Para reactivar tu servicio, por favor realiza tu pago <a href={subscriptionInfo.paymentLink} target="_blank" rel="noopener noreferrer">aquí</a>.
+        </div>
+      )}
       <div className="invoice-list-container">
         <h1>Facturas</h1>
         
@@ -118,8 +177,13 @@ const InvoiceList = () => {
                   </button>
                 )}
               </div>
-              <button className="new-invoice-btn">
-                <Link to="/facturas/nueva">Nueva Factura</Link>
+              {/* Modified Button */}
+              <button 
+                className={`new-invoice-btn ${!isSubscriptionActive ? 'new-invoice-btn-inactive' : ''}`} // Add class for potential styling
+                onClick={handleNewInvoiceClick}
+                title={!isSubscriptionActive ? 'Suscripción inactiva - Renueva para generar facturas' : 'Generar nueva factura'} // Tooltip
+              >
+                Nueva Factura
               </button>
             </div>
             

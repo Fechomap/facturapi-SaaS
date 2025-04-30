@@ -95,6 +95,9 @@ export function registerSubscriptionCommand(bot) {
         `API Key configurada: ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
         `Organización FacturAPI: ${tenantData.facturapiOrganizationId || 'No configurada'}`,
         Markup.inlineKeyboard([
+          // Mostrar botón de pago solo si la suscripción está inactiva o pendiente de pago
+          ...(subscription.status === 'payment_pending' || subscription.status === 'suspended' || subscription.status === 'cancelled' ? 
+            [[Markup.button.callback('💰 Realizar Pago', 'generate_payment_link')]] : []),
           [Markup.button.callback('💳 Actualizar Plan', 'update_subscription')],
           [Markup.button.callback('↩️ Volver al Menú', 'menu_principal')]
         ])
@@ -116,6 +119,44 @@ export function registerSubscriptionCommand(bot) {
     
     // Simplemente ejecutar el comando /suscripcion
     ctx.telegram.sendMessage(ctx.chat.id, '/suscripcion');
+  });
+  
+  // Acción para generar un enlace de pago
+  bot.action('generate_payment_link', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('⏳ Generando enlace de pago, por favor espere...');
+    
+    try {
+      // Obtener el tenant ID
+      const tenantId = ctx.userState.tenantId;
+      
+      // Generar el enlace de pago
+      const paymentLink = await TenantService.generatePaymentLink(tenantId);
+      
+      if (paymentLink && paymentLink.url) {
+        await ctx.reply(
+          `🔗 Enlace de pago generado correctamente\n\n` +
+          `Para reactivar tu suscripción, realiza el pago a través del siguiente enlace:\n\n` +
+          `${paymentLink.url}\n\n` +
+          `Una vez completado el pago, tu suscripción se actualizará automáticamente.`,
+          Markup.inlineKeyboard([
+            [Markup.button.url('💳 Realizar Pago', paymentLink.url)],
+            [Markup.button.callback('↩️ Volver', 'menu_suscripcion')]
+          ])
+        );
+      } else {
+        throw new Error('No se pudo generar el enlace de pago');
+      }
+    } catch (error) {
+      console.error('Error al generar enlace de pago:', error);
+      await ctx.reply(
+        `❌ Error al generar el enlace de pago: ${error.message}\n\n` +
+        `Por favor, intenta nuevamente más tarde o contacta a soporte.`,
+        Markup.inlineKeyboard([
+          [Markup.button.callback('↩️ Volver', 'menu_suscripcion')]
+        ])
+      );
+    }
   });
   
   // Implementar acción para actualizar suscripción

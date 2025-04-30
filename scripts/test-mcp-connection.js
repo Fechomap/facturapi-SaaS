@@ -79,38 +79,38 @@ async function main() {
     return; // No debería llegar aquí, pero por si acaso
   }
   
-  // Paso 2: Probar herramienta simple (list_products)
-  console.log(`\n${colors.cyan}Paso 2: Probando herramienta list_products...${colors.reset}`);
+  // Paso 2: Probar herramienta simple (products.read)
+  console.log(`\n${colors.cyan}Paso 2: Probando herramienta products.read...${colors.reset}`);
   try {
-    const products = await callStripeMcpTool('list_products', { limit: 1 });
-    console.log(`${colors.green}✓ Herramienta list_products ejecutada correctamente${colors.reset}`);
+    const products = await callStripeMcpTool('products.read', { limit: 1 });
+    console.log(`${colors.green}✓ Herramienta products.read ejecutada correctamente${colors.reset}`);
     console.log('Respuesta:', JSON.stringify(products, null, 2));
   } catch (error) {
-    console.log(`${colors.red}✗ Error al llamar a list_products: ${error.message}${colors.reset}`);
+    console.log(`${colors.red}✗ Error al llamar a products.read: ${error.message}${colors.reset}`);
     console.log(`${colors.yellow}Sugerencias:${colors.reset}`);
     console.log('- Verifica que la API key de Stripe sea correcta');
     console.log('- Verifica que el servidor MCP tenga acceso a la API de Stripe');
-    console.log('- Verifica que la herramienta list_products esté disponible en el servidor MCP');
+    console.log('- Verifica que la herramienta products.read esté disponible en el servidor MCP');
     return;
   }
   
-  // Paso 3: Probar herramienta más compleja (create_customer y luego list_customers)
-  console.log(`\n${colors.cyan}Paso 3: Probando herramienta create_customer...${colors.reset}`);
+  // Paso 3: Probar herramienta más compleja (customers.create y luego customers.read)
+  console.log(`\n${colors.cyan}Paso 3: Probando herramienta customers.create...${colors.reset}`);
   try {
-    const testCustomer = await callStripeMcpTool('create_customer', {
+    const testCustomer = await callStripeMcpTool('customers.create', {
       name: 'Cliente de Prueba MCP',
       email: `test-${Date.now()}@example.com`
     });
-    console.log(`${colors.green}✓ Herramienta create_customer ejecutada correctamente${colors.reset}`);
+    console.log(`${colors.green}✓ Herramienta customers.create ejecutada correctamente${colors.reset}`);
     console.log('Cliente creado:', JSON.stringify(testCustomer, null, 2));
-    
+
     // Verificar que el cliente se haya creado correctamente
-    console.log(`\n${colors.cyan}Paso 4: Verificando cliente creado con list_customers...${colors.reset}`);
-    const customers = await callStripeMcpTool('list_customers', {
+    console.log(`\n${colors.cyan}Paso 4: Verificando cliente creado con customers.read...${colors.reset}`);
+    const customers = await callStripeMcpTool('customers.read', {
       email: testCustomer.email,
       limit: 1
     });
-    console.log(`${colors.green}✓ Herramienta list_customers ejecutada correctamente${colors.reset}`);
+    console.log(`${colors.green}✓ Herramienta customers.read ejecutada correctamente${colors.reset}`);
     console.log('Clientes encontrados:', JSON.stringify(customers, null, 2));
     
     if (customers.data && customers.data.length > 0) {
@@ -119,7 +119,7 @@ async function main() {
       console.log(`${colors.red}✗ Cliente no encontrado en la lista${colors.reset}`);
     }
   } catch (error) {
-    console.log(`${colors.red}✗ Error al probar create_customer/list_customers: ${error.message}${colors.reset}`);
+    console.log(`${colors.red}✗ Error al probar customers.create/customers.read: ${error.message}${colors.reset}`);
     return;
   }
   
