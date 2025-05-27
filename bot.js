@@ -3,6 +3,7 @@ import { initConfig, config } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
 import { createBot } from './bot/index.js';
+import express from 'express';
 
 // Logger específico para el bot
 const botLogger = logger.child({ module: 'telegram-bot' });
@@ -21,8 +22,35 @@ async function startBot() {
     // Crear e inicializar el bot usando el módulo modular
     const bot = createBot(botLogger);
     
-    // Iniciar el bot
-    await bot.launch();
+    // Iniciar el bot según el entorno
+    if (config.env === 'production' && config.isRailway) {
+      // En Railway, usar webhook
+      const webhookDomain = config.apiBaseUrl.replace(/^https?:\/\//i, '');
+      botLogger.info(`Configurando webhook en dominio: ${webhookDomain}`);
+      
+      // Configurar webhook - Railway requiere HTTPS
+      await bot.telegram.setWebhook(`https://${webhookDomain}/telegram-webhook`);
+      
+      // Iniciar servidor web para el webhook
+      const app = express();
+      app.use(express.json());
+      
+      // Ruta del webhook
+      app.use('/telegram-webhook', (req, res) => {
+        bot.handleUpdate(req.body, res);
+      });
+      
+      // Puerto para el webhook (usar el puerto asignado por Railway)
+      const PORT = process.env.PORT || 3000;
+      app.listen(PORT, () => {
+        botLogger.info(`Servidor webhook escuchando en puerto ${PORT}`);
+      });
+    } else {
+      // En desarrollo, usar polling
+      await bot.launch();
+      botLogger.info('Bot iniciado en modo polling');
+    }
+    
     botLogger.info('Bot de Telegram iniciado correctamente');
     botLogger.info(`Entorno: ${config.env}`);
     
