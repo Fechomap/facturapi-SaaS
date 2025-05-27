@@ -29,6 +29,43 @@ class InvoiceService {
       // Obtener el cliente de FacturAPI usando la API key almacenada en el tenant
       const facturapi = await facturapIService.getFacturapiClient(tenantId);
       
+      // Verificar si el clienteId es un código corto o un ID hexadecimal
+      let facturapiClienteId = data.clienteId;
+      const hexRegex = /^[0-9a-f]{24}$/i;
+      
+      // Si el clienteId no es un ID hexadecimal válido, buscar el cliente por nombre
+      if (!hexRegex.test(facturapiClienteId)) {
+        console.log(`El ID de cliente "${facturapiClienteId}" no es un ID hexadecimal. Buscando cliente por nombre...`);
+        
+        // Mapa de códigos cortos a nombres completos para buscar
+        const clientMap = {
+          'SOS': 'PROTECCION S.O.S. JURIDICO',
+          'ARSA': 'ARSA ASESORIA INTEGRAL PROFESIONAL',
+          'INFO': 'INFOASIST INFORMACION Y ASISTENCIA'
+        };
+        
+        // Obtener el nombre completo si es un código corto
+        const nombreBusqueda = clientMap[facturapiClienteId] || data.clienteNombre || facturapiClienteId;
+        
+        try {
+          // Buscar clientes que coincidan con el nombre
+          const clientes = await facturapi.customers.list({
+            q: nombreBusqueda.substring(0, 10) // Buscar por las primeras palabras
+          });
+          
+          if (clientes && clientes.data && clientes.data.length > 0) {
+            // Usar el primer cliente que coincida
+            facturapiClienteId = clientes.data[0].id;
+            console.log(`Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${facturapiClienteId})`);
+          } else {
+            throw new Error(`No se encontró el cliente "${nombreBusqueda}" en FacturAPI`);
+          }
+        } catch (error) {
+          console.error('Error buscando cliente por nombre:', error);
+          throw new Error(`Error al buscar cliente por nombre: ${error.message}`);
+        }
+      }
+      
       // Obtener el próximo folio
       const folio = await TenantService.getNextFolio(tenantId, 'A');
       
@@ -72,7 +109,7 @@ class InvoiceService {
       
       // Crear la factura en FacturAPI
       const facturaData = {
-        customer: data.clienteId,
+        customer: facturapiClienteId, // Usar el ID convertido
         items: [
           {
             quantity: 1,
