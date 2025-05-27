@@ -5,10 +5,11 @@ import { config, initConfig } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
 import routes from './api/routes/index.js';
-import { tenantMiddleware } from './api/middlewares/tenant.middleware.js'; // Corrected import
+import { tenantMiddleware } from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
 import { startJobs } from './jobs/index.js';
 import NotificationService from './services/notification.service.js';
+import { createBot } from './bot/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -19,11 +20,37 @@ const __dirname = path.dirname(__filename);
 // Logger específico para el servidor
 const serverLogger = logger.child({ module: 'server' });
 
+// Variable para el bot de Telegram
+let telegramBot = null;
+
+// Función para inicializar el bot de Telegram
+async function initializeTelegramBot() {
+  try {
+    if (!config.telegram.token) {
+      serverLogger.warn('Token de Telegram no configurado');
+      return null;
+    }
+
+    const botLogger = logger.child({ module: 'telegram-bot' });
+    telegramBot = createBot(botLogger);
+
+    if (config.env === 'production' && config.isRailway) {
+      const webhookUrl = `${config.apiBaseUrl}/telegram-webhook`;
+      await telegramBot.telegram.setWebhook(webhookUrl);
+      serverLogger.info(`Webhook de Telegram configurado: ${webhookUrl}`);
+    }
+
+    return telegramBot;
+  } catch (error) {
+    serverLogger.error('Error al inicializar bot de Telegram:', error);
+    return null;
+  }
+}
+
 // Función para inicializar la aplicación Express
 async function initializeApp() {
   // Inicializar configuración
   await initConfig();
-
 
   // Inicializar la aplicación Express
   const app = express();
@@ -35,14 +62,35 @@ async function initializeApp() {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID']
   }));
 
-  // Configuración especial para webhooks de Stripe (necesita el cuerpo raw)
+  // Configuración especial para webhooks
   app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+  app.use('/telegram-webhook', express.json());
+
+  // === WEBHOOK DE TELEGRAM ===
+  app.post('/telegram-webhook', async (req, res) => {
+    try {
+      if (telegramBot) {
+        await telegramBot.handleUpdate(req.body);
+      }
+      res.status(200).json({ ok: true });
+    } catch (error) {
+      serverLogger.error('Error en webhook de Telegram:', error);
+      res.status(200).json({ ok: true });
+    }
+  });
+
+  app.get('/telegram-webhook', (req, res) => {
+    res.json({ 
+      status: 'Webhook de Telegram activo',
+      bot_initialized: Boolean(telegramBot)
+    });
+  });
 
   // Middleware para parsing JSON para el resto de rutas
   app.use(express.json());
 
   // Middleware para extraer información de tenant
-  app.use('/api', tenantMiddleware); // Use the correctly imported middleware
+  app.use('/api', tenantMiddleware);
 
   // Registrar todas las rutas bajo el prefijo /api
   app.use('/api', routes);
@@ -56,13 +104,14 @@ async function initializeApp() {
     res.json({
       status: 'API de Facturación activa - FacturAPI SaaS',
       environment: config.env,
-      version: '1.0.0'
+      version: '1.0.0',
+      telegram_bot: Boolean(telegramBot)
     });
   });
 
   // Cualquier otra ruta que no sea de API sirve el frontend
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
+    if (req.path.startsWith('/api') || req.path.startsWith('/telegram-webhook')) {
       return next();
     }
     // Ensure the file exists before sending
@@ -91,6 +140,9 @@ async function startServer() {
     // Inicializar la aplicación
     const app = await initializeApp();
 
+    // Inicializar el bot de Telegram
+    telegramBot = await initializeTelegramBot();
+
     // Puerto de la aplicación desde la configuración centralizada
     const PORT = process.env.PORT || config.port || 3000;
 
@@ -101,6 +153,7 @@ async function startServer() {
       serverLogger.info(`API de Facturación SaaS lista y funcionando`);
       serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
       serverLogger.info(`Frontend disponible en http://localhost:${PORT}`);
+      serverLogger.info(`Bot de Telegram: ${telegramBot ? '✅ Activo' : '❌ Inactivo'}`);
 
       // Inicializar servicio de notificaciones
       const notificationInitialized = NotificationService.initialize();
@@ -151,6 +204,28 @@ async function startServer() {
         process.exit(1);
       }
     });
+
+    // Habilitar el cierre correcto
+    process.once('SIGINT', () => {
+      serverLogger.info('Señal SIGINT recibida, cerrando servidor y bot');
+      if (telegramBot) {
+        telegramBot.stop('SIGINT');
+      }
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+
+    process.once('SIGTERM', () => {
+      serverLogger.info('Señal SIGTERM recibida, cerrando servidor y bot');
+      if (telegramBot) {
+        telegramBot.stop('SIGTERM');
+      }
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+
   } catch (error) {
     // Log errors during the initial setup phase (before app.listen)
     console.error('Raw Server Initialization Error:', error);
@@ -159,7 +234,7 @@ async function startServer() {
         stack: error.stack,
         code: error.code,
         errno: error.errno,
-        syscall: error.syscall
+        syscall: error.syscale
     }, 'Error detallado durante la inicialización del servidor');
     process.exit(1);
   }

@@ -790,8 +790,17 @@ function registerCancellationHandlers(bot) {
       
       // Llamar a la API para cancelar la factura
       try {
-      const apiUrl = `${config.apiBaseUrl}/api/facturas/${facturaId}`;
+        // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
+        let baseUrl = config.apiBaseUrl;
+        
+        // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
+        if (config.env === 'development' && baseUrl.includes('localhost')) {
+          baseUrl = 'http://localhost:3000';
+        }
+        
+        const apiUrl = `${baseUrl}/api/facturas/${facturaId}`;
         console.log(`Enviando solicitud de cancelación a: ${apiUrl} con motivo: ${motivoCancelacion}`);
+
         
         const response = await axios.delete(apiUrl, { 
           data: { 
