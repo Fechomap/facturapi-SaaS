@@ -25,6 +25,20 @@ try {
     }
   }
   
+  // Construir el frontend
+  console.log('💻 Construyendo el frontend...');
+  try {
+    console.log('Instalando dependencias del frontend...');
+    execSync('cd frontend && npm install', { stdio: 'inherit' });
+    console.log('Ejecutando build del frontend...');
+    execSync('cd frontend && npm run build', { stdio: 'inherit' });
+    console.log('✅ Frontend construido correctamente.');
+  } catch (frontendError) {
+    console.error('⚠️ Error al construir el frontend:', frontendError.message);
+    // No fallamos el despliegue si la construcción del frontend falla
+    console.log('El servidor continuará la ejecución, pero el frontend puede no estar disponible.');
+  }
+  
   console.log('🎉 Proceso de despliegue completado con éxito.');
 } catch (error) {
   console.error('❌ Error durante el despliegue:', error.message);
