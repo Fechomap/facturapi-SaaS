@@ -64,7 +64,15 @@ function ensureTempDirExists() {
  * @returns {Promise<string>} - Ruta al archivo descargado
  */
 async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
-  const apiUrl = `${config.apiBaseUrl}/api/facturas/${facturaId}/${formato}`;
+  // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
+  let baseUrl = config.apiBaseUrl;
+  
+  // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
+  if (config.env === 'development' && baseUrl.includes('localhost')) {
+    baseUrl = 'http://localhost:3000';
+  }
+  
+  const apiUrl = `${baseUrl}/api/facturas/${facturaId}/${formato}`;
   console.log('Descargando desde URL:', apiUrl);
 
   const tempDir = ensureTempDirExists();
@@ -558,7 +566,15 @@ export function registerInvoiceHandler(bot) {
           console.log('Intentando consultar folio:', folioConsulta);
         
           try {
-            const apiUrl = `${config.apiBaseUrl}/api/facturas/by-folio/${folioConsulta}`;
+            // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
+            let baseUrl = config.apiBaseUrl;
+            
+            // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
+            if (config.env === 'development' && baseUrl.includes('localhost')) {
+              baseUrl = 'http://localhost:3000';
+            }
+            
+            const apiUrl = `${baseUrl}/api/facturas/by-folio/${folioConsulta}`;
             console.log('URL de consulta:', apiUrl);
             
             // Obtener el tenant ID del contexto del usuario

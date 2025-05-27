@@ -30,40 +30,45 @@ Sistema de facturación en modo multitenancy basado en FacturAPI.
    npm start
    ```
 
-### Operaciones en Heroku
+### Operaciones en Railway (Plataforma Actual)
 
-#### Gestión de Dynos
+#### Gestión de Servicios
 
-#### Detener aplicaciones:
+Los servicios en Railway se gestionan directamente desde el dashboard o usando la CLI de Railway.
+
 ```bash
-# Producción
-heroku ps:scale web=0 bot=0 --app facturapi-saas
+# Instalar Railway CLI (solo primera vez)
+npm i -g @railway/cli
 
-# Staging
-heroku ps:scale web=0 bot=0 --app facturapi-staging
+# Iniciar sesión en Railway
+railway login
 
-#### Iniciar aplicaciones:
-```bash
-# Producción
-heroku ps:scale web=1 bot=1 --app facturapi-saas
-
-# Staging
-heroku ps:scale web=1 bot=1 --app facturapi-staging
-
-#### Reinicio completo:
-```bash
-heroku restart --app facturapi-saas    # Producción
-heroku restart --app facturapi-staging # Staging
+# Listar proyectos
+railway projects
 ```
 
-#### Despliegue en Heroku
+#### Desplegar en Railway
 
 ```bash
-# Añadir remote de Heroku (solo primera vez)
-heroku git:remote -a facturapi-saas
+# Usando el dashboard de Railway (Recomendado)
+# 1. Conecta tu repositorio de GitHub
+# 2. Railway desplegará automáticamente cuando haya cambios
 
-# Desplegar última versión
-git push heroku main
+# Usando CLI para despliegue manual
+railway up
+```
+
+#### Monitoreo y Logs
+
+```bash
+# Ver logs en tiempo real (CLI)
+railway logs
+
+# Acceder al dashboard para monitoreo
+railway open
+```
+
+### Operaciones en Heroku (Plataforma Anterior)
 
 # Ver los últimos logs después del despliegue
 heroku logs --tail -a facturapi-saas
@@ -73,7 +78,17 @@ heroku logs --tail -a facturapi-staging
 
 ### Diagnóstico y Logs
 
-#### Logs de aplicación
+#### Logs de aplicación en Railway
+
+```bash
+# Ver logs en tiempo real usando CLI
+railway logs
+
+# O utilizar el dashboard de Railway para ver logs
+railway open
+```
+
+#### Logs en Heroku (plataforma anterior)
 
 ```bash
 # Ver logs en tiempo real
@@ -97,15 +112,21 @@ Los logs en desarrollo se almacenan en la carpeta `/logs`:
 #### Diagnóstico rápido
 
 1. **Problemas de conexión a la base de datos**:
-   - Verificar la variable `DATABASE_URL`
+   - En Railway: Verificar la variable `DATABASE_URL` en el dashboard o usando `railway variables get DATABASE_URL`
    - En Heroku: `heroku config:get DATABASE_URL -a facturapi-saas`
 
 2. **Problemas con el bot**:
-   - Verificar token: `heroku config:get TELEGRAM_BOT_TOKEN -a facturapi-saas`
-   - Consultar logs de worker: `heroku logs --source worker -a facturapi-saas`
+   - En Railway: Verificar token en el dashboard o usando `railway variables get TELEGRAM_BOT_TOKEN`
+   - En Heroku: `heroku config:get TELEGRAM_BOT_TOKEN -a facturapi-saas`
 
 3. **Problemas con FacturAPI**:
-   - Verificar modo y API key: 
+   - En Railway: Verificar variables en el dashboard
+     ```bash
+     railway variables get FACTURAPI_ENV
+     railway variables get FACTURAPI_TEST_KEY
+     railway variables get FACTURAPI_LIVE_KEY
+     ```
+   - En Heroku:
      ```bash
      heroku config:get FACTURAPI_ENV -a facturapi-saas
      heroku config:get FACTURAPI_TEST_KEY -a facturapi-saas
@@ -141,7 +162,13 @@ El sistema detecta automáticamente el entorno y ajusta su configuración:
    - Usa las rutas de archivos locales para almacenamiento
    - Habilita mensajes de depuración detallados
 
-2. **Producción (Heroku)**:
+2. **Producción (Railway)**:
+   - Se detecta automáticamente cuando se ejecuta en Railway
+   - Usa la URL de Railway (`https://{app-name}.railway.app`)
+   - Utiliza `/tmp/storage` para almacenamiento temporal
+   - Optimiza logs para producción
+
+3. **Producción (Heroku - Plataforma anterior)**:
    - Se detecta automáticamente cuando se ejecuta en Heroku
    - Usa la URL de Heroku (`https://{app-name}.herokuapp.com`)
    - Utiliza `/tmp/storage` para almacenamiento temporal
@@ -159,10 +186,11 @@ Esto permite ejecutar pruebas con datos reales usando el API key de producción 
 ## Base de datos
 
 ### Estructura de Entornos:
-- **Producción**: Base de datos dedicada (facturapi-saas)
+- **Producción en Railway**: Base de datos dedicada PostgreSQL en Railway
+- **Producción en Heroku (anterior)**: Base de datos dedicada (facturapi-saas)
 - **Staging**: Comparte base de datos con entorno local (facturapi-staging)
 
-Se recomienda mantener bases de datos separadas para desarrollo y producción. En Heroku, la base de datos se configura automáticamente mediante el add-on de PostgreSQL.
+Se recomienda mantener bases de datos separadas para desarrollo y producción. Tanto en Railway como en Heroku, la base de datos PostgreSQL se configura automáticamente.
 
 Para desarrollo local, configura una base de datos PostgreSQL y establece la URL en `DATABASE_URL`.
 
@@ -227,10 +255,51 @@ heroku pg:info -a facturapi-saas
 heroku pg:connections -a facturapi-saas
 ```
 
-## Despliegue en Heroku
+## Despliegue en Railway (Plataforma Actual)
+
+Para desplegar en Railway, sigue estos pasos:
+
+1. **Conecta tu repositorio**: En el dashboard de Railway, conecta tu repositorio de GitHub
+
+2. **Configura las variables de entorno**:
+   - `IS_RAILWAY=true`
+   - `FACTURAPI_ENV`
+   - `FACTURAPI_LIVE_KEY` (para producción)
+   - `FACTURAPI_TEST_KEY` (para pruebas)
+   - `FACTURAPI_USER_KEY`
+   - `RAILWAY_PUBLIC_DOMAIN` (autogenerado por Railway)
+   - Todas las demás variables requeridas como IDs de clientes
+
+3. **Configuración de Railway**: El archivo `railway.json` contiene la configuración para el despliegue:
+   ```json
+   {
+     "$schema": "https://railway.app/railway.schema.json",
+     "build": {
+       "builder": "NIXPACKS",
+       "buildCommand": "npm run railway:build"
+     },
+     "deploy": {
+       "startCommand": "npm run railway:start",
+       "healthcheckPath": "/api/info",
+       "healthcheckTimeout": 300,
+       "restartPolicyType": "ON_FAILURE",
+       "restartPolicyMaxRetries": 10
+     }
+   }
+   ```
+
+4. **Scripts de Railway**: En `package.json` se han agregado scripts específicos para Railway:
+   - `railway:build`: Ejecuta migraciones y genera el cliente Prisma
+   - `railway:start`: Inicia el servidor
+   - `railway:start:bot`: Inicia el bot
+
+Railway configura automáticamente `DATABASE_URL` al agregar una base de datos PostgreSQL.
+
+## Despliegue en Heroku (Plataforma Anterior)
 
 Para desplegar en Heroku, asegúrate de configurar las siguientes variables en el dashboard:
 
+- `IS_HEROKU=true`
 - `FACTURAPI_ENV`
 - `FACTURAPI_LIVE_KEY` (para producción)
 - `FACTURAPI_TEST_KEY` (para pruebas)

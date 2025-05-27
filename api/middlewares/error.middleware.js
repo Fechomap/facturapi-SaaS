@@ -1,8 +1,5 @@
-// api/middlewares/error.middleware.js
-// Removed top-level logger import
+// api/middlewares/error.middleware.js - Actualizado para Railway
 import NotificationService from '../../services/notification.service.js';
-
-// Logger will be imported dynamically inside the function
 
 // Errores conocidos y sus códigos de estado
 const ERROR_TYPES = {
@@ -60,8 +57,6 @@ function normalizeError(err) {
     };
   }
 
-  // Otros errores específicos según librerías
-
   // Por defecto, error interno del servidor
   return {
     type: err.name || 'InternalServerError',
@@ -76,7 +71,7 @@ function normalizeError(err) {
 /**
  * Middleware para manejo centralizado de errores
  */
-async function errorMiddleware(err, req, res, next) { // Added async
+async function errorMiddleware(err, req, res, next) {
   // Si ya se envió una respuesta, pasar al siguiente middleware
   if (res.headersSent) {
     return next(err);
@@ -86,13 +81,11 @@ async function errorMiddleware(err, req, res, next) { // Added async
   let errorLogger;
   let logMethod;
   try {
-    // Use await for dynamic import
     const loggerModule = await import('../../core/utils/logger.js');
-    const logger = loggerModule.default; // Access the default export
+    const logger = loggerModule.default;
     errorLogger = logger.child({ module: 'error-middleware' });
   } catch (importError) {
     console.error("FATAL: Failed to import logger in error middleware:", importError);
-    // Fallback logging if logger fails
     errorLogger = {
         error: (obj, msg) => console.error(`[ERROR_MW_ERROR] ${msg}`, JSON.stringify(obj)),
         warn: (obj, msg) => console.warn(`[ERROR_MW_WARN] ${msg}`, JSON.stringify(obj)),
@@ -102,8 +95,7 @@ async function errorMiddleware(err, req, res, next) { // Added async
   // Normalizar el error
   const normalizedError = normalizeError(err);
 
-  // Log según nivel de gravedad using the dynamically obtained logger
-  // Use .bind() to ensure correct 'this' context for pino methods
+  // Log según nivel de gravedad
   logMethod = normalizedError.logLevel === 'error' ? errorLogger.error.bind(errorLogger) : errorLogger.warn.bind(errorLogger);
 
   // Crear objeto de log con contexto enriquecido
@@ -121,16 +113,20 @@ async function errorMiddleware(err, req, res, next) { // Added async
 
   // Log completo del error con stack trace para errores críticos
   if (normalizedError.logLevel === 'error') {
-    logContext.stack = normalizedError.originalError?.stack; // Use optional chaining
+    logContext.stack = normalizedError.originalError?.stack;
     logContext.details = normalizedError.details;
 
-    // Para errores críticos, notificar a administradores si están configurados
+    // Para errores críticos, notificar a administradores
     try {
+      const isProduction = process.env.NODE_ENV === 'production';
+      const isRailway = process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
       const isHeroku = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
-      // Solo notificar si explícitamente se ha activado la notificación de errores
-      if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || isHeroku) {
-        // Crear mensaje de notificación para admins
-        const adminMessage = `🚨 *Error Crítico en API*\n\n` +
+      
+      // Notificar si estamos en producción (Railway, Heroku) o si está explícitamente activado
+      if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || (isProduction && (isRailway || isHeroku))) {
+        const platformName = isRailway ? 'Railway' : isHeroku ? 'Heroku' : 'Producción';
+        
+        const adminMessage = `🚨 *Error Crítico en API (${platformName})*\n\n` +
           `*Tipo:* ${normalizedError.type}\n` +
           `*Endpoint:* ${req.method} ${req.path}\n` +
           `*Tenant:* ${req.tenant?.id || 'N/A'}\n` +
@@ -138,16 +134,15 @@ async function errorMiddleware(err, req, res, next) { // Added async
           `*Hora:* ${new Date().toISOString()}\n\n` +
           `Ver logs para más detalles.`;
 
-        // Enviar notificación asincrónica (no esperamos respuesta para no bloquear)
         NotificationService.notifySystemAdmins(adminMessage).catch(notifyError => {
-          errorLogger.warn( // Use the dynamic logger here too
+          errorLogger.warn(
             { error: notifyError },
             'Error al enviar notificación de error crítico'
           );
         });
       }
     } catch (notifyError) {
-      errorLogger.warn( // And here
+      errorLogger.warn(
         { error: notifyError },
         'Error al procesar notificación de error crítico'
       );
@@ -164,7 +159,7 @@ async function errorMiddleware(err, req, res, next) { // Added async
     timestamp: new Date().toISOString()
   };
 
-  // Incluir detalles solo para tipos específicos de errores o en desarrollo/debug
+  // Incluir detalles según el entorno
   const isDebug = process.env.DEBUG_ERRORS === 'true';
   if (normalizedError.details && (
     process.env.NODE_ENV === 'development' ||
@@ -174,9 +169,9 @@ async function errorMiddleware(err, req, res, next) { // Added async
     clientResponse.details = normalizedError.details;
   }
 
-  // Incluir stack trace solo en desarrollo o modo debug explícito
+  // Incluir stack trace solo en desarrollo o modo debug
   if (process.env.NODE_ENV === 'development' || isDebug) {
-    clientResponse.stack = normalizedError.originalError?.stack; // Use optional chaining
+    clientResponse.stack = normalizedError.originalError?.stack;
   }
 
   res.status(normalizedError.status).json(clientResponse);
