@@ -26,9 +26,10 @@
         "lint": "eslint .",
         "format": "prettier --write .",
         "build": "prisma generate",
-        "railway:build": "prisma migrate deploy && prisma generate",
+        "railway:build": "node scripts/railway-deploy.js",
         "railway:start": "node server.js",
         "railway:start:bot": "node bot.js",
+        "railway:init-db": "node scripts/init-railway-db.js",
         "init-db": "node scripts/init-db.js",
         "reset-db": "prisma migrate reset --force && prisma migrate deploy"
     },
