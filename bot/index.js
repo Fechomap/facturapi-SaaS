@@ -7,6 +7,7 @@ import { registerAllCommands } from './commands/index.js';
 import authMiddleware from './middlewares/auth.middleware.js';
 
 // Importación directa de handlers
+import { registerPDFInvoiceHandler } from './handlers/pdf-invoice.handler.js'; // Nuevo handler para PDFs
 import { registerClientHandler } from './handlers/client.handler.js';
 import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
@@ -70,12 +71,13 @@ export function createBot(logger) {
   // Registrar todos los comandos (incluyendo los de admin a través de registerAllCommands)
   registerAllCommands(bot);
 
-  // Registrar handlers en orden: primero los específicos, último el de producción
-  registerClientHandler(bot);
-  registerInvoiceHandler(bot);
-  registerChubbHandler(bot);         // Ahora antes del Production
-  registerOnboardingHandler(bot);
-  registerProductionSetupHandler(bot); // Este debe ser el último
+  // Registrar handlers en orden: IMPORTANTE - el handler de PDF debe ir PRIMERO
+  registerPDFInvoiceHandler(bot);    // 1. PDF (PRIMERO)
+  registerClientHandler(bot);        // 2. Clientes
+  registerInvoiceHandler(bot);       // 3. Facturas
+  registerChubbHandler(bot);         // 4. Excel CHUBB
+  registerOnboardingHandler(bot);    // 5. Onboarding
+  registerProductionSetupHandler(bot); // 6. Producción (ÚLTIMO)
   
   logger.info('Bot configurado correctamente');
   return bot;

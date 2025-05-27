@@ -7,8 +7,9 @@ import { Markup } from 'telegraf';
 export function mainMenu() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('📝 Generar Factura', 'menu_generar')],
+    [Markup.button.callback('📂 Subir PDF de Pedido', 'menu_subir_pdf')],
     [Markup.button.callback('🔍 Consultar Factura', 'menu_consultar')],
-    [Markup.button.callback('📊 Reportes', 'menu_reportes')], // Nueva opción
+    [Markup.button.callback('📊 Reportes', 'menu_reportes')],
     [Markup.button.callback('💳 Mi Suscripción', 'menu_suscripcion')],
     [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')]
   ]);

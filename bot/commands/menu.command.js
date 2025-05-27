@@ -1,5 +1,6 @@
 // bot/commands/menu.command.js
-import { mainMenu } from '../views/menu.view.js';
+import { Markup } from 'telegraf';
+import { mainMenu, reportsMenu } from '../views/menu.view.js';
 
 /**
  * Registra el comando menu (/menu) y acciones relacionadas
@@ -101,5 +102,28 @@ export function registerMenuCommand(bot) {
   bot.action('reporte_suscripcion_action', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_suscripcion');
+  });
+  
+  // Acción para subir PDF de pedido
+  bot.action('menu_subir_pdf', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    if (!ctx.hasTenant()) {
+      return ctx.reply(
+        'Para subir un PDF de pedido, primero debes registrar tu empresa.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📝 Registrar empresa', 'start_registration')]
+        ])
+      );
+    }
+    
+    await ctx.reply(
+      '📂 *Subir PDF de Pedido*\n\n' +
+      'Envíame el PDF del pedido de compra para analizarlo automáticamente y generar la factura.\n\n' +
+      '✅ Funcionará con pedidos de *ARSA*, *INFOASIST* y *SOS*.\n' +
+      '📌 La clave SAT (`78101803`) se asignará automáticamente.\n\n' +
+      'Por favor, adjunta ahora el archivo PDF:',
+      { parse_mode: 'Markdown' }
+    );
   });
 }
