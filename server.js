@@ -12,6 +12,7 @@ import NotificationService from './services/notification.service.js';
 import { createBot } from './bot/index.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 // Definir __dirname para módulos ES
 const __filename = fileURLToPath(import.meta.url);
@@ -116,7 +117,7 @@ async function initializeApp() {
     }
     // Ensure the file exists before sending
     const indexPath = path.join(frontendPath, 'index.html');
-    if (require('fs').existsSync(indexPath)) {
+    if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
     } else {
       // Handle case where index.html doesn't exist (e.g., frontend not built)
