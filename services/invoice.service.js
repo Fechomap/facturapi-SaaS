@@ -48,9 +48,10 @@ class InvoiceService {
         const nombreBusqueda = clientMap[facturapiClienteId] || data.clienteNombre || facturapiClienteId;
         
         try {
-          // Buscar clientes que coincidan con el nombre
+          // Buscar clientes que coincidan con el nombre (usando nombre completo)
+          console.log(`Buscando cliente con nombre: "${nombreBusqueda}"`);
           const clientes = await facturapi.customers.list({
-            q: nombreBusqueda.substring(0, 10) // Buscar por las primeras palabras
+            q: nombreBusqueda // Usar el nombre completo para mayor precisión
           });
           
           if (clientes && clientes.data && clientes.data.length > 0) {

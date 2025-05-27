@@ -102,9 +102,9 @@ class PDFAnalysisService {
 
     // 3. EXTRAER IMPORTE TOTAL
     const amountPatterns = [
-      /Importe:\s*\$\s*([\d,]+\.?\d*)\s*MXN/i,
-      /Total.*?\$\s*([\d,]+\.?\d*)/i,
-      /Suma\s+total.*?\$\s*([\d,]+\.?\d*)/i
+      /Importe:\s*\$\s*([\d,.]+\.?\d*)\s*MXN/i,
+      /Total.*?\$\s*([\d,.]+\.?\d*)/i,
+      /Suma\s+total.*?\$\s*([\d,.]+\.?\d*)/i
     ];
 
     for (const pattern of amountPatterns) {
@@ -127,8 +127,30 @@ class PDFAnalysisService {
   }
 
   static parseAmount(amountStr) {
-    // Remover comas y convertir a número
-    return parseFloat(amountStr.replace(/,/g, ''));
+    // Normalizar formato para manejar diferentes convenciones de decimales
+    let cleanAmount = amountStr.trim();
+    
+    // Determinar si el último separador (coma o punto) es decimal
+    const lastCommaIndex = cleanAmount.lastIndexOf(',');
+    const lastDotIndex = cleanAmount.lastIndexOf('.');
+    
+    // Si hay coma y está cerca del final, podría ser separador decimal
+    if (lastCommaIndex > -1 && cleanAmount.length - lastCommaIndex <= 3) {
+      // Formato con coma decimal (p.ej. 80,57)
+      cleanAmount = cleanAmount.replace(/\./g, ''); // Quitar puntos de miles
+      cleanAmount = cleanAmount.replace(',', '.'); // Reemplazar coma decimal con punto
+    } else if (lastDotIndex > -1 && cleanAmount.length - lastDotIndex <= 3) {
+      // Formato con punto decimal (p.ej. 80.57)
+      cleanAmount = cleanAmount.replace(/,/g, ''); // Quitar comas de miles
+    } else {
+      // Sin decimal, limpiar todos los separadores
+      cleanAmount = cleanAmount.replace(/[,.\s]/g, '');
+    }
+    
+    // Para depuración
+    console.log(`Monto original: ${amountStr}, Monto limpio: ${cleanAmount}`);
+    
+    return parseFloat(cleanAmount);
   }
 
   static validateExtractedData(analysis) {
@@ -177,23 +199,19 @@ class PDFAnalysisService {
     };
   }
 
-  // Método para mapear cliente a ID interno (usar IDs reales de FacturAPI)
+  // Método para mapear código de cliente a nombre completo
   static getClientMapping(clientCode) {
-    // IDs reales de clientes en FacturAPI (hexadecimales)
+    // Mapa de códigos cortos a nombres completos
     const clientMap = {
       'SOS': {
-        // Estos IDs deben reemplazarse con los IDs reales de FacturAPI
-        id: '67d8f315808be76519b559c9', // ID de ejemplo, debe ser un ID real
         name: 'PROTECCION S.O.S. JURIDICO',
         satKey: '78101803' // Siempre usar esta clave SAT para todos
       },
       'ARSA': {
-        id: '67d8f315808be76519b559c9', // ID de ejemplo, debe ser un ID real
         name: 'ARSA ASESORIA INTEGRAL PROFESIONAL',
         satKey: '78101803' // Siempre usar esta clave SAT para todos
       },
       'INFO': {
-        id: '67d8f315808be76519b559c9', // ID de ejemplo, debe ser un ID real
         name: 'INFOASIST INFORMACION Y ASISTENCIA', 
         satKey: '78101803' // Siempre usar esta clave SAT para todos
       }

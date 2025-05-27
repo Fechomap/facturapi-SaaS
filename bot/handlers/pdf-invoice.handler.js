@@ -191,9 +191,10 @@ async function generateSimpleInvoice(ctx, analysisData) {
     // Intentar buscar cliente por nombre
     let clienteId = null;
     try {
-      // Buscar clientes que coincidan con el nombre
+      // Buscar clientes que coincidan con el nombre (usando nombre completo)
+      console.log(`Buscando cliente con nombre completo: "${analysis.clientName}"`);
       const clientes = await facturapi.customers.list({
-        q: analysis.clientName.substring(0, 10) // Buscar por las primeras palabras
+        q: analysis.clientName // Usar el nombre completo para mayor precisión
       });
       
       if (clientes && clientes.data && clientes.data.length > 0) {
