@@ -1,0 +1,14 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "postgresql"]
+
+[phases.install]
+cmds = ["npm ci --no-cache"]
+
+[phases.build]
+cmds = ["npm run railway:build"]
+
+[start]
+cmd = "npm run railway:start"
+
+[variables]
+NODE_OPTIONS = "--max-old-space-size=512"
