@@ -99,7 +99,7 @@ export const searchInvoices = async (criteria) => {
   }
 };
 
-export default {
+const invoiceService = {
   getInvoiceById,
   getInvoices,
   createInvoice,
@@ -108,3 +108,5 @@ export default {
   downloadInvoiceXml,
   searchInvoices
 };
+
+export default invoiceService;

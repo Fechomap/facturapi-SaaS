@@ -81,8 +81,8 @@ const Dashboard = () => {
         });
         
         // Cargar datos de clientes
-        const clientsResponse = await clientService.getClients();
-        const clients = clientsResponse.data.data || [];
+        // Nota: solo necesitamos la llamada a la API, no usamos la variable clients
+        await clientService.getClients();
         
         // Generar top clientes basado en facturas reales
         const clientInvoiceTotals = {};

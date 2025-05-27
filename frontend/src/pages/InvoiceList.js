@@ -1,5 +1,5 @@
 // frontend/src/pages/InvoiceList.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getInvoices, downloadInvoicePdf, downloadInvoiceXml, cancelInvoice, searchInvoices } from '../services/invoiceService';
 import Navbar from '../components/Navbar';
@@ -14,7 +14,7 @@ const InvoiceList = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCriteria, setSearchCriteria] = useState({});
 
-  const fetchInvoices = async (pageNum = page) => {
+  const fetchInvoices = useCallback(async (pageNum = page) => {
     try {
       setLoading(true);
       const data = await getInvoices(pageNum, 10);
@@ -27,7 +27,7 @@ const InvoiceList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page]);
   
   const handleSearch = async () => {
     try {
@@ -73,7 +73,7 @@ const InvoiceList = () => {
     if (Object.keys(searchCriteria).length === 0) {
       fetchInvoices();
     }
-  }, [page]);
+  }, [fetchInvoices, searchCriteria]);
   
   const handlePrevPage = () => {
     if (page > 1) setPage(page - 1);
