@@ -242,7 +242,6 @@ async function generateSimpleInvoice(ctx, analysisData) {
         ...Markup.inlineKeyboard([
           [Markup.button.callback('📄 Descargar PDF', `pdf_${factura.id}_${factura.folio_number}`), 
            Markup.button.callback('📂 Descargar XML', `xml_${factura.id}_${factura.folio_number}`)],
-          [Markup.button.callback('📃 Ver Detalles', `ver_factura_${factura.id}`)],
           [Markup.button.callback('⬅️ Volver al Menú', 'menu_principal')]
         ])
       }
