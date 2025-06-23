@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 
 import logger from '../core/utils/logger.js';
-import { facturapiConfig, stripeConfig, clientesIds, validateServicesConfig } from './services.js';
+import { facturapiConfig, stripeConfig, validateServicesConfig } from './services.js';
 import { authConfig, validateAuthConfig } from './auth.js';
 import { prisma, connectDatabase } from './database.js';
 
@@ -46,8 +46,7 @@ const validateEnv = () => {
   // Para cualquier entorno, necesitamos la URL de la base de datos
   requiredVars.push('DATABASE_URL');
   
-  // Para cualquier entorno, necesitamos los IDs de clientes
-  requiredVars.push('CLIENTE_INFOASIST', 'CLIENTE_SOS', 'CLIENTE_ARSA', 'CLIENTE_CHUBB');
+  // NOTA: Variables CLIENTE_* removidas - ya no se requieren en sistema multitenant
   
   // Para operaciones administrativas de FacturAPI
   requiredVars.push('FACTURAPI_USER_KEY');
@@ -138,8 +137,7 @@ const config = {
   // URL base para las solicitudes del bot a la API
   apiBaseUrl: apiBaseUrlConfig,
   
-  // IDs de clientes
-  clientes: clientesIds,
+  // NOTA: IDs de clientes removidos - sistema multitenant
   
   // Base de datos
   database: {
@@ -189,12 +187,7 @@ const config = {
           ? `${this.telegram.adminChatIds.length} admins configurados`
           : 'Sin admins configurados'
       },
-      clientes: {
-        INFOASIST: this.clientes.INFOASIST ? 'configurado' : 'no configurado',
-        SOS: this.clientes.SOS ? 'configurado' : 'no configurado',
-        ARSA: this.clientes.ARSA ? 'configurado' : 'no configurado',
-        CHUBB: this.clientes.CHUBB ? 'configurado' : 'no configurado'
-      },
+      // NOTA: Configuración de clientes removida - sistema multitenant
       database: {
         url: this.database.url ? 'configurada' : 'no configurada'
       },
