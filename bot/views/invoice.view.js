@@ -7,13 +7,27 @@ import { Markup } from 'telegraf';
  * @param {string} transactionId - ID de transacción
  */
 export function invoiceSummaryView(invoiceData, transactionId) {
+  // Determinar si el cliente requiere retención (SOS, INFOASIST, ARSA)
+  const clienteNombre = invoiceData.clienteNombre || '';
+  const requiresWithholding = 
+    clienteNombre.includes('INFOASIST') || 
+    clienteNombre.includes('ARSA') || 
+    clienteNombre.includes('S.O.S') || 
+    clienteNombre.includes('SOS');
+  
+  // Determinar tipo de servicio con información de retención
+  const tipoServicio = requiresWithholding ? 
+    'Servicio Con Retención (4%)' : 
+    'Servicio Sin Retención';
+  
+  // Usar formato estándar CHUBB
   const message = 
-    `📋 *Resumen de la Factura*\n\n` +
+    `📋 *Vista previa de factura*\n\n` +
+    `• Tipo: ${tipoServicio}\n` +
     `• Cliente: ${invoiceData.clienteNombre}\n` +
-    `• Número de Pedido: ${invoiceData.numeroPedido}\n` +
-    `• Clave de Producto: ${invoiceData.claveProducto}\n` +
-    `• Monto: $${invoiceData.monto.toFixed(2)} MXN\n` +
-    `¿Desea proceder con la generación de la factura?`;
+    `• Clave SAT: ${invoiceData.claveProducto}\n` +
+    `• Registros incluidos: 1\n` +
+    `• Monto: $${invoiceData.monto.toFixed(2)} MXN\n`;
   
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback('✅ Confirmar', `confirmar_${transactionId}`)],

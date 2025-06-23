@@ -124,8 +124,8 @@ export function registerAxaHandler(bot) {
     }
   });
   
-  // Manejador para confirmar la generación de facturas AXA
-  bot.action('axa_confirmar', async (ctx) => {
+  // Manejador para servicios realizados (con retención)
+  bot.action('axa_servicios_realizados', async (ctx) => {
     await ctx.answerCbQuery();
     
     // Verificar que tenemos datos para procesar
@@ -133,16 +133,80 @@ export function registerAxaHandler(bot) {
       return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
     
+    // Guardar el tipo de servicio en el estado
+    ctx.userState.axaTipoServicio = 'realizados';
+    ctx.userState.axaConRetencion = true;
+    
+    // Mostrar confirmación final
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
+    await ctx.reply(
+      `🚛 *Servicios Realizados seleccionados*\n\n` +
+      `• Se aplicará retención del 4%\n` +
+      `• ${ctx.userState.axaData.length} registros\n\n` +
+      `¿Confirma la generación de la factura?`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Confirmar y Generar', 'axa_confirmar_final')],
+          [Markup.button.callback('❌ Cancelar', 'axa_cancelar')]
+        ])
+      }
+    );
+  });
+
+  // Manejador para servicios muertos (sin retención)
+  bot.action('axa_servicios_muertos', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    // Verificar que tenemos datos para procesar
+    if (!ctx.userState.axaData || !ctx.userState.axaColumnMappings) {
+      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+    }
+    
+    // Guardar el tipo de servicio en el estado
+    ctx.userState.axaTipoServicio = 'muertos';
+    ctx.userState.axaConRetencion = false;
+    
+    // Mostrar confirmación final
+    await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
+    await ctx.reply(
+      `💀 *Servicios Muertos seleccionados*\n\n` +
+      `• Sin retención\n` +
+      `• ${ctx.userState.axaData.length} registros\n\n` +
+      `¿Confirma la generación de la factura?`,
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Confirmar y Generar', 'axa_confirmar_final')],
+          [Markup.button.callback('❌ Cancelar', 'axa_cancelar')]
+        ])
+      }
+    );
+  });
+
+  // Manejador para confirmar la generación de facturas AXA (después de seleccionar tipo)
+  bot.action('axa_confirmar_final', async (ctx) => {
+    await ctx.answerCbQuery();
+    
+    // Verificar que tenemos datos para procesar
+    if (!ctx.userState.axaData || !ctx.userState.axaColumnMappings || ctx.userState.axaTipoServicio === undefined) {
+      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+    }
+    
     try {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
-      await ctx.reply('⏳ Procesando solicitud de generación de factura...');
+      
+      const tipoServicio = ctx.userState.axaTipoServicio;
+      const conRetencion = ctx.userState.axaConRetencion;
+      
+      await ctx.reply(`⏳ Procesando factura para servicios ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...`);
       
       const data = ctx.userState.axaData;
       const columnMappings = ctx.userState.axaColumnMappings;
       
       // Generar una sola factura con todos los registros
       await ctx.reply(`⏳ Generando factura para servicios AXA (${data.length} registros)...`);
-      const factura = await generarFacturaAxa(data, ctx, columnMappings);
+      const factura = await generarFacturaAxa(data, ctx, columnMappings, conRetencion);
       
       // Informar resultado final
       if (factura) {
@@ -154,6 +218,8 @@ export function registerAxaHandler(bot) {
       // Limpiar el estado
       delete ctx.userState.axaData;
       delete ctx.userState.axaColumnMappings;
+      delete ctx.userState.axaTipoServicio;
+      delete ctx.userState.axaConRetencion;
       ctx.userState.esperando = null;
       
     } catch (error) {
@@ -173,6 +239,8 @@ export function registerAxaHandler(bot) {
       // Limpiar el estado
       delete ctx.userState.axaData;
       delete ctx.userState.axaColumnMappings;
+      delete ctx.userState.axaTipoServicio;
+      delete ctx.userState.axaConRetencion;
       ctx.userState.esperando = null;
     } catch (error) {
       console.error('Error al cancelar operación:', error);
@@ -354,11 +422,12 @@ async function procesarArchivoAxa(ctx, filePath) {
     ctx.userState.axaData = data;
     ctx.userState.axaColumnMappings = columnMappings;
     
-    // Solicitar confirmación al usuario antes de generar las facturas
+    // Preguntar sobre el tipo de servicios antes de la confirmación final
     await ctx.reply(
-      `${infoResumen}\n¿Desea proceder con la generación de la factura?`,
+      `${infoResumen}\n¿Qué tipo de servicios son?`,
       Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Generar Factura', 'axa_confirmar')],
+        [Markup.button.callback('🚛 Servicios Realizados (con retención 4%)', 'axa_servicios_realizados')],
+        [Markup.button.callback('💀 Servicios Muertos (sin retención)', 'axa_servicios_muertos')],
         [Markup.button.callback('❌ Cancelar', 'axa_cancelar')]
       ])
     );
@@ -436,9 +505,10 @@ function mapColumnNamesAxa(firstRow) {
  * @param {Array} items - Elementos a incluir en la factura
  * @param {Object} ctx - Contexto de Telegram
  * @param {Object} columnMappings - Mapeo de nombres de columnas
+ * @param {boolean} conRetencion - Si aplica retención del 4%
  * @returns {Promise<Object>} - Factura generada
  */
-async function generarFacturaAxa(items, ctx, columnMappings) {
+async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = false) {
   if (items.length === 0) {
     console.log('No hay items para generar factura AXA');
     return null;
@@ -466,6 +536,21 @@ async function generarFacturaAxa(items, ctx, columnMappings) {
     // Descripción usando la plantilla de AXA: "ARRASTRE DE GRUA FACTURA xxx No. ORDEN xxx No. FOLIO xxx AUTORIZACION xxx"
     const descripcion = `ARRASTRE DE GRUA FACTURA ${factura} No. ORDEN ${orden} No. FOLIO ${folio} AUTORIZACION ${autorizacion}`;
     
+    // Configurar los impuestos - IVA siempre se aplica
+    const taxes = [
+      { type: "IVA", rate: 0.16, factor: "Tasa" }
+    ];
+    
+    // Agregar retención de IVA del 4% si aplica (solo para servicios realizados)
+    if (conRetencion) {
+      taxes.push({
+        type: "IVA",
+        rate: 0.04,
+        factor: "Tasa",
+        withholding: true
+      });
+    }
+    
     return {
       quantity: 1,
       product: {
@@ -475,9 +560,7 @@ async function generarFacturaAxa(items, ctx, columnMappings) {
         unit_name: "SERVICIO",
         price: importe,
         tax_included: false,
-        taxes: [
-          { type: "IVA", rate: 0.16, factor: "Tasa" }
-        ]
+        taxes: taxes
       }
     };
   });
@@ -493,10 +576,10 @@ async function generarFacturaAxa(items, ctx, columnMappings) {
     exchange: 1
   };
   
-  // Mostrar resumen detallado de la factura antes de generarla
+  // Mostrar resumen de la factura antes de generarla (formato estándar como CHUBB)
   await ctx.reply(
     `📋 *Vista previa de factura*\n\n` +
-    `• Tipo: Servicios de Grúa AXA\n` +
+    `• Tipo: ${conRetencion ? 'Servicios de Grúa AXA Con Retención (4%)' : 'Servicios de Grúa AXA Sin Retención'}\n` +
     `• Cliente: AXA ASSISTANCE MEXICO\n` +
     `• Clave SAT: ${CLAVE_SAT_SERVICIOS_GRUA}\n` +
     `• Registros incluidos: ${items.length}\n` +
