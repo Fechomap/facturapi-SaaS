@@ -55,7 +55,7 @@ function ensureTempDirExists() {
 }
 
 /**
- * Descarga un archivo de factura (PDF/XML)
+ * Descarga un archivo de factura (PDF/XML) directamente de FacturAPI
  * @param {string} facturaId - ID de la factura
  * @param {string} formato - Formato (pdf/xml)
  * @param {string} folio - Número de folio
@@ -64,16 +64,7 @@ function ensureTempDirExists() {
  * @returns {Promise<string>} - Ruta al archivo descargado
  */
 async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
-  // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
-  let baseUrl = config.apiBaseUrl;
-  
-  // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
-  if (config.env === 'development' && baseUrl.includes('localhost')) {
-    baseUrl = 'http://localhost:3000';
-  }
-  
-  const apiUrl = `${baseUrl}/api/facturas/${facturaId}/${formato}`;
-  console.log('Descargando desde URL:', apiUrl);
+  console.log(`Descargando factura ${facturaId} en formato ${formato}`);
 
   const tempDir = ensureTempDirExists();
   const clienteStr = clienteNombre || 'Cliente';
@@ -90,63 +81,57 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   const writer = fs.createWriteStream(filePath);
 
   try {
-    console.log('Enviando solicitud a:', apiUrl);
-    
     // Obtener el tenant ID del contexto del usuario
     const tenantId = ctx.userState?.tenantId;
     if (!tenantId) {
       throw new Error('No se encontró el tenant ID en el estado del usuario');
     }
     
-    const response = await axios({
-      method: 'GET',
-      url: apiUrl,
-      responseType: 'stream',
-      headers: {
-        // Añadir el header X-Tenant-ID
-        'X-Tenant-ID': tenantId
-      }
-    });
-
-    response.data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      writer.on('finish', () => {
-        console.log('Archivo descargado exitosamente:', filePath);
-        resolve(filePath);
-      });
-      writer.on('error', (err) => {
-        console.error('Error al escribir el archivo:', err);
-        try {
-          if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-          }
-        } catch (e) {
-          console.error('Error al eliminar archivo parcial:', e);
-        }
-        reject(err);
-      });
-    });
-  } catch (error) {
-    console.error('Error en la petición de descarga:', error.message);
+    // Obtener el cliente de FacturAPI para este tenant
+    const facturapIService = (await import('../../services/facturapi.service.js')).default;
+    const facturapi = await facturapIService.getFacturapiClient(tenantId);
     
-    // Capturar y mostrar más detalles del error
-    if (error.response) {
-      console.error('Respuesta de error:', error.response.status, error.response.data);
+    console.log(`Cliente FacturAPI obtenido para tenant ${tenantId}, descargando ${formato}...`);
+    
+    // Usar axios para descargar directamente desde la API de FacturAPI
+    if (formato === 'pdf' || formato === 'xml') {
+      // Obtener la API key directamente del tenant
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId }
+      });
       
-      // Si la respuesta es un stream, extraer el contenido
-      if (error.response.data && typeof error.response.data.on === 'function') {
-        try {
-          const chunks = [];
-          error.response.data.on('data', chunk => chunks.push(chunk));
-          error.response.data.on('end', () => {
-            const body = Buffer.concat(chunks).toString('utf8');
-            console.error('Contenido de la respuesta de error:', body);
-          });
-        } catch (e) {
-          console.error('Error al leer respuesta del error:', e);
-        }
+      if (!tenant || !tenant.facturapiApiKey) {
+        throw new Error('No se pudo obtener la API key del tenant');
       }
+      
+      // Construir la URL de la API de FacturAPI
+      const apiUrl = `https://www.facturapi.io/v2/invoices/${facturaId}/${formato}`;
+      
+      console.log(`Descargando desde URL de FacturAPI: ${apiUrl}`);
+      
+      // Realizar la solicitud con axios
+      const response = await axios({
+        method: 'GET',
+        url: apiUrl,
+        responseType: 'arraybuffer', // Importante: usar arraybuffer para archivos binarios
+        headers: {
+          'Authorization': `Bearer ${tenant.facturapiApiKey}` // Usar la API key del tenant
+        }
+      });
+      
+      // Escribir el archivo
+      fs.writeFileSync(filePath, response.data);
+      console.log('Archivo descargado exitosamente:', filePath);
+      return filePath;
+    } else {
+      throw new Error(`Formato no soportado: ${formato}`);
+    }
+  } catch (error) {
+    console.error(`Error al descargar ${formato} de FacturAPI:`, error.message);
+    
+    // Mostrar detalles adicionales si están disponibles
+    if (error.response) {
+      console.error('Detalles del error:', error.response.status, error.response.data);
     }
     
     try {
@@ -278,9 +263,16 @@ export function registerInvoiceHandler(bot) {
 
   // Manejador para confirmación de factura
   bot.action(/^confirmar_(?!cancelacion_)(.+)/, async (ctx) => {
-    const transactionId = ctx.match[1];
+    console.log(`[DEBUG] Entering confirmar_ action handler for transactionId: ${ctx.match?.[1]}`); // ADDED INITIAL LOG + transactionId check
+    try { // ADDED TRY BLOCK
+      const transactionId = ctx.match[1];
+      if (!transactionId) {
+          console.error('[ERROR] Transaction ID not found in ctx.match for confirmar_ action.');
+          await ctx.answerCbQuery('Error interno: ID de transacción no encontrado.');
+          return ctx.reply('❌ Ocurrió un error interno (ID no encontrado). Por favor, intente generar la factura de nuevo.');
+      }
 
-    // Verificar si hay una sesión activa
+      // Verificar si hay una sesión activa
     if (!ctx.userState) {
       return ctx.reply('La sesión ha expirado. Por favor, comience de nuevo.', 
         Markup.inlineKeyboard([[Markup.button.callback('Volver al Menú', 'menu_principal')]])
@@ -297,19 +289,53 @@ export function registerInvoiceHandler(bot) {
       );
     }
 
-    // Verificar si el usuario puede generar facturas (límites del plan)
+    // --- MOVED SUBSCRIPTION CHECK HERE ---
+    // Verificar si el usuario puede generar facturas (límites del plan y estado)
+    console.log(`[CHECK_SUBS] Verificando capacidad para generar factura para tenant ${ctx.getTenantId()}...`); // REPLACED LOGGER
     const canGenerateResult = await TenantService.canGenerateInvoice(ctx.getTenantId());
+    console.log(`[CHECK_SUBS] Resultado de verificación de capacidad para tenant ${ctx.getTenantId()}:`, canGenerateResult); // REPLACED LOGGER
     
     if (!canGenerateResult.canGenerate) {
-      return ctx.reply(
-        `❌ No puedes generar más facturas: ${canGenerateResult.reason}\n\n` +
-        `Contacta al administrador o actualiza tu plan de suscripción.`,
-        Markup.inlineKeyboard([
-          [Markup.button.callback('💳 Ver planes', 'show_pricing')],
-          [Markup.button.callback('🔙 Volver', 'menu_principal')]
-        ])
-      );
+      console.warn(`[CHECK_SUBS] Generación de factura NO permitida para tenant ${ctx.getTenantId()}. Resultado:`, canGenerateResult); // REPLACED LOGGER
+      // Verificar si la razón es por suscripción inactiva
+      const inactiveStates = ['pending_payment', 'expired', 'canceled', 'none'];
+      if (canGenerateResult.subscriptionStatus && inactiveStates.includes(canGenerateResult.subscriptionStatus)) {
+        console.warn(`[CHECK_SUBS] Razón: Suscripción inactiva (${canGenerateResult.subscriptionStatus}) para tenant ${ctx.getTenantId()}. Enviando alerta...`); // REPLACED LOGGER
+        // Construir el mensaje de alerta específico
+        const statusText = canGenerateResult.subscriptionStatus === 'pending_payment' ? 'Pago pendiente' : 'Vencida';
+        const paymentLink = canGenerateResult.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Fallback
+        const planName = 'Basic Plan'; // TODO: Obtener el nombre real del plan si es posible desde canGenerateResult o tenant
+
+        return ctx.reply(
+          `🚨 Suscripción Vencida\n\n` +
+          `Tu período de prueba o suscripción para Pego ha vencido.\n\n` +
+          `Plan: ${planName}\n` + // Ajustar si se obtiene el nombre real
+          `Estado: ${statusText}\n\n` +
+          `Para reactivar tu servicio y continuar usándolo, por favor realiza tu pago a través del siguiente enlace:\n\n` +
+          `${paymentLink}\n\n` +
+          `Si tienes alguna duda, contáctanos.`,
+          Markup.inlineKeyboard([
+            [Markup.button.url('Realizar Pago', paymentLink)], // Botón directo al pago
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ])
+        );
+      } else {
+        console.warn(`[CHECK_SUBS] Razón: Otra (${canGenerateResult.reason}) para tenant ${ctx.getTenantId()}. Enviando alerta genérica...`); // REPLACED LOGGER
+        // Si la razón es otra (límite alcanzado, error interno, etc.)
+        return ctx.reply(
+          `❌ No puedes generar más facturas: ${canGenerateResult.reason}\n\n` +
+          `Contacta al administrador o revisa tu plan.`,
+          Markup.inlineKeyboard([
+            // Podríamos añadir botones específicos según la razón aquí
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ])
+        );
+      }
+    } else {
+        console.log(`[CHECK_SUBS] Generación de factura PERMITIDA para tenant ${ctx.getTenantId()}. Continuando flujo...`); // REPLACED LOGGER
     }
+    // --- END MOVED SUBSCRIPTION CHECK ---
+
 
     // Solo verificar el ID de transacción si ya se generó una factura
     if (ctx.userState.facturaGenerada && ctx.userState.transactionId !== transactionId) {
@@ -380,8 +406,27 @@ export function registerInvoiceHandler(bot) {
       ctx.reply(errorMsg, Markup.inlineKeyboard([[Markup.button.callback('Volver al Menú', 'menu_principal')]]));
     } finally {
       ctx.markProcessInactive(transactionId);
-      await ctx.answerCbQuery();
-    }
+      await ctx.answerCbQuery(); // From original finally block
+    } // END OF ORIGINAL FINALLY
+    } catch (err) { // ADDED CATCH BLOCK
+        console.error('[ERROR] Uncaught error within confirmar_ handler:', err); // Log the actual error
+        // Send a generic error message to the user
+        try {
+            // Use the specific error message if available, otherwise generic
+            const userMessage = err.message && typeof err.message === 'string' ? 
+                                `❌ Error: ${err.message}` : 
+                                '❌ Ocurrió un error inesperado al procesar tu solicitud. Por favor, intenta de nuevo o contacta a soporte.';
+            await ctx.reply(userMessage);
+        } catch (replyError) {
+            console.error('[ERROR] Failed to send error reply to user:', replyError);
+        }
+        // Ensure the callback query is answered even in case of error
+        try {
+            await ctx.answerCbQuery('Error procesando la solicitud.'); // Provide text for the notification
+        } catch (answerError) {
+             console.error('[ERROR] Failed to answer callback query on error:', answerError);
+        }
+    } // END OF ADDED CATCH BLOCK
   });
 
   // Manejador para cancelar operación
@@ -563,41 +608,35 @@ export function registerInvoiceHandler(bot) {
           }
         
           ctx.reply('⏳ Buscando factura con folio: ' + folioConsulta + ', por favor espere...');
-          console.log('Intentando consultar folio:', folioConsulta);
+          console.log('Intentando consultar factura con folio:', folioConsulta);
         
           try {
-            // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
-            let baseUrl = config.apiBaseUrl;
-            
-            // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
-            if (config.env === 'development' && baseUrl.includes('localhost')) {
-              baseUrl = 'http://localhost:3000';
-            }
-            
-            const apiUrl = `${baseUrl}/api/facturas/by-folio/${folioConsulta}`;
-            console.log('URL de consulta:', apiUrl);
-            
             // Obtener el tenant ID del contexto del usuario
             const tenantId = ctx.getTenantId();
             if (!tenantId) {
               throw new Error('No se encontró el tenant ID en el contexto del usuario');
             }
             
-            // Incluir el header X-Tenant-ID en la solicitud
-            const response = await axios.get(apiUrl, {
-              headers: {
-                'X-Tenant-ID': tenantId
-              }
+            // Obtener el cliente de FacturAPI para este tenant
+            const facturapIService = (await import('../../services/facturapi.service.js')).default;
+            const facturapi = await facturapIService.getFacturapiClient(tenantId);
+            
+            console.log(`Cliente FacturAPI obtenido para tenant ${tenantId}, buscando factura con folio ${folioConsulta}...`);
+            
+            // Buscar la factura por folio
+            const facturas = await facturapi.invoices.list({
+              q: folioConsulta, // Buscar por folio
+              limit: 1 // Solo necesitamos una
             });
             
-            const factura = response.data;
-            console.log('Respuesta del backend:', factura);
-        
-            if (factura && (factura.id || factura.facturapiInvoiceId)) {
+            console.log(`Resultado de búsqueda para folio ${folioConsulta}:`, facturas.total_results);
+            
+            if (facturas.total_results > 0) {
+              const factura = facturas.data[0];
+              
               // Guardamos información de la factura en el estado del usuario
-              ctx.userState.facturaId = factura.facturapiInvoiceId || factura.id; // Usar el ID de FacturAPI
+              ctx.userState.facturaId = factura.id;
               ctx.userState.folioFactura = factura.folio_number;
-              // Depuración: confirmar que se guarda el ID correcto
               console.log('Guardando ID de factura en el estado:', ctx.userState.facturaId);
               
               // Determinar el estado de la factura
@@ -628,6 +667,9 @@ export function registerInvoiceHandler(bot) {
               ctx.reply(message, { parse_mode, ...keyboard });
               
               ctx.userState.esperando = null; // Reseteamos el estado
+            } else {
+              ctx.reply(`❌ No se encontró ninguna factura con el folio: ${folioConsulta}`);
+              ctx.userState.esperando = null;
             }
           } catch (error) {
             console.error('Error al consultar factura por folio:', error);
@@ -788,30 +830,24 @@ function registerCancellationHandlers(bot) {
       // Mostrar mensaje de procesamiento
       await ctx.reply(`⏳ Cancelando factura A-${folioFactura} con motivo: ${MOTIVOS_CANCELACION[motivoCancelacion]}...`);
       
-      // Llamar a la API para cancelar la factura
+      // Cancelar la factura directamente con FacturAPI
       try {
-        // Asegurarse de que la URL base sea correcta (preferir usar el puerto 3000 en desarrollo local)
-        let baseUrl = config.apiBaseUrl;
-        
-        // Si estamos en entorno de desarrollo y la URL base contiene localhost, asegurarse de usar el puerto correcto
-        if (config.env === 'development' && baseUrl.includes('localhost')) {
-          baseUrl = 'http://localhost:3000';
+        // Obtener el tenant ID del contexto del usuario
+        const tenantId = ctx.getTenantId();
+        if (!tenantId) {
+          throw new Error('No se encontró el tenant ID en el contexto del usuario');
         }
         
-        const apiUrl = `${baseUrl}/api/facturas/${facturaId}`;
-        console.log(`Enviando solicitud de cancelación a: ${apiUrl} con motivo: ${motivoCancelacion}`);
-
+        // Obtener el cliente de FacturAPI para este tenant
+        const facturapIService = (await import('../../services/facturapi.service.js')).default;
+        const facturapi = await facturapIService.getFacturapiClient(tenantId);
         
-        const response = await axios.delete(apiUrl, { 
-          data: { 
-            motive: motivoCancelacion 
-          },
-          headers: {
-            'X-Tenant-ID': ctx.getTenantId() // Añadir el header del tenant
-          }
-        });
+        console.log(`Cliente FacturAPI obtenido para tenant ${tenantId}, cancelando factura ${facturaId} con motivo ${motivoCancelacion}...`);
         
-        console.log('Respuesta de cancelación:', response.data);
+        // Cancelar la factura
+        const result = await facturapi.invoices.cancel(facturaId, { motive: motivoCancelacion });
+        
+        console.log('Respuesta de cancelación de FacturAPI:', result);
         
         // Éxito en la cancelación
         await ctx.reply(

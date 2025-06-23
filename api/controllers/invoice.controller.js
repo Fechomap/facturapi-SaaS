@@ -24,6 +24,20 @@ class InvoiceController {
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
+      
+      // --- Verificar estado de la suscripción del Tenant ---
+      const subscriptionStatus = req.tenant?.subscriptionStatus; // Asume que el middleware añade esto
+      const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
+
+      if (!isActive) {
+        console.warn(`Intento de crear factura bloqueado para tenant ${tenantId} con suscripción ${subscriptionStatus}`);
+        return res.status(403).json({
+          error: 'SubscriptionError',
+          message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,
+          subscriptionStatus: subscriptionStatus
+        });
+      }
+      // --- Fin verificación suscripción ---
 
       // Validar datos básicos
       const { customer, items } = req.body;
@@ -87,6 +101,20 @@ class InvoiceController {
           message: 'Se requiere un tenant válido para esta operación'
         });
       }
+
+      // --- Verificar estado de la suscripción del Tenant ---
+      const subscriptionStatus = req.tenant?.subscriptionStatus; // Asume que el middleware añade esto
+      const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
+
+      if (!isActive) {
+        console.warn(`Intento de crear factura simple bloqueado para tenant ${tenantId} con suscripción ${subscriptionStatus}`);
+        return res.status(403).json({
+          error: 'SubscriptionError',
+          message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,
+          subscriptionStatus: subscriptionStatus
+        });
+      }
+      // --- Fin verificación suscripción ---
 
       // Extraer datos del request
       const { cliente_id, producto_id, cantidad = 1 } = req.body;

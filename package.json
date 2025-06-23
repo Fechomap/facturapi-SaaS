@@ -13,7 +13,7 @@
         "dev:bot": "NODE_ENV=development nodemon bot.js",
         "dev:all": "NODE_ENV=development concurrently \"npm run dev\" \"npm run dev:bot\"",
         "dev:all:mcp": "NODE_ENV=development concurrently \"npm run dev\" \"npm run dev:bot\" \"npm run start:mcp\"",
-        "test": "NODE_ENV=test jest",
+        "test": "NODE_ENV=test NODE_OPTIONS=--experimental-vm-modules jest",
         "test:subscription": "node tests/test-subscription-flow.js",
         "test:subscription:shell": "./tests/run-subscription-test.sh",
         "test:full": "./scripts/run-full-test.sh",

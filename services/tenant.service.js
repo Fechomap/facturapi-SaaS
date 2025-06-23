@@ -80,12 +80,64 @@ class TenantService {
   /**
    * Verifica si un tenant puede generar más facturas según su plan
    * @param {string} tenantId - ID del tenant
-   * @returns {Promise<Object>} - Resultado de la verificación
+   * @returns {Promise<{canGenerate: boolean, reason?: string, subscriptionStatus?: string, paymentLink?: string}>} - Resultado de la verificación
    */
   static async canGenerateInvoice(tenantId) {
-    // En un caso real, aquí se verificaría el límite de facturas, plan, etc.
-    // Para esta simulación, permitimos generar facturas
-    return { canGenerate: true };
+    try {
+      const tenant = await this.findTenantWithSubscription(tenantId);
+
+      if (!tenant) {
+        return { canGenerate: false, reason: 'Tenant no encontrado.' };
+      }
+
+      const subscription = tenant.subscriptions?.[0]; // La más reciente
+
+      if (!subscription) {
+        // Considerar si un tenant sin suscripción puede operar (quizás un plan gratuito implícito)
+        // Por ahora, asumimos que se requiere una suscripción.
+        return { canGenerate: false, reason: 'No se encontró una suscripción activa.', subscriptionStatus: 'none' };
+      }
+
+      const status = subscription.status;
+      const plan = subscription.plan;
+      const paymentLink = tenant.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Usar link del tenant o fallback
+
+      // 1. Verificar Estado de la Suscripción
+      const isActiveStatus = status === 'active' || status === 'trial'; // Cambiado 'trialing' por 'trial'
+      if (!isActiveStatus) {
+        let reason = 'Suscripción inactiva.';
+        if (status === 'pending_payment') reason = 'Suscripción pendiente de pago.';
+        else if (status === 'expired') reason = 'Suscripción expirada.';
+        else if (status === 'canceled') reason = 'Suscripción cancelada.';
+        
+        return { 
+          canGenerate: false, 
+          reason: reason, 
+          subscriptionStatus: status, 
+          paymentLink: paymentLink 
+        };
+      }
+
+      // 2. Verificar Límite de Facturas (si el plan tiene uno)
+      if (plan && plan.invoiceLimit !== null && plan.invoiceLimit > 0) { // Asumiendo 0 o null significa ilimitado
+        const invoicesUsed = subscription.invoicesUsed || 0;
+        if (invoicesUsed >= plan.invoiceLimit) {
+          return { 
+            canGenerate: false, 
+            reason: `Límite de ${plan.invoiceLimit} facturas alcanzado para el plan ${plan.name}.`,
+            subscriptionStatus: status, 
+            paymentLink: paymentLink 
+          };
+        }
+      }
+
+      // Si pasa todas las verificaciones
+      return { canGenerate: true, subscriptionStatus: status };
+
+    } catch (error) {
+      console.error(`Error al verificar capacidad de generar factura para tenant ${tenantId}:`, error);
+      return { canGenerate: false, reason: 'Error interno al verificar la suscripción.' };
+    }
   }
   
   /**
@@ -199,6 +251,53 @@ class TenantService {
   }
   
     /**
+   * Genera un enlace de pago para un tenant
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<Object>} - Enlace de pago generado
+   */
+  static async generatePaymentLink(tenantId) {
+    try {
+      // Obtener el tenant con su suscripción y plan
+      const tenant = await this.findTenantWithSubscription(tenantId);
+      
+      if (!tenant) {
+        throw new Error('Tenant no encontrado');
+      }
+      
+      const subscription = tenant.subscriptions?.[0];
+      
+      if (!subscription) {
+        throw new Error('No se encontró una suscripción para este tenant');
+      }
+      
+      const plan = subscription.plan;
+      
+      if (!plan || !plan.stripePriceId) {
+        throw new Error('El plan no tiene un ID de precio de Stripe configurado');
+      }
+      
+      // Importar el servicio de Stripe
+      const StripeService = (await import('../services/stripe.service.js')).default;
+      
+      // Generar el enlace de pago
+      const paymentLink = await StripeService.createPaymentLink({
+        priceId: plan.stripePriceId,
+        quantity: 1,
+        metadata: {
+          tenant_id: tenantId,
+          subscription_id: subscription.id,
+          plan_name: plan.name
+        }
+      });
+      
+      return paymentLink;
+    } catch (error) {
+      console.error(`Error al generar enlace de pago para tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Incrementa el contador de facturas usadas en la suscripción actual
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<Object>} - Suscripción actualizada
