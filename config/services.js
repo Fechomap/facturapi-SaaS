@@ -35,14 +35,7 @@ const stripeConfig = {
   },
 };
 
-// IDs de clientes predefinidos
-const clientesIds = {
-  INFOASIST: process.env.CLIENTE_INFOASIST,
-  SOS: process.env.CLIENTE_SOS,
-  ARSA: process.env.CLIENTE_ARSA,
-  CHUBB: process.env.CLIENTE_CHUBB,
-  AXA: process.env.CLIENTE_AXA
-};
+// NOTA: IDs de clientes removidos - sistema multitenant usa búsqueda dinámica
 
 // Comprobar la configuración crítica e imprimir advertencias
 function validateServicesConfig() {
@@ -62,12 +55,7 @@ function validateServicesConfig() {
     warnings.push('STRIPE_WEBHOOK_SECRET no está configurada. Los webhooks de Stripe no funcionarán correctamente.');
   }
   
-  // Validar clientes predefinidos
-  Object.entries(clientesIds).forEach(([nombre, id]) => {
-    if (!id) {
-      warnings.push(`CLIENTE_${nombre} no está configurado. Las funcionalidades relacionadas podrían fallar.`);
-    }
-  });
+  // NOTA: Validación de clientes removida - sistema multitenant
   
   // Mostrar advertencias
   if (warnings.length > 0) {
@@ -82,6 +70,5 @@ function validateServicesConfig() {
 export {
   facturapiConfig,
   stripeConfig,
-  clientesIds,
   validateServicesConfig
 };
