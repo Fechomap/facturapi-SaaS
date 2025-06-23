@@ -2,6 +2,63 @@
 import prisma from '../../lib/prisma.js';
 import { Markup } from 'telegraf';
 
+// Función auxiliar para mostrar opciones de suscripción
+async function showSubscriptionOptions(ctx, tenantId) {
+  try {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: {
+        subscriptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+    
+    if (!tenant) {
+      return ctx.reply(`❌ No se encontró el tenant con ID: ${tenantId}`);
+    }
+    
+    const sub = tenant.subscriptions[0];
+    const now = new Date();
+    let statusInfo = '';
+    
+    if (sub) {
+      const endDate = sub.status === 'trial' ? sub.trialEndsAt : sub.currentPeriodEndsAt;
+      const daysLeft = endDate ? Math.floor((endDate - now) / (1000 * 60 * 60 * 24)) : 0;
+      
+      statusInfo = `\nEstado actual: ${sub.status}\n` +
+        `Expira: ${endDate ? endDate.toLocaleDateString() : 'N/A'}\n` +
+        `Días restantes: ${daysLeft > 0 ? daysLeft : 'EXPIRADO ⚠️'}`;
+    } else {
+      statusInfo = '\nEstado: Sin suscripción';
+    }
+    
+    await ctx.reply(
+      `🏢 ${tenant.businessName}\n` +
+      `RFC: ${tenant.rfc}` +
+      statusInfo +
+      '\n\n¿Cuánto tiempo deseas extender la suscripción?',
+      {
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback('1 mes', `sus_extend_${tenantId}_30`),
+            Markup.button.callback('3 meses', `sus_extend_${tenantId}_90`)
+          ],
+          [
+            Markup.button.callback('6 meses', `sus_extend_${tenantId}_180`),
+            Markup.button.callback('12 meses', `sus_extend_${tenantId}_365`)
+          ],
+          [Markup.button.callback('🔙 Volver', 'sus_back')]
+        ])
+      }
+    );
+  } catch (error) {
+    console.error('Error mostrando opciones:', error);
+    await ctx.reply(`❌ Error: ${error.message}`);
+  }
+}
+
 /**
  * Registra comandos administrativos para recuperación y mantenimiento
  * @param {Object} bot - Instancia del bot
@@ -318,5 +375,175 @@ export function registerAdminCommands(bot) {
         console.error('Error al obtener estado:', error);
         await ctx.reply(`❌ Error: ${error.message}`);
       }
+    });
+    
+    // Comando para gestionar suscripciones manualmente
+    bot.command('sus', async (ctx) => {
+      // Verificar que sea admin
+      const adminChatIds = process.env.ADMIN_CHAT_IDS?.split(',').map(id => id.trim()) || [];
+      const userId = ctx.from.id.toString();
+      
+      if (!adminChatIds.includes(userId)) {
+        return ctx.reply('❌ No tienes permisos para usar este comando.');
+      }
+      
+      // Si viene con tenantId directo
+      const args = ctx.message.text.split(' ');
+      if (args.length >= 2) {
+        const tenantId = args[1];
+        return showSubscriptionOptions(ctx, tenantId);
+      }
+      
+      // Mostrar lista de tenants activos
+      try {
+        const tenants = await prisma.tenant.findMany({
+          include: {
+            subscriptions: {
+              orderBy: { createdAt: 'desc' },
+              take: 1
+            }
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 10
+        });
+        
+        const buttons = tenants.map(tenant => {
+          const sub = tenant.subscriptions[0];
+          const status = sub ? (sub.status === 'active' ? '🟢' : sub.status === 'trial' ? '🔵' : '🔴') : '⚫';
+          return [Markup.button.callback(
+            `${status} ${tenant.businessName.substring(0, 30)}...`,
+            `sus_select_${tenant.id}`
+          )];
+        });
+        
+        await ctx.reply(
+          '📋 Gestión de Suscripciones\n\nSelecciona un tenant:',
+          Markup.inlineKeyboard(buttons)
+        );
+      } catch (error) {
+        console.error('Error en comando /sus:', error);
+        await ctx.reply(`❌ Error: ${error.message}`);
+      }
+    });
+    
+    // Action para seleccionar tenant
+    bot.action(/sus_select_(.+)/, async (ctx) => {
+      await ctx.answerCbQuery();
+      const tenantId = ctx.match[1];
+      await showSubscriptionOptions(ctx, tenantId);
+    });
+    
+    // Action para extender suscripción
+    bot.action(/sus_extend_(.+)_(\d+)/, async (ctx) => {
+      await ctx.answerCbQuery();
+      const tenantId = ctx.match[1];
+      const days = parseInt(ctx.match[2]);
+      
+      try {
+        await ctx.editMessageText('⏳ Procesando extensión de suscripción...');
+        
+        // Buscar suscripción actual
+        const subscription = await prisma.tenantSubscription.findFirst({
+          where: { tenantId },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        const now = new Date();
+        let newEndDate;
+        
+        if (subscription) {
+          // Si tiene suscripción, extender desde la fecha actual o la fecha de expiración (lo que sea mayor)
+          const currentEnd = subscription.status === 'trial' ? subscription.trialEndsAt : subscription.currentPeriodEndsAt;
+          const baseDate = currentEnd > now ? currentEnd : now;
+          newEndDate = new Date(baseDate);
+          newEndDate.setDate(newEndDate.getDate() + days);
+          
+          // Actualizar suscripción existente
+          await prisma.tenantSubscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: 'active',
+              currentPeriodEndsAt: newEndDate,
+              updatedAt: now
+            }
+          });
+        } else {
+          // Si no tiene suscripción, crear una nueva
+          newEndDate = new Date(now);
+          newEndDate.setDate(newEndDate.getDate() + days);
+          
+          // Obtener el plan básico
+          const basicPlan = await prisma.subscriptionPlan.findFirst({
+            where: { isActive: true },
+            orderBy: { price: 'asc' }
+          });
+          
+          if (!basicPlan) {
+            throw new Error('No se encontró un plan de suscripción activo');
+          }
+          
+          await prisma.tenantSubscription.create({
+            data: {
+              tenantId: tenantId,
+              planId: basicPlan.id,
+              status: 'active',
+              currentPeriodEndsAt: newEndDate
+            }
+          });
+        }
+        
+        // Registrar el pago manual con el costo correcto
+        const updatedSubscription = await prisma.tenantSubscription.findFirst({
+          where: { tenantId },
+          include: { plan: true },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        if (updatedSubscription) {
+          // Calcular el costo basado en el período seleccionado
+          const monthsExtended = Math.floor(days / 30);
+          const totalAmount = updatedSubscription.plan.price * monthsExtended;
+          
+          await prisma.tenantPayment.create({
+            data: {
+              tenantId: tenantId,
+              subscriptionId: updatedSubscription.id,
+              amount: totalAmount,
+              currency: 'MXN',
+              status: 'succeeded',
+              paymentMethod: 'transferencia_bancaria',
+              paymentDate: now
+            }
+          });
+          
+          console.log(`💳 Pago registrado: $${totalAmount} MXN por ${monthsExtended} mes(es)`);
+        }
+        
+        // Confirmar éxito
+        const months = Math.floor(days / 30);
+        const totalAmount = updatedSubscription ? updatedSubscription.plan.price * months : 0;
+        
+        await ctx.editMessageText(
+          `✅ Suscripción extendida exitosamente\n\n` +
+          `• Tenant: ${tenantId}\n` +
+          `• Extensión: ${days} días (${months} ${months === 1 ? 'mes' : 'meses'})\n` +
+          `• Monto registrado: $${totalAmount} MXN\n` +
+          `• Nueva fecha de expiración: ${newEndDate.toLocaleDateString()}\n` +
+          `• Registrado por: @${ctx.from.username || ctx.from.id}\n\n` +
+          `El servicio ya está activo y el usuario puede continuar facturando.`
+        );
+        
+      } catch (error) {
+        console.error('Error extendiendo suscripción:', error);
+        await ctx.editMessageText(`❌ Error al extender suscripción: ${error.message}`);
+      }
+    });
+    
+    // Action para volver al menú principal
+    bot.action('sus_back', async (ctx) => {
+      await ctx.answerCbQuery();
+      // Volver a ejecutar el comando /sus
+      ctx.message = { text: '/sus' };
+      await bot.handleUpdate({ message: ctx.message, from: ctx.from });
     });
    }
