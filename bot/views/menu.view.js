@@ -49,6 +49,7 @@ export function clientSelectionMenu(clients, includeChubb = true) {
   
   if (includeChubb) {
     buttons.push([Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')]);
+    buttons.push([Markup.button.callback('AXA (Archivo Excel)', 'menu_axa')]);
   }
   
   return Markup.inlineKeyboard(buttons);

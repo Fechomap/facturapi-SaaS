@@ -243,9 +243,9 @@ export function registerInvoiceHandler(bot) {
       // Guardar el mapa de nombres en el estado del contexto
       ctx.clientNameMap = shortToFullNameMap;
       
-      // Filtrar clientes, excluyendo CHUBB del flujo normal
+      // Filtrar clientes, excluyendo CHUBB y AXA del flujo normal (solo Excel)
       const clientsForMenu = availableCustomers
-        .filter(customer => !customer.legalName.includes('CHUBB'))
+        .filter(customer => !customer.legalName.includes('CHUBB') && !customer.legalName.includes('AXA'))
         .map(customer => ({
           id: customer.facturapiCustomerId,
           name: shortenName(customer.legalName)

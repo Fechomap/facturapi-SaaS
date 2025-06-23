@@ -11,6 +11,7 @@ import { registerPDFInvoiceHandler } from './handlers/pdf-invoice.handler.js'; /
 import { registerClientHandler } from './handlers/client.handler.js';
 import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
+import { registerAxaHandler } from './handlers/axa.handler.js';
 import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js'; 
 import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
@@ -76,8 +77,9 @@ export function createBot(logger) {
   registerClientHandler(bot);        // 2. Clientes
   registerInvoiceHandler(bot);       // 3. Facturas
   registerChubbHandler(bot);         // 4. Excel CHUBB
-  registerOnboardingHandler(bot);    // 5. Onboarding
-  registerProductionSetupHandler(bot); // 6. Producción (ÚLTIMO)
+  registerAxaHandler(bot);           // 5. Excel AXA
+  registerOnboardingHandler(bot);    // 6. Onboarding
+  registerProductionSetupHandler(bot); // 7. Producción (ÚLTIMO)
   
   logger.info('Bot configurado correctamente');
   return bot;

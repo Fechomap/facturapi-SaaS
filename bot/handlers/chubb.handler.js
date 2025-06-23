@@ -38,6 +38,16 @@ export function registerChubbHandler(bot) {
     await ctx.answerCbQuery();
     
     try {
+      // Limpiar cualquier estado previo de otros clientes
+      delete ctx.userState.axaData;
+      delete ctx.userState.axaColumnMappings;
+      delete ctx.userState.axaClientId;
+      delete ctx.userState.chubbGrupos;
+      delete ctx.userState.chubbColumnMappings;
+      delete ctx.userState.chubbMontosPorGrupo;
+      delete ctx.userState.chubbClientId;
+      ctx.userState.esperando = null;
+      
       // Obtener el ID del tenant actual
       const tenantId = ctx.getTenantId();
       

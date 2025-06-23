@@ -40,7 +40,8 @@ const clientesIds = {
   INFOASIST: process.env.CLIENTE_INFOASIST,
   SOS: process.env.CLIENTE_SOS,
   ARSA: process.env.CLIENTE_ARSA,
-  CHUBB: process.env.CLIENTE_CHUBB
+  CHUBB: process.env.CLIENTE_CHUBB,
+  AXA: process.env.CLIENTE_AXA
 };
 
 // Comprobar la configuración crítica e imprimir advertencias

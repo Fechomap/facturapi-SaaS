@@ -71,6 +71,23 @@ const CLIENTES_PREDEFINIDOS = [
     },
     email: "chubb@example.com",
     phone: ""
+  },
+  {
+    legal_name: "AXA ASSISTANCE MEXICO",
+    tax_id: "AAM850528H51",
+    tax_system: "601",
+    address: {
+      street: "Félix Cuevas",
+      exterior: "366",
+      interior: "PISO 6",
+      neighborhood: "Tlacoquemécatl",
+      zip: "03200",
+      municipality: "Benito Juárez",
+      state: "Ciudad de México",
+      country: "MEX"
+    },
+    email: "axa@example.com",
+    phone: ""
   }
 ];
 
