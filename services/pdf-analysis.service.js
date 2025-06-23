@@ -14,11 +14,36 @@ class PDFAnalysisService {
       
       console.log('Analizando PDF...');
       
-      // Analizar el texto para extraer información clave
+      // PRIMERO: Identificar el tipo de documento
+      const documentType = this.identifyDocumentType(text);
+      
+      if (documentType !== 'PEDIDO_COMPRA') {
+        console.log(`❌ Documento rechazado: Tipo identificado como ${documentType}`);
+        return {
+          success: false,
+          error: `Este documento es una ${documentType}, no un pedido de compra válido`,
+          documentType
+        };
+      }
+      
+      // SEGUNDO: Extraer información del pedido
       const analysis = this.extractKeyInformation(text);
+      
+      // TERCERO: Validar la información extraída
+      const validation = this.validateExtractedData(analysis);
+      
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join(', '),
+          documentType,
+          analysis
+        };
+      }
       
       return {
         success: true,
+        documentType,
         analysis,
         fullText: text
       };
@@ -31,6 +56,56 @@ class PDFAnalysisService {
     }
   }
 
+  static identifyDocumentType(text) {
+    // Obtener las primeras 1000 caracteres para enfocarnos en la parte superior
+    const headerText = text.substring(0, 1000);
+    
+    // Verificar PRIMERO si es un pedido de compra (parte superior izquierda)
+    const pedidoCompraPattern = /Pedido\s+de\s+compra/i;
+    
+    if (pedidoCompraPattern.test(headerText)) {
+      console.log('✅ Se detectó "Pedido de compra" en la parte superior');
+      
+      // Verificar que NO sea una factura con elementos CFDI
+      const facturaPatterns = [
+        /Folio\s+Fiscal/i,
+        /Sello\s+digital\s+del\s+CFDI/i,
+        /Cadena\s+original\s+del\s+complemento/i,
+        /Este\s+documento\s+es\s+una\s+representación\s+impresa\s+de\s+un\s+CFDI/i,
+        /Tipo\s+de\s+CFDI/i,
+        /Versión\s+CFDI/i,
+        /Método\s+de\s+pago.*?(PUE|PPD)/i
+      ];
+      
+      // Si contiene elementos de factura CFDI, no es un pedido
+      for (const pattern of facturaPatterns) {
+        if (pattern.test(text)) {
+          console.log('❌ Se encontraron elementos de factura CFDI');
+          return 'FACTURA';
+        }
+      }
+      
+      // Si dice "Pedido de compra" y no tiene elementos CFDI, es pedido
+      console.log('✅ Confirmado como PEDIDO_COMPRA');
+      return 'PEDIDO_COMPRA';
+    }
+    
+    // Verificar otros tipos solo si NO es pedido de compra
+    if (/Factura/i.test(headerText) || /Folio\s+Fiscal|CFDI/i.test(text)) {
+      return 'FACTURA';
+    }
+    
+    if (/COTIZACI[ÓO]N|PRESUPUESTO|PROPUESTA\s+ECON[ÓO]MICA/i.test(headerText)) {
+      return 'COTIZACION';
+    }
+    
+    if (/REMISI[ÓO]N|NOTA\s+DE\s+ENTREGA/i.test(headerText)) {
+      return 'REMISION';
+    }
+
+    return 'DESCONOCIDO';
+  }
+
   static extractKeyInformation(text) {
     const result = {
       client: null,
@@ -39,57 +114,109 @@ class PDFAnalysisService {
       orderNumber: null,
       totalAmount: null,
       confidence: 0,
-      errors: []
-    };
-
-    // 1. DETECTAR CLIENTE
-    const clientPatterns = {
-      'SOS': {
-        pattern: /PROTECCION\s+S\.O\.S\.\s+JURIDICO/i,
-        code: 'SOS',
-        fullName: 'PROTECCION S.O.S. JURIDICO'
-      },
-      'ARSA': {
-        pattern: /ARSA\s+ASESORIA\s+INTEGRAL\s+PROFESIONAL/i,
-        code: 'ARSA',
-        fullName: 'ARSA ASESORIA INTEGRAL PROFESIONAL'
-      },
-      'INFOASIST': {
-        pattern: /INFOASIST\s+INFORMACION\s+Y\s+ASISTENCIA/i,
-        code: 'INFO',
-        fullName: 'INFOASIST INFORMACION Y ASISTENCIA'
+      errors: [],
+      metadata: {
+        hasValidStructure: true,
+        extractedAt: new Date().toISOString(),
+        providerName: null
       }
     };
 
-    // Buscar cliente
-    for (const [clientKey, clientInfo] of Object.entries(clientPatterns)) {
-      if (clientInfo.pattern.test(text)) {
-        result.client = clientKey;
-        result.clientCode = clientInfo.code;
-        result.clientName = clientInfo.fullName;
-        result.confidence += 40;
-        console.log(`✅ Cliente detectado: ${clientKey}`);
-        break;
+    // 1. DETECTAR CLIENTE (buscar en sección "Desde: Cliente")
+    const clientSectionMatch = text.match(/Desde:\s*Cliente\s*([\s\S]*?)Para:/i);
+    
+    if (clientSectionMatch) {
+      const clientSection = clientSectionMatch[1];
+      const lines = clientSection.trim().split('\n');
+      
+      if (lines.length > 0) {
+        const clientNameLine = lines.find(line => line.trim().length > 0);
+        if (clientNameLine) {
+          result.clientName = clientNameLine.trim();
+          
+          // Intentar mapear a código conocido
+          const clientPatterns = {
+            'SOS': {
+              pattern: /PROTECCION\s+S\.O\.S\.\s+JURIDICO/i,
+              code: 'SOS',
+              fullName: 'PROTECCION S.O.S. JURIDICO'
+            },
+            'ARSA': {
+              pattern: /ARSA\s+ASESORIA\s+INTEGRAL\s+PROFESIONAL/i,
+              code: 'ARSA',
+              fullName: 'ARSA ASESORIA INTEGRAL PROFESIONAL'
+            },
+            'INFOASIST': {
+              pattern: /INFOASIST\s+INFORMACION\s+Y\s+ASISTENCIA/i,
+              code: 'INFO',
+              fullName: 'INFOASIST INFORMACION Y ASISTENCIA'
+            }
+          };
+          
+          for (const [clientKey, clientInfo] of Object.entries(clientPatterns)) {
+            if (clientInfo.pattern.test(result.clientName)) {
+              result.client = clientKey;
+              result.clientCode = clientInfo.code;
+              result.clientName = clientInfo.fullName;
+              break;
+            }
+          }
+          
+          result.confidence += 30;
+          console.log(`✅ Cliente detectado: ${result.clientName}`);
+        }
+      }
+    }
+    
+    // Si no se encontró en la sección, buscar con los patrones originales
+    if (!result.clientName) {
+      const clientPatterns = {
+        'SOS': {
+          pattern: /PROTECCION\s+S\.O\.S\.\s+JURIDICO/i,
+          code: 'SOS',
+          fullName: 'PROTECCION S.O.S. JURIDICO'
+        },
+        'ARSA': {
+          pattern: /ARSA\s+ASESORIA\s+INTEGRAL\s+PROFESIONAL/i,
+          code: 'ARSA',
+          fullName: 'ARSA ASESORIA INTEGRAL PROFESIONAL'
+        },
+        'INFOASIST': {
+          pattern: /INFOASIST\s+INFORMACION\s+Y\s+ASISTENCIA/i,
+          code: 'INFO',
+          fullName: 'INFOASIST INFORMACION Y ASISTENCIA'
+        }
+      };
+
+      for (const [clientKey, clientInfo] of Object.entries(clientPatterns)) {
+        if (clientInfo.pattern.test(text)) {
+          result.client = clientKey;
+          result.clientCode = clientInfo.code;
+          result.clientName = clientInfo.fullName;
+          result.confidence += 30;
+          console.log(`✅ Cliente detectado: ${clientKey}`);
+          break;
+        }
       }
     }
 
-    if (!result.client) {
+    if (!result.clientName) {
       result.errors.push('No se pudo identificar el cliente');
       console.log('❌ Cliente no detectado');
     }
 
     // 2. EXTRAER NÚMERO DE PEDIDO
     const orderPatterns = [
-      /Pedido\s+de\s+compra:\s*(\d+)/i,
-      /Pedido\s+de\s+compra\s*\(Nuevo\)\s*(\d+)/i,
-      /(\d{10})/g // Números de 10 dígitos
+      /Pedido\s+de\s+compra:\s*(\d{10})/i,
+      /Pedido\s+de\s+compra\s*\(Nuevo\)\s*(\d{10})/i,
+      /(\d{10})/g // Números de 10 dígitos como fallback
     ];
 
     for (const pattern of orderPatterns) {
       const match = text.match(pattern);
-      if (match && match[1]) {
+      if (match && match[1] && /^\d{10}$/.test(match[1])) {
         result.orderNumber = match[1];
-        result.confidence += 30;
+        result.confidence += 35;
         console.log(`✅ Número de pedido: ${result.orderNumber}`);
         break;
       }
@@ -111,7 +238,7 @@ class PDFAnalysisService {
       const match = text.match(pattern);
       if (match && match[1]) {
         result.totalAmount = this.parseAmount(match[1]);
-        result.confidence += 30;
+        result.confidence += 35;
         console.log(`✅ Importe detectado: $${result.totalAmount}`);
         break;
       }
@@ -120,6 +247,20 @@ class PDFAnalysisService {
     if (!result.totalAmount) {
       result.errors.push('No se encontró el importe total');
       console.log('❌ Importe no detectado');
+    }
+
+    // 4. EXTRAER PROVEEDOR (opcional)
+    const providerSectionMatch = text.match(/Para:\s*([\s\S]*?)Condiciones\s+de\s+pago/i);
+    
+    if (providerSectionMatch) {
+      const providerSection = providerSectionMatch[1];
+      const lines = providerSection.trim().split('\n');
+      
+      const providerNameLine = lines.find(line => line.trim().length > 0 && !line.includes('Teléfono') && !line.includes('Fax') && !line.includes('Correo'));
+      if (providerNameLine) {
+        result.metadata.providerName = providerNameLine.trim();
+        console.log(`✅ Proveedor detectado: ${result.metadata.providerName}`);
+      }
     }
 
     console.log(`📊 Confianza total: ${result.confidence}%`);
@@ -147,9 +288,6 @@ class PDFAnalysisService {
       cleanAmount = cleanAmount.replace(/[,.\s]/g, '');
     }
     
-    // Para depuración
-    console.log(`Monto original: ${amountStr}, Monto limpio: ${cleanAmount}`);
-    
     return parseFloat(cleanAmount);
   }
 
@@ -162,58 +300,70 @@ class PDFAnalysisService {
     };
 
     // Validaciones críticas
-    if (!analysis.client) {
+    if (!analysis.clientName) {
       validation.isValid = false;
       validation.errors.push('Cliente no identificado');
     }
 
-    if (!analysis.orderNumber) {
+    if (!analysis.orderNumber || !/^\d{10}$/.test(analysis.orderNumber)) {
       validation.isValid = false;
-      validation.errors.push('Número de pedido no encontrado');
+      validation.errors.push('Número de pedido no válido (debe ser de 10 dígitos)');
     }
 
-    if (!analysis.totalAmount) {
-      validation.warnings.push('Importe no encontrado');
+    if (!analysis.totalAmount || analysis.totalAmount <= 0) {
+      validation.isValid = false;
+      validation.errors.push('Importe total no válido');
     }
 
-    // Validación de confianza mínima
+    // Validación de confianza mínima reducida
     if (analysis.confidence < 50) {
       validation.isValid = false;
-      validation.errors.push('Confianza muy baja en los datos extraídos');
+      validation.errors.push('Confianza insuficiente en la validación del pedido');
+    }
+
+    // Advertencias no críticas
+    if (!analysis.clientCode) {
+      validation.warnings.push('Cliente no mapeado a código conocido, se usará el nombre completo');
+    }
+
+    if (!analysis.metadata.providerName) {
+      validation.warnings.push('Nombre del proveedor no detectado');
     }
 
     return validation;
   }
 
   static generateInvoiceData(analysis) {
-    if (analysis.confidence < 70) {
-      return null; // No suficiente confianza para procesar automáticamente
+    // Solo generar datos si la confianza es suficiente
+    if (analysis.confidence < 50) {
+      return null;
     }
 
     return {
-      clientCode: analysis.clientCode,
+      clientCode: analysis.clientCode || null,
       clientName: analysis.clientName,
       orderNumber: analysis.orderNumber,
       totalAmount: analysis.totalAmount,
-      confidence: analysis.confidence
+      confidence: analysis.confidence,
+      satKey: '78101803', // Siempre usar esta clave SAT
+      providerName: analysis.metadata.providerName
     };
   }
 
   // Método para mapear código de cliente a nombre completo
   static getClientMapping(clientCode) {
-    // Mapa de códigos cortos a nombres completos
     const clientMap = {
       'SOS': {
         name: 'PROTECCION S.O.S. JURIDICO',
-        satKey: '78101803' // Siempre usar esta clave SAT para todos
+        satKey: '78101803'
       },
       'ARSA': {
         name: 'ARSA ASESORIA INTEGRAL PROFESIONAL',
-        satKey: '78101803' // Siempre usar esta clave SAT para todos
+        satKey: '78101803'
       },
       'INFO': {
         name: 'INFOASIST INFORMACION Y ASISTENCIA', 
-        satKey: '78101803' // Siempre usar esta clave SAT para todos
+        satKey: '78101803'
       }
     };
 
