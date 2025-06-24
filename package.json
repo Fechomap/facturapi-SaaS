@@ -26,7 +26,7 @@
         "lint": "eslint .",
         "format": "prettier --write .",
         "build": "prisma generate",
-        "railway:build": "node scripts/railway-deploy.js",
+        "railway:build": "npx prisma generate",
         "railway:start": "node server.js",
         "railway:start:bot": "node bot.js",
         "railway:init-db": "node scripts/init-railway-db.js",
