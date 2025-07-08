@@ -68,7 +68,7 @@ class InvoiceService {
       }
       
       // Obtener el próximo folio
-      const folio = await TenantService.getNextFolio(tenantId, 'A');
+      await TenantService.getNextFolio(tenantId, 'A');
       
       // Verificar si el cliente requiere retención (SOS, INFOASIST, ARSA)
       let requiresWithholding = false;
@@ -140,7 +140,7 @@ class InvoiceService {
       console.log('Folio asignado por FacturAPI:', factura.folio_number); // Logging para verificar
       
       // Registrar la factura en la base de datos con el folio asignado por FacturAPI
-      const registeredInvoice = await TenantService.registerInvoice(
+      await TenantService.registerInvoice(
         tenantId,
         factura.id,
         factura.series,

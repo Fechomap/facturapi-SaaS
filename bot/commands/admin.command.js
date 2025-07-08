@@ -240,7 +240,7 @@ export function registerAdminCommands(bot) {
       
       // Reconfigurar clientes
       // Eliminar clientes existentes
-      const deleteResult = await prisma.tenantCustomer.deleteMany({
+      await prisma.tenantCustomer.deleteMany({
         where: { tenantId }
       });
       

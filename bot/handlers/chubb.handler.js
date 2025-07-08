@@ -4,8 +4,6 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import XLSX from 'xlsx';
-import moment from 'moment-timezone';
-import { config } from '../../config/index.js';
 import { fileURLToPath } from 'url';
 
 // Importar prisma de manera segura
@@ -78,7 +76,7 @@ export function registerChubbHandler(bot) {
           const CustomerSetupService = await import('../../services/customer-setup.service.js');
           
           // Configurar los clientes predefinidos
-          const setupResult = await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
           
           // Buscar nuevamente el cliente CHUBB
           const chubbClientAfterSetup = await prisma.tenantCustomer.findFirst({
@@ -372,7 +370,7 @@ async function procesarArchivoChubb(ctx, filePath) {
     console.log('Primeras filas del Excel:', data.slice(0, 2));
     
     // Verificar que los valores numéricos sean correctos
-    let erroresNumericos = [];
+    const erroresNumericos = [];
     data.forEach((row, index) => {
       const monto = parseFloat(row[columnMappings.monto]);
       if (isNaN(monto) || monto <= 0) {
@@ -401,7 +399,7 @@ async function procesarArchivoChubb(ctx, filePath) {
     
     // Construir resumen de datos por grupo
     let infoGrupos = '📊 Resumen de datos clasificados:\n\n';
-    let montosPorGrupo = {};
+    const montosPorGrupo = {};
     
     if (grupos.gruaConRetencion.length > 0) {
       const montoTotal = grupos.gruaConRetencion.reduce((total, item) => {
@@ -467,7 +465,7 @@ function mapColumnNames(firstRow) {
   };
   
   // Objeto para almacenar las columnas encontradas
-  let columnMapping = {};
+  const columnMapping = {};
   
   // Buscar el mejor match para cada columna requerida
   Object.keys(posiblesColumnas).forEach(tipoColumna => {

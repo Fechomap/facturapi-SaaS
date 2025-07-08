@@ -255,7 +255,7 @@ async function savePayment(
  */
 function calculateNextBillingDate(startDate) {
     const paymentDate = startDate.getDate();
-    let nextBillingDate = new Date(startDate);
+    const nextBillingDate = new Date(startDate);
 
     // Avanzar un mes
     nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
@@ -447,7 +447,7 @@ async function handleCheckoutSessionCompleted(session) {
     const nextBillingDate = calculateNextBillingDate(paymentDate);
 
     // 7. Actualizar la suscripción en la base de datos
-    const updatedDbSubscription = await prisma.tenantSubscription.update({
+    await prisma.tenantSubscription.update({
         where: { id: dbSubscription.id },
         data: {
             status: 'active',
@@ -462,8 +462,8 @@ async function handleCheckoutSessionCompleted(session) {
     // 8. Registrar el pago
     // Necesitamos el Payment Intent ID y el método de pago.
     // A veces están directamente en la sesión, otras veces hay que recuperarlo.
-    let paymentIntentId = session.payment_intent;
-    let paymentMethodDetails = { type: 'unknown', brand: 'unknown' }; // Default values
+    const paymentIntentId = session.payment_intent;
+    const paymentMethodDetails = { type: 'unknown', brand: 'unknown' }; // Default values
     let paymentMethodType = 'unknown';
 
     if (paymentIntentId) {
@@ -551,7 +551,7 @@ async function handleSubscriptionCreated(subscription) {
   }
 
   // Buscar si ya existe una suscripción en nuestra base de datos para este ID de Stripe
-  let dbSubscription = await prisma.tenantSubscription.findFirst({
+  const dbSubscription = await prisma.tenantSubscription.findFirst({
     where: {
       stripeSubscriptionId: subscription.id
     }

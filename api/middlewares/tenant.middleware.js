@@ -143,7 +143,8 @@ async function requireTenant(req, res, next) {
                 // Ya se verificó la gracia en el caso 'active' (cuando currentPeriodEndsAt < now)
                 // Si llega aquí como 'payment_pending', significa que ya expiró la gracia o nunca estuvo activo.
                 // Re-verificar gracia por si acaso el estado cambió directamente a pending.
-                let referenceDateForGrace = subscription.currentPeriodEndsAt || subscription.trialEndsAt; // Use end date or trial end date
+                {
+                const referenceDateForGrace = subscription.currentPeriodEndsAt || subscription.trialEndsAt; // Use end date or trial end date
                 if (referenceDateForGrace) {
                     const gracePeriodEnd = new Date(referenceDateForGrace);
                     gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 3);
@@ -158,6 +159,7 @@ async function requireTenant(req, res, next) {
                 } else {
                      middlewareLogger.warn({ tenantId }, 'Acceso denegado: Pago pendiente sin fecha de referencia para gracia.');
                      denialReason = 'PaymentPendingUnknownGrace';
+                }
                 }
                 break;
             case 'suspended':

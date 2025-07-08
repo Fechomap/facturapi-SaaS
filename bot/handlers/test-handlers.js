@@ -60,8 +60,6 @@ export function registerTestHandlers(bot) {
     
     // Guardar información importante
     const tenantId = ctx.userState?.tenantId;
-    const tenantName = ctx.userState?.tenantName;
-    const userStatus = ctx.userState?.userStatus;
     
     if (!tenantId) {
       return ctx.reply('❌ No tienes un tenant asignado. No se puede reiniciar la configuración.');

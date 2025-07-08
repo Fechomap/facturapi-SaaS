@@ -1,7 +1,6 @@
 // api/controllers/auth.controller.js
 import jwt from 'jsonwebtoken';
 import prisma from '../../lib/prisma.js';
-import { config } from '../../config/index.js';
 
 // Clave secreta para JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'facturapi-saas-secret-dev';
@@ -100,7 +99,7 @@ export async function login(req, res) {
  * @param {Object} res - Response de Express
  */
 export function register(req, res) {
-  const { email, password, name } = req.body;
+  const { email, name } = req.body;
   
   // Aquí implementarías la lógica real de registro
   return res.json({

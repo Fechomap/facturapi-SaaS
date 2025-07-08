@@ -1,6 +1,5 @@
 import { Markup } from 'telegraf';
 import TenantService from '../../services/tenant.service.js';
-import prisma from '../../lib/prisma.js';
 
 /**
  * Registra el comando suscripcion (/suscripcion) y acciones relacionadas
@@ -258,7 +257,7 @@ export function registerSubscriptionCommand(bot) {
   });
   
   // Implementar acción para actualizar suscripción
-  bot.action('update_subscription', async (ctx) => {
+  bot.action('update_subscription', async (_ctx) => {
     // ... (código original para actualizar suscripción) ...
   });
 }

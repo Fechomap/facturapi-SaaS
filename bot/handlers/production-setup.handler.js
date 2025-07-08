@@ -5,7 +5,6 @@ import path from 'path';
 import axios from 'axios';
 import FormData from 'form-data';
 import { fileURLToPath } from 'url';
-import { config } from '../../config/index.js';
 import TenantService from '../../services/tenant.service.js';
 import prisma from '../../lib/prisma.js';
 

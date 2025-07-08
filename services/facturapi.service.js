@@ -1,5 +1,4 @@
 import prisma from '../lib/prisma.js';
-import { decryptApiKey } from '../core/utils/encryption.js';
 import axios from 'axios';
 
 // Variable para almacenar el módulo Facturapi una vez importado
@@ -34,7 +33,7 @@ class FacturapiService {
       console.log(`Obteniendo API key para tenant: ${tenant.businessName} (${tenantId})`);
       
       // Usar exclusivamente la API key del tenant
-      let apiKey = tenant.facturapiApiKey;
+      const apiKey = tenant.facturapiApiKey;
       
       // Registrar el entorno para depuración
       console.log(`Usando API key almacenada para el tenant: ${tenant.businessName} (${tenantId})`);

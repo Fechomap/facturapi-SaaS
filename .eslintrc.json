@@ -1,7 +1,8 @@
 {
     "env": {
       "node": true,
-      "es2022": true
+      "es2022": true,
+      "jest": true
     },
     "extends": ["eslint:recommended", "prettier"],
     "parserOptions": {
@@ -13,5 +14,16 @@
       "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
       "no-var": "error",
       "prefer-const": "error"
-    }
+    },
+    "overrides": [
+      {
+        "files": ["tests/**/*.js", "**/*.test.js", "**/*.spec.js"],
+        "env": {
+          "jest": true
+        },
+        "rules": {
+          "no-console": "off"
+        }
+      }
+    ]
   }

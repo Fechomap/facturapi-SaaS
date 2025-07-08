@@ -2,7 +2,6 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import fs from 'fs';
 
 import logger from '../core/utils/logger.js';
 import { facturapiConfig, stripeConfig, validateServicesConfig } from './services.js';

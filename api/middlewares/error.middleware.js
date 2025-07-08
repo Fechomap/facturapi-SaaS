@@ -79,7 +79,6 @@ async function errorMiddleware(err, req, res, next) {
 
   // Dynamically import logger and get child instance
   let errorLogger;
-  let logMethod;
   try {
     const loggerModule = await import('../../core/utils/logger.js');
     const logger = loggerModule.default;
@@ -96,7 +95,7 @@ async function errorMiddleware(err, req, res, next) {
   const normalizedError = normalizeError(err);
 
   // Log según nivel de gravedad
-  logMethod = normalizedError.logLevel === 'error' ? errorLogger.error.bind(errorLogger) : errorLogger.warn.bind(errorLogger);
+  const logMethod = normalizedError.logLevel === 'error' ? errorLogger.error.bind(errorLogger) : errorLogger.warn.bind(errorLogger);
 
   // Crear objeto de log con contexto enriquecido
   const logContext = {

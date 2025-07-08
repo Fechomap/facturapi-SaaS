@@ -3,8 +3,8 @@ import { config } from '../../config/index.js';
 import logger from '../../core/utils/logger.js';
 import { handleWebhookEvent } from '../../services/payment.service.js';
 import NotificationService from '../../services/notification.service.js';
-import SubscriptionService from '../../core/subscription/subscription.service.js';
 import { withRetry } from '../../services/retry.service.js';
+import prisma from '../../lib/prisma.js';
 
 // Logger específico para webhooks
 const webhookLogger = logger.child({ module: 'webhook-controller' });
@@ -19,7 +19,7 @@ class WebhookController {
    * @param {Object} res - Response de Express
    * @param {Function} next - Función next de Express
    */
-  async handleStripeWebhook(req, res, next) {
+  async handleStripeWebhook(req, res, _next) {
     try {
       // Verificar firma del webhook de Stripe
       const signature = req.headers['stripe-signature'];
@@ -106,7 +106,7 @@ class WebhookController {
    * @param {Object} res - Response de Express
    * @param {Function} next - Función next de Express
    */
-  async handleFacturapiWebhook(req, res, next) {
+  async handleFacturapiWebhook(req, res, _next) {
     try {
       const payload = req.body;
       

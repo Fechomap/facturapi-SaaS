@@ -1,6 +1,6 @@
 // tests/validate-notifications.js
 import NotificationService from '../services/notification.service.js';
-import { config, initConfig } from '../config/index.js';
+import { initConfig } from '../config/index.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import logger from '../core/utils/logger.js';
 

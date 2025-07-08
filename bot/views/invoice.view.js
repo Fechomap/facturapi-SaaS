@@ -86,7 +86,7 @@ export function invoiceDetailsView(invoice, estadoFactura, estaCancelada) {
   const facturaId = invoice.facturapiInvoiceId || invoice.id;
   
   // Botones diferentes según si la factura está cancelada o no
-  let botonesFactura = [
+  const botonesFactura = [
     [Markup.button.callback('📄 Descargar PDF', `pdf_${facturaId}_${invoice.folio_number}`)],
     [Markup.button.callback('🔠 Descargar XML', `xml_${facturaId}_${invoice.folio_number}`)]
   ];

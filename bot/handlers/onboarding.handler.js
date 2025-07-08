@@ -2,8 +2,6 @@
 import { Markup } from 'telegraf';
 import axios from 'axios';
 import prisma from '../../lib/prisma.js';
-import { config } from '../../config/index.js';
-import { encryptApiKey } from '../../core/utils/encryption.js';
 import TenantService from '../../core/tenant/tenant.service.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import OnboardingProgressService from '../../services/onboarding-progress.service.js';
@@ -497,6 +495,7 @@ export function registerOnboardingHandler(bot) {
         ctx.userState.esperando = RegistrationState.CONFIRM;
         
         // Preparar mensaje de confirmación con todos los datos
+        {
         const data = ctx.userState.registrationData;
         const confirmationMessage = 
           `📋 *Resumen de datos ingresados*\n\n` +
@@ -530,6 +529,7 @@ export function registerOnboardingHandler(bot) {
             ])
           }
         );
+        }
         break;
       // Continuar procesando el resto de los campos...
       
@@ -801,7 +801,7 @@ export function registerOnboardingHandler(bot) {
         }
 
         // Mensaje de éxito
-        let finalMessage = `✅ *¡Registro completado exitosamente!*\n\n` +
+        const finalMessage = `✅ *¡Registro completado exitosamente!*\n\n` +
             `Tu empresa "${tenant.businessName}" ha sido registrada correctamente y tu cuenta está configurada como administrador.\n\n` +
             (subscriptionCreated 
                 ? `*Plan de prueba:* Se ha activado tu período de prueba de 14 días, el cual vence el ${subscriptionEndDate}.\n\n` 
@@ -1048,7 +1048,7 @@ function validateEmail(email) {
  */
 function validatePhone(phone) {
   // Eliminar espacios, guiones y paréntesis
-  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  const cleanPhone = phone.replace(/[\s\-()]/g, '');
   // Debe tener al menos 10 dígitos
   return /^\d{10,15}$/.test(cleanPhone);
 }

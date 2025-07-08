@@ -2,7 +2,7 @@
 import prisma from '../../lib/prisma.js';
 import logger from '../utils/logger.js';
 import { withTransaction, auditLog } from '../utils/transaction.js';
-import { encryptApiKey, decryptApiKey, legacyDecryptApiKey } from '../utils/encryption.js';
+import { legacyDecryptApiKey } from '../utils/encryption.js';
 
 // Logger específico para el servicio de tenant
 const tenantLogger = logger.child({ module: 'tenant-service' });
@@ -25,7 +25,7 @@ class TenantService {
     if (!data.email) throw new Error('El correo electrónico es requerido');
 
     // Usar la API key directamente sin encriptar
-    let facturapiApiKey = data.facturapiApiKey;
+    const facturapiApiKey = data.facturapiApiKey;
     if (!facturapiApiKey) {
       tenantLogger.warn(`Creando tenant ${data.businessName} sin API key de FacturAPI - esto causará problemas al facturar.`);
     } else {

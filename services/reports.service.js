@@ -202,7 +202,7 @@ class ReportsService {
       const now = new Date();
       
       // Calcular estado y fechas relevantes
-      let status = subscription.status;
+      const status = subscription.status;
       let endDate = null;
       let daysLeft = 0;
       

@@ -13,7 +13,7 @@ async function validateJobs() {
     testLogger.info('Sistema de jobs iniciado correctamente');
     
     // Verificar que los jobs estén registrados
-    const jobsModule = await import('../jobs/index.js');
+    await import('../jobs/index.js');
     
     // Esperar 2 segundos para asegurar que los jobs se registren
     await new Promise(resolve => setTimeout(resolve, 2000));

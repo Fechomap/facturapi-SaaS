@@ -4,7 +4,6 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { config } from '../../config/index.js';
 import TenantService from '../../services/tenant.service.js';
 import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
@@ -67,7 +66,6 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   console.log(`Descargando factura ${facturaId} en formato ${formato}`);
 
   const tempDir = ensureTempDirExists();
-  const clienteStr = clienteNombre || 'Cliente';
   const folioStr = folio || 'unknown';
 
   // Intentar obtener la serie del estado del usuario
@@ -78,7 +76,7 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   const filePath = `${tempDir}/${series}${folioStr}.${formato}`;
   console.log('Creando archivo temporal en:', filePath);
 
-  const writer = fs.createWriteStream(filePath);
+  fs.createWriteStream(filePath);
 
   try {
     // Obtener el tenant ID del contexto del usuario
@@ -89,7 +87,7 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
     
     // Obtener el cliente de FacturAPI para este tenant
     const facturapIService = (await import('../../services/facturapi.service.js')).default;
-    const facturapi = await facturapIService.getFacturapiClient(tenantId);
+    await facturapIService.getFacturapiClient(tenantId);
     
     console.log(`Cliente FacturAPI obtenido para tenant ${tenantId}, descargando ${formato}...`);
     
@@ -214,7 +212,7 @@ export function registerInvoiceHandler(bot) {
       const shortToFullNameMap = {};
       
       // Construir los botones para los clientes disponibles
-      const clientButtons = availableCustomers.map(customer => {
+      availableCustomers.map(customer => {
         const shortName = shortenName(customer.legalName);
         shortToFullNameMap[shortName] = customer.legalName;
         

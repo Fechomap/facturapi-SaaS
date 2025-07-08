@@ -2,6 +2,7 @@
 import { Markup } from 'telegraf';
 import ReportsService from '../../services/reports.service.js';
 import logger from '../../core/utils/logger.js';
+import prisma from '../../lib/prisma.js';
 
 // Logger específico para comandos de reportes
 const reportsCommandLogger = logger.child({ module: 'report-commands' });

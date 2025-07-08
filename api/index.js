@@ -9,7 +9,7 @@ import tenantMiddleware from './middlewares/tenant.middleware.js';
  * @param {Object} app - Instancia de Express
  * @param {Object} options - Opciones de configuración
  */
-function setupAPI(app, options = {}) {
+function setupAPI(app) {
   // Configuración especial para webhooks que necesitan el cuerpo raw
   app.use(['/api/webhooks/stripe', '/api/webhooks/facturapi'], express.raw({ type: 'application/json' }));
   

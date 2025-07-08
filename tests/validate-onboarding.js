@@ -1,6 +1,5 @@
 // tests/validate-onboarding.js
 import OnboardingProgressService from '../services/onboarding-progress.service.js';
-import { OnboardingSteps } from '../services/onboarding-progress.service.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { initConfig } from '../config/index.js';
 import logger from '../core/utils/logger.js';

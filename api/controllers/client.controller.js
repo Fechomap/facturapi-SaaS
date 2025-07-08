@@ -1,6 +1,5 @@
 // api/controllers/client.controller.js
 // Importaciones (temporales hasta que los servicios estén completamente implementados)
-import axios from 'axios';
 
 /**
  * Controlador para operaciones relacionadas con clientes

@@ -1,7 +1,6 @@
 // api/routes/client.routes.js
 import express from 'express';
 import clientController from '../controllers/client.controller.js';
-import { validateRequest } from '../middlewares/validation.middleware.js';
 
 const router = express.Router();
 

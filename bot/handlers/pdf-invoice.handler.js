@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url';
 import PDFAnalysisService from '../../services/pdf-analysis.service.js';
 import InvoiceService from '../../services/invoice.service.js';
 import facturapIService from '../../services/facturapi.service.js';
-import { config } from '../../config/index.js';
 
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);

@@ -4,8 +4,6 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import XLSX from 'xlsx';
-import moment from 'moment-timezone';
-import { config } from '../../config/index.js';
 import { fileURLToPath } from 'url';
 
 // Importar prisma de manera segura
@@ -82,7 +80,7 @@ export function registerAxaHandler(bot) {
           const CustomerSetupService = await import('../../services/customer-setup.service.js');
           
           // Configurar los clientes predefinidos
-          const setupResult = await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
           
           // Buscar nuevamente el cliente AXA
           const axaClientAfterSetup = await prisma.tenantCustomer.findFirst({
@@ -392,7 +390,7 @@ async function procesarArchivoAxa(ctx, filePath) {
     console.log('Primeras filas del Excel AXA:', data.slice(0, 2));
     
     // Verificar que los valores numéricos sean correctos
-    let erroresNumericos = [];
+    const erroresNumericos = [];
     data.forEach((row, index) => {
       const importe = parseFloat(row[columnMappings.importe]);
       if (isNaN(importe) || importe <= 0) {
@@ -463,7 +461,7 @@ function mapColumnNamesAxa(firstRow) {
   };
   
   // Objeto para almacenar las columnas encontradas
-  let columnMapping = {};
+  const columnMapping = {};
   
   // Buscar el mejor match para cada columna requerida
   Object.keys(posiblesColumnas).forEach(tipoColumna => {
