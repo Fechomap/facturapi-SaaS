@@ -1,6 +1,5 @@
 import prisma from '../lib/prisma.js';
 import axios from 'axios';
-import logger from '../core/utils/logger.js';
 
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;

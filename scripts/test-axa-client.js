@@ -79,7 +79,7 @@ async function testAxaClient() {
     
     // Guardar en base de datos local
     console.log('⏳ Guardando cliente AXA en base de datos local...');
-    const savedCustomer = await prisma.tenantCustomer.create({
+    await prisma.tenantCustomer.create({
       data: {
         tenantId: tenant.id,
         facturapiCustomerId: nuevoCliente.id,

@@ -308,7 +308,7 @@ try {
     const customer = await facturapi.customers.create(clientData);
     
     // Guardar el cliente en la base de datos
-    await prisma.tenantCustomer.create({
+    const savedCustomer = await prisma.tenantCustomer.create({
     data: {
         tenantId,
         facturapiCustomerId: customer.id,
