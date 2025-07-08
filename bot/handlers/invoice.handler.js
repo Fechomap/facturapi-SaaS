@@ -9,18 +9,22 @@ import InvoiceService from '../../services/invoice.service.js';
 import { invoiceSummaryView, invoiceCreatedView, invoiceDetailsView } from '../views/invoice.view.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import { clientSelectionMenu } from '../views/menu.view.js';
+import logger from '../../core/utils/logger.js';
 
 // Importar prisma de manera segura
 import { prisma as configPrisma } from '../../config/database.js';
 // También intentar importar desde lib
 import libPrisma from '../../lib/prisma.js';
 
+// Logger específico para invoice handler del bot
+const invoiceHandlerLogger = logger.child({ module: 'bot-invoice-handler' });
+
 // Usar la instancia que esté disponible
 const prisma = libPrisma || configPrisma;
 
 // Verificación de seguridad
 if (!prisma) {
-  console.error('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
+  invoiceHandlerLogger.fatal('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
 }
 
 
@@ -45,9 +49,9 @@ function ensureTempDirExists() {
   if (!fs.existsSync(tempDir)) {
     try {
       fs.mkdirSync(tempDir, { recursive: true });
-      console.log('Directorio temporal creado:', tempDir);
+      invoiceHandlerLogger.debug({ tempDir }, 'Directorio temporal creado');
     } catch (err) {
-      console.error('Error al crear directorio temporal:', err);
+      invoiceHandlerLogger.error({ tempDir, error: err.message }, 'Error al crear directorio temporal');
     }
   }
   return tempDir;

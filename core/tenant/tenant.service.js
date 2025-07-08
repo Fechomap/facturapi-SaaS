@@ -2,7 +2,6 @@
 import prisma from '../../lib/prisma.js';
 import logger from '../utils/logger.js';
 import { withTransaction, auditLog } from '../utils/transaction.js';
-import { legacyDecryptApiKey } from '../utils/encryption.js';
 
 // Logger específico para el servicio de tenant
 const tenantLogger = logger.child({ module: 'tenant-service' });

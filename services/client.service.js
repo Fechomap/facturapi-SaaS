@@ -170,7 +170,7 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
 
         const nuevoCliente = await facturapi.customers.create(clientData);
 
-        const savedCustomer = await prisma.tenantCustomer.create({
+        await prisma.tenantCustomer.create({
           data: {
             tenantId,
             facturapiCustomerId: nuevoCliente.id,
@@ -199,7 +199,7 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
             const clienteModificado = { ...clientData, tax_id: 'AAA010101AAA' };
             const nuevoCliente = await facturapi.customers.create(clienteModificado);
 
-            const savedCustomer = await prisma.tenantCustomer.create({
+            await prisma.tenantCustomer.create({
               data: {
                 tenantId,
                 facturapiCustomerId: nuevoCliente.id,
@@ -308,7 +308,7 @@ try {
     const customer = await facturapi.customers.create(clientData);
     
     // Guardar el cliente en la base de datos
-    const savedCustomer = await prisma.tenantCustomer.create({
+    await prisma.tenantCustomer.create({
     data: {
         tenantId,
         facturapiCustomerId: customer.id,

@@ -111,7 +111,7 @@ class InvoiceController {
       const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
 
       if (!isActive) {
-        console.warn(`Intento de crear factura simple bloqueado para tenant ${tenantId} con suscripción ${subscriptionStatus}`);
+        invoiceLogger.warn({ tenantId, subscriptionStatus }, 'Intento de crear factura simple bloqueado por suscripción inactiva');
         return res.status(403).json({
           error: 'SubscriptionError',
           message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,
@@ -181,7 +181,7 @@ class InvoiceController {
       const endDate = req.query.end_date;
       const status = req.query.status;
 
-      console.log(`Buscando facturas para tenant ${tenantId} (página ${page}, límite ${limit})`);
+      invoiceLogger.debug({ tenantId, page, limit }, 'Buscando facturas');
 
       // Crear objeto de criterios para la búsqueda
       const criteria = {
@@ -194,7 +194,7 @@ class InvoiceController {
       // Usar el servicio para obtener facturas reales de la base de datos
       const invoices = await InvoiceService.searchInvoices(criteria);
 
-      console.log(`Se encontraron ${invoices.length} facturas para el tenant ${tenantId}`);
+      invoiceLogger.info({ tenantId, count: invoices.length }, 'Facturas encontradas');
 
       // Aplicar paginación manual si es necesario
       const startIndex = (page - 1) * limit;

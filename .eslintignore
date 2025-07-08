@@ -1,0 +1,21 @@
+# Archivos y directorios a ignorar por ESLint
+
+# Frontend compilado y minificado
+frontend/build/
+frontend/dist/
+frontend/public/
+frontend/src/
+*.min.js
+
+# Node modules
+node_modules/
+
+# Archivos temporales
+temp/
+tmp/
+
+# Logs
+*.log
+
+# Archivos de configuración específicos
+.env*

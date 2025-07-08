@@ -5,8 +5,6 @@ import logger from '../core/utils/logger.js';
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;
 
-// Logger específico para FacturAPI service
-const facturapiLogger = logger.child({ module: 'facturapi-service' });
 
 /**
  * Servicio para interactuar con FacturAPI en modo multi-tenant

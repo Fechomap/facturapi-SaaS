@@ -1,5 +1,9 @@
 // services/pdf-analysis.service.js
 import fs from 'fs';
+import logger from '../core/utils/logger.js';
+
+// Logger específico para análisis de PDF
+const pdfAnalysisLogger = logger.child({ module: 'pdf-analysis-service' });
 
 class PDFAnalysisService {
   static async analyzePDF(filePath) {
@@ -12,7 +16,7 @@ class PDFAnalysisService {
       const pdfData = await pdfParse(dataBuffer);
       const text = pdfData.text;
       
-      console.log('Analizando PDF...');
+      pdfAnalysisLogger.debug({ filePath }, 'Analizando PDF');
       
       // PRIMERO: Identificar el tipo de documento
       const documentType = this.identifyDocumentType(text);
