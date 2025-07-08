@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import axios from 'axios';
+import facturapiQueueService from './facturapi-queue.service.js';
 
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;
@@ -136,21 +137,28 @@ class FacturapiService {
   }
 
   /**
-   * Verifica la conexión con FacturAPI
+   * Verifica la conexión con FacturAPI usando cola y timeouts adaptativos
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<Object>} - Resultado de la verificación
    */
   static async testConnection(tenantId) {
     try {
-      const facturapi = await this.getFacturapiClient(tenantId);
-      
-      // Intentar obtener algo simple como los productos
-      const products = await facturapi.catalogs.getProducts();
+      // Usar cola para operaciones de prueba
+      const result = await facturapiQueueService.enqueue(
+        async () => {
+          const facturapi = await this.getFacturapiClient(tenantId);
+          const products = await facturapi.catalogs.getProducts();
+          return { products_count: products.length };
+        },
+        'quick', // Operación rápida
+        { tenantId, operation: 'test_connection' },
+        2 // Prioridad media-alta
+      );
       
       return { 
         success: true, 
         message: 'Conexión establecida correctamente con FacturAPI',
-        data: { products_count: products.length }
+        data: result
       };
     } catch (error) {
       console.error(`Error al probar conexión para tenant ${tenantId}:`, error);
@@ -160,6 +168,76 @@ class FacturapiService {
         error: error
       };
     }
+  }
+
+  /**
+   * Crear factura usando cola y timeouts adaptativos para escalabilidad
+   * @param {Object} facturapi - Cliente de FacturAPI
+   * @param {Object} facturaData - Datos de la factura
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<Object>} - Factura creada
+   */
+  static async createInvoiceQueued(facturapi, facturaData, tenantId) {
+    return await facturapiQueueService.enqueue(
+      async () => {
+        return await facturapi.invoices.create(facturaData);
+      },
+      'normal', // Operación normal
+      { tenantId, operation: 'create_invoice', invoiceData: facturaData },
+      3 // Prioridad alta para facturación
+    );
+  }
+
+  /**
+   * Buscar clientes usando cola para evitar sobrecarga
+   * @param {Object} facturapi - Cliente de FacturAPI
+   * @param {string} searchQuery - Query de búsqueda
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<Object>} - Resultados de búsqueda
+   */
+  static async searchCustomersQueued(facturapi, searchQuery, tenantId) {
+    return await facturapiQueueService.enqueue(
+      async () => {
+        return await facturapi.customers.list({ q: searchQuery });
+      },
+      'quick', // Búsquedas son operaciones rápidas
+      { tenantId, operation: 'search_customers', query: searchQuery },
+      1 // Prioridad baja para búsquedas
+    );
+  }
+
+  /**
+   * Obtener catálogos usando cola
+   * @param {string} tenantId - ID del tenant
+   * @param {string} catalogType - Tipo de catálogo
+   * @returns {Promise<Array>} - Catálogo solicitado
+   */
+  static async getCatalogQueued(tenantId, catalogType) {
+    return await facturapiQueueService.enqueue(
+      async () => {
+        const facturapi = await this.getFacturapiClient(tenantId);
+        
+        switch (catalogType) {
+          case 'products':
+            return facturapi.catalogs.getProducts();
+          case 'units':
+            return facturapi.catalogs.getUnits();
+          case 'payment_forms':
+            return facturapi.catalogs.getPaymentForms();
+          case 'payment_methods':
+            return facturapi.catalogs.getPaymentMethods();
+          case 'cfdi_uses':
+            return facturapi.catalogs.getCfdiUses();
+          case 'tax_types':
+            return facturapi.catalogs.getTaxTypes();
+          default:
+            throw new Error(`Tipo de catálogo no soportado: ${catalogType}`);
+        }
+      },
+      'quick', // Catálogos son operaciones rápidas
+      { tenantId, operation: 'get_catalog', catalogType },
+      1 // Prioridad baja
+    );
   }
   
   /**

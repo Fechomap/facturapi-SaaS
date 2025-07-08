@@ -7,6 +7,7 @@ import logger from './core/utils/logger.js';
 import routes from './api/routes/index.js';
 import { tenantMiddleware } from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
+import { generalRateLimit, invoiceRateLimit, queryRateLimit, authRateLimit } from './api/middlewares/rate-limit.middleware.js';
 import { startJobs } from './jobs/index.js';
 import NotificationService from './services/notification.service.js';
 import { createBot } from './bot/index.js';
@@ -89,6 +90,16 @@ async function initializeApp() {
 
   // Middleware para parsing JSON para el resto de rutas
   app.use(express.json());
+
+  // === RATE LIMITING PARA ESCALABILIDAD ===
+  // Rate limiting general para toda la API
+  app.use('/api', generalRateLimit);
+  
+  // Rate limiting específico para endpoints críticos
+  app.use('/api/invoices', invoiceRateLimit);
+  app.use('/api/auth', authRateLimit);
+  app.use('/api/customers', queryRateLimit);
+  app.use('/api/subscriptions', queryRateLimit);
 
   // Middleware para extraer información de tenant
   app.use('/api', tenantMiddleware);

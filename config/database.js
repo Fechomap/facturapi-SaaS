@@ -1,90 +1,137 @@
 // config/database.js
-import { PrismaClient } from '@prisma/client';
 import logger from '../core/utils/logger.js';
 
-// Crear una instancia de logger específica para la base de datos
-const dbLogger = logger.child({ module: 'database' });
+// Logger específico para base de datos
+const dbLogger = logger.child({ module: 'database-config' });
 
-// Opciones de Prisma según el entorno
-const prismaOptions = {
-  log: [
-    {
-      emit: 'event',
-      level: 'query',
-    },
-    {
-      emit: 'event',
-      level: 'error',
-    },
-    {
-      emit: 'event',
-      level: 'warn',
-    },
-  ],
+/**
+ * Configuración optimizada de base de datos para escalabilidad
+ */
+export const getDatabaseConfig = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // URL base de la base de datos
+  const databaseUrl = process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL no está configurada');
+  }
+  
+  // Configuración de connection pooling para escalabilidad
+  const poolConfig = new URLSearchParams({
+    // Conexiones concurrentes (adaptado según entorno)
+    connection_limit: isProduction ? '20' : '10',
+    
+    // Timeout para obtener conexión del pool (20 segundos)
+    pool_timeout: '20',
+    
+    // Timeout para queries individuales (30 segundos)
+    socket_timeout: '30',
+    
+    // Conexiones idle antes de cerrar (2 minutos)
+    idle_timeout: '120',
+    
+    // Vida máxima de conexión (10 minutos)
+    max_lifetime: '600'
+  });
+  
+  // Agregar parámetros de pooling si no están presentes
+  const url = new URL(databaseUrl);
+  
+  // Solo agregar parámetros si no existen
+  for (const [key, value] of poolConfig) {
+    if (!url.searchParams.has(key)) {
+      url.searchParams.set(key, value);
+    }
+  }
+  
+  const optimizedUrl = url.toString();
+  
+  dbLogger.info('Configuración de base de datos optimizada', {
+    environment: process.env.NODE_ENV,
+    connectionLimit: url.searchParams.get('connection_limit'),
+    poolTimeout: url.searchParams.get('pool_timeout'),
+    socketTimeout: url.searchParams.get('socket_timeout')
+  });
+  
+  return {
+    url: optimizedUrl,
+    config: {
+      connection_limit: parseInt(url.searchParams.get('connection_limit') || '10'),
+      pool_timeout: parseInt(url.searchParams.get('pool_timeout') || '20'),
+      socket_timeout: parseInt(url.searchParams.get('socket_timeout') || '30')
+    }
+  };
 };
 
-// Inicializar cliente Prisma
-const prisma = new PrismaClient(prismaOptions);
-
-// Vincular eventos de log de Prisma a nuestro logger
-prisma.$on('query', (e) => {
-  // En desarrollo, loggear las consultas para depuración
-  // La variable de entorno DEBUG_DATABASE=true permite activar esto en cualquier entorno
-  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_DATABASE === 'true') {
-    dbLogger.debug({
-      query: e.query,
-      params: e.params,
-      duration: e.duration,
-    }, 'Prisma Query');
+/**
+ * Validar que la configuración de BD sea adecuada para escalabilidad
+ */
+export const validateDatabaseConfig = () => {
+  const warnings = [];
+  const config = getDatabaseConfig();
+  
+  // Validaciones para escalabilidad
+  if (config.config.connection_limit < 10) {
+    warnings.push('Connection limit muy bajo para escalabilidad (recomendado: 10+)');
   }
-});
-
-prisma.$on('error', (e) => {
-  dbLogger.error(e, 'Prisma Error');
-});
-
-prisma.$on('warn', (e) => {
-  dbLogger.warn(e, 'Prisma Warning');
-});
-
-// Función para inicializar la conexión
-async function connectDatabase() {
-  try {
-    await prisma.$connect();
-    
-    // Verificar la conexión intentando ejecutar una consulta simple
-    await prisma.$queryRaw`SELECT 1+1 as result`;
-    
-    // Determinar si estamos en Heroku
-    const isHeroku = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
-    
-    // Mostrar información sobre el entorno de la base de datos
-    const databaseUrl = process.env.DATABASE_URL || 'No configurada';
-    // Ocultar credenciales para mostrar en logs
-    const safeDbUrl = databaseUrl.replace(/\/\/([^:]+):([^@]+)@/, '//[USERNAME]:[PASSWORD]@');
-    
-    dbLogger.info(`Conexión a base de datos establecida correctamente`);
-    dbLogger.info(`Entorno de base de datos: ${process.env.NODE_ENV}`);
-    dbLogger.info(`Plataforma: ${isHeroku ? 'Heroku' : 'Local/Otro'}`);
-    dbLogger.info(`URL de conexión: ${safeDbUrl}`);
-    
-    return prisma;
-  } catch (error) {
-    dbLogger.error({ error }, 'Error al conectar a la base de datos');
-    throw error;
+  
+  if (config.config.pool_timeout < 10) {
+    warnings.push('Pool timeout muy bajo (recomendado: 10+ segundos)');
   }
-}
-
-// Función para cerrar la conexión
-async function disconnectDatabase() {
-  try {
-    await prisma.$disconnect();
-    dbLogger.info('Conexión a base de datos cerrada correctamente');
-  } catch (error) {
-    dbLogger.error({ error }, 'Error al cerrar conexión a la base de datos');
-    throw error;
+  
+  if (config.config.socket_timeout < 20) {
+    warnings.push('Socket timeout muy bajo para operaciones complejas (recomendado: 20+ segundos)');
   }
-}
+  
+  // Mostrar advertencias
+  if (warnings.length > 0) {
+    warnings.forEach(warning => dbLogger.warn(warning));
+  } else {
+    dbLogger.info('Configuración de base de datos validada para escalabilidad');
+  }
+  
+  return {
+    isValid: warnings.length === 0,
+    warnings,
+    config: config.config
+  };
+};
 
-export { prisma, connectDatabase, disconnectDatabase };
-export default prisma;
+// Importar y reexportar prisma
+import prismaInstance from '../lib/prisma.js';
+export const prisma = prismaInstance;
+
+/**
+ * Función para conectar a la base de datos (dummy para compatibilidad)
+ * En Prisma la conexión es automática
+ */
+export const connectDatabase = async () => {
+  const dbConfig = getDatabaseConfig();
+  const validation = validateDatabaseConfig();
+  
+  if (!validation.isValid) {
+    throw new Error(`Configuración de BD inválida: ${validation.warnings.join(', ')}`);
+  }
+  
+  return {
+    success: true,
+    message: 'Configuración de base de datos validada',
+    config: validation.config
+  };
+};
+
+/**
+ * Función para desconectar de la base de datos
+ */
+export const disconnectDatabase = async () => {
+  // En Prisma la desconexión se maneja automáticamente
+  return { success: true, message: 'Base de datos desconectada' };
+};
+
+export default {
+  getDatabaseConfig,
+  validateDatabaseConfig,
+  connectDatabase,
+  disconnectDatabase
+};

@@ -6,7 +6,8 @@ import path from 'path';
 import logger from '../core/utils/logger.js';
 import { facturapiConfig, stripeConfig, validateServicesConfig } from './services.js';
 import { authConfig, validateAuthConfig } from './auth.js';
-import { prisma, connectDatabase } from './database.js';
+import { getDatabaseConfig, validateDatabaseConfig, connectDatabase, disconnectDatabase } from './database.js';
+import prisma from '../lib/prisma.js';
 
 // Logger específico para configuración
 const configLogger = logger.child({ module: 'config' });
