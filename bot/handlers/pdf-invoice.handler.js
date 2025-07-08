@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import PDFAnalysisService from '../../services/pdf-analysis.service.js';
 import InvoiceService from '../../services/invoice.service.js';
 import facturapIService from '../../services/facturapi.service.js';
+import prisma from '../../lib/prisma.js';
 
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);
@@ -184,24 +185,37 @@ async function generateSimpleInvoice(ctx, analysisData) {
       return ctx.reply('❌ Error: No se encontró el ID del tenant');
     }
     
-    // Buscar cliente por nombre en lugar de usar mapeo estático
-    const facturapi = await facturapIService.getFacturapiClient(tenantId);
-    
-    // Intentar buscar cliente por nombre
+    // ✅ OPTIMIZACIÓN: Buscar cliente primero en BD local, luego en FacturAPI
     let clienteId = null;
     try {
-      // Buscar clientes que coincidan con el nombre (usando nombre completo)
-      console.log(`Buscando cliente con nombre completo: "${analysis.clientName}"`);
-      const clientes = await facturapi.customers.list({
-        q: analysis.clientName // Usar el nombre completo para mayor precisión
+      // 1. Buscar primero en BD local (mucho más rápido)
+      console.log(`🔍 Buscando cliente en BD local: "${analysis.clientName}"`);
+      const localCustomer = await prisma.tenantCustomer.findFirst({
+        where: {
+          tenantId,
+          legalName: { contains: analysis.clientName, mode: 'insensitive' }
+        }
       });
       
-      if (clientes && clientes.data && clientes.data.length > 0) {
-        // Usar el primer cliente que coincida
-        clienteId = clientes.data[0].id;
-        console.log(`Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${clienteId})`);
+      if (localCustomer) {
+        // ✅ Encontrado en BD local (0.1 segundos)
+        clienteId = localCustomer.facturapiCustomerId;
+        console.log(`✅ Cliente encontrado en BD local: ${localCustomer.legalName} (ID: ${clienteId})`);
       } else {
-        return ctx.reply(`❌ No se encontró el cliente "${analysis.clientName}" en FacturAPI. Por favor, asegúrate de que esté registrado.`);
+        // ⚠️ Solo como fallback, buscar en FacturAPI (30 segundos)
+        console.log(`⚠️ Cliente no encontrado en BD local, buscando en FacturAPI: "${analysis.clientName}"`);
+        const facturapi = await facturapIService.getFacturapiClient(tenantId);
+        const clientes = await facturapi.customers.list({
+          q: analysis.clientName // Usar el nombre completo para mayor precisión
+        });
+        
+        if (clientes && clientes.data && clientes.data.length > 0) {
+          // Usar el primer cliente que coincida
+          clienteId = clientes.data[0].id;
+          console.log(`Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${clienteId})`);
+        } else {
+          return ctx.reply(`❌ No se encontró el cliente "${analysis.clientName}" ni en BD local ni en FacturAPI. Por favor, asegúrate de que esté registrado.`);
+        }
       }
     } catch (error) {
       console.error('Error buscando cliente:', error);

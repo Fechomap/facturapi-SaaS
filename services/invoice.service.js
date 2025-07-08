@@ -52,21 +52,39 @@ class InvoiceService {
         const nombreBusqueda = clientMap[facturapiClienteId] || data.clienteNombre || facturapiClienteId;
         
         try {
-          // Buscar clientes que coincidan con el nombre (usando nombre completo)
-          console.log(`Buscando cliente con nombre: "${nombreBusqueda}"`);
-          const clientes = await facturapi.customers.list({
-            q: nombreBusqueda // Usar el nombre completo para mayor precisión
+          // ✅ OPTIMIZACIÓN: Buscar primero en BD local (mucho más rápido)
+          console.log(`🔍 Buscando cliente en BD local: "${nombreBusqueda}"`);
+          const localCustomer = await prisma.tenantCustomer.findFirst({
+            where: {
+              tenantId,
+              OR: [
+                { legalName: { contains: nombreBusqueda, mode: 'insensitive' } },
+                { legalName: clientMap[facturapiClienteId] }
+              ]
+            }
           });
           
-          if (clientes && clientes.data && clientes.data.length > 0) {
-            // Usar el primer cliente que coincida
-            facturapiClienteId = clientes.data[0].id;
-            console.log(`Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${facturapiClienteId})`);
+          if (localCustomer) {
+            // ✅ Encontrado en BD local (0.1 segundos)
+            facturapiClienteId = localCustomer.facturapiCustomerId;
+            console.log(`✅ Cliente encontrado en BD local: ${localCustomer.legalName} (ID: ${facturapiClienteId})`);
           } else {
-            throw new Error(`No se encontró el cliente "${nombreBusqueda}" en FacturAPI`);
+            // ⚠️ Solo como fallback, buscar en FacturAPI (30 segundos)
+            console.log(`⚠️ Cliente no encontrado en BD local, buscando en FacturAPI: "${nombreBusqueda}"`);
+            const clientes = await facturapi.customers.list({
+              q: nombreBusqueda // Usar el nombre completo para mayor precisión
+            });
+            
+            if (clientes && clientes.data && clientes.data.length > 0) {
+              // Usar el primer cliente que coincida
+              facturapiClienteId = clientes.data[0].id;
+              console.log(`Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${facturapiClienteId})`);
+            } else {
+              throw new Error(`No se encontró el cliente "${nombreBusqueda}" ni en BD local ni en FacturAPI`);
+            }
           }
         } catch (error) {
-          console.error('Error buscando cliente por nombre:', error);
+          console.error('Error buscando cliente:', error);
           throw new Error(`Error al buscar cliente por nombre: ${error.message}`);
         }
       }
