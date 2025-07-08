@@ -1,4 +1,8 @@
 import prisma from '../lib/prisma.js';
+import logger from '../core/utils/logger.js';
+
+// Logger específico para el servicio de tenants
+const tenantServiceLogger = logger.child({ module: 'tenant-service' });
 
 /**
  * Servicio para gestión de tenants
@@ -19,7 +23,7 @@ class TenantService {
         }
       });
     } catch (error) {
-      console.error(`Error al buscar cliente con nombre ${namePattern} para tenant ${tenantId}:`, error);
+      tenantServiceLogger.error({ tenantId, namePattern, error: error.message }, 'Error al buscar cliente por nombre');
       return null;
     }
   }
@@ -135,7 +139,7 @@ class TenantService {
       return { canGenerate: true, subscriptionStatus: status };
 
     } catch (error) {
-      console.error(`Error al verificar capacidad de generar factura para tenant ${tenantId}:`, error);
+      tenantServiceLogger.error({ tenantId, error: error.message }, 'Error al verificar capacidad de generar factura');
       return { canGenerate: false, reason: 'Error interno al verificar la suscripción.' };
     }
   }
@@ -160,9 +164,7 @@ class TenantService {
     total, 
     createdById
   ) {
-    console.log(
-      `Registrando factura: ${series}-${folioNumber} para tenant ${tenantId}`
-    );
+    tenantServiceLogger.info({ tenantId, series, folioNumber }, 'Registrando factura');
     
     try {
       // Guardar realmente en la base de datos usando Prisma

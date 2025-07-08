@@ -3,6 +3,10 @@
 import axios from 'axios';
 import prisma from '../../lib/prisma.js';
 import InvoiceService from '../../services/invoice.service.js';
+import logger from '../../core/utils/logger.js';
+
+// Logger específico para facturas
+const invoiceLogger = logger.child({ module: 'invoice-controller' });
 
 /**
  * Controlador para operaciones relacionadas con facturas
@@ -30,7 +34,7 @@ class InvoiceController {
       const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
 
       if (!isActive) {
-        console.warn(`Intento de crear factura bloqueado para tenant ${tenantId} con suscripción ${subscriptionStatus}`);
+        invoiceLogger.warn({ tenantId, subscriptionStatus }, 'Intento de crear factura bloqueado por suscripción inactiva');
         return res.status(403).json({
           error: 'SubscriptionError',
           message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,

@@ -1,9 +1,13 @@
 // api/controllers/auth.controller.js
 import jwt from 'jsonwebtoken';
 import prisma from '../../lib/prisma.js';
+import logger from '../../core/utils/logger.js';
 
 // Clave secreta para JWT
 const JWT_SECRET = process.env.JWT_SECRET || 'facturapi-saas-secret-dev';
+
+// Logger específico para autenticación
+const authLogger = logger.child({ module: 'auth-controller' });
 
 /**
  * Función para iniciar sesión
@@ -85,7 +89,7 @@ export async function login(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error en login:', error);
+    authLogger.error({ error: error.message, stack: error.stack }, 'Error en login');
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

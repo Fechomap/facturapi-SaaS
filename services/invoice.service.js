@@ -1,6 +1,10 @@
 import prisma from '../lib/prisma.js';
 import TenantService from './tenant.service.js';
 import facturapIService from './facturapi.service.js';
+import logger from '../core/utils/logger.js';
+
+// Logger específico para el servicio de facturas
+const invoiceServiceLogger = logger.child({ module: 'invoice-service' });
 
 /**
  * Servicio para gestión de facturas
@@ -35,7 +39,7 @@ class InvoiceService {
       
       // Si el clienteId no es un ID hexadecimal válido, buscar el cliente por nombre
       if (!hexRegex.test(facturapiClienteId)) {
-        console.log(`El ID de cliente "${facturapiClienteId}" no es un ID hexadecimal. Buscando cliente por nombre...`);
+        invoiceServiceLogger.debug({ clienteId: facturapiClienteId }, 'ID de cliente no es hexadecimal, buscando por nombre');
         
         // Mapa de códigos cortos a nombres completos para buscar
         const clientMap = {
