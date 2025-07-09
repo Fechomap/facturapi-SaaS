@@ -23,6 +23,52 @@ if (!prisma) {
 const CLAVE_SAT_GRUA_CON_RETENCION = '78101803';
 const CLAVE_SAT_SERVICIOS_SIN_RETENCION = '90121800';
 
+// 📱 UTILIDADES PARA PROGRESO VISUAL
+const PROGRESS_FRAMES = ['⏳', '⌛', '⏳', '⌛'];
+const PROGRESS_BARS = [
+  '▱▱▱▱▱▱▱▱▱▱',
+  '▰▱▱▱▱▱▱▱▱▱',
+  '▰▰▱▱▱▱▱▱▱▱',
+  '▰▰▰▱▱▱▱▱▱▱',
+  '▰▰▰▰▱▱▱▱▱▱',
+  '▰▰▰▰▰▱▱▱▱▱',
+  '▰▰▰▰▰▰▱▱▱▱',
+  '▰▰▰▰▰▰▰▱▱▱',
+  '▰▰▰▰▰▰▰▰▱▱',
+  '▰▰▰▰▰▰▰▰▰▱',
+  '▰▰▰▰▰▰▰▰▰▰'
+];
+
+/**
+ * Actualiza el mensaje de progreso con animación
+ */
+async function updateProgressMessage(ctx, messageId, step, total, currentTask, details = '') {
+  if (!messageId) return;
+  
+  const percentage = Math.round((step / total) * 100);
+  const progressBarIndex = Math.min(Math.floor((step / total) * 10), 9);
+  const frameIndex = step % PROGRESS_FRAMES.length;
+  
+  const progressText = `${PROGRESS_FRAMES[frameIndex]} **Procesando archivo CHUBB**\n\n` +
+                      `📊 Progreso: ${percentage}% ${PROGRESS_BARS[progressBarIndex]}\n` +
+                      `🔄 ${currentTask}\n` +
+                      (details ? `📝 ${details}\n` : '') +
+                      `\n⏱️ Por favor espere...`;
+  
+  try {
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      messageId,
+      null,
+      progressText,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    // Si no se puede editar el mensaje, crear uno nuevo
+    console.log('No se pudo editar mensaje de progreso:', error.message);
+  }
+}
+
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -122,14 +168,32 @@ export function registerChubbHandler(bot) {
   bot.action('chubb_confirmar', async (ctx) => {
     await ctx.answerCbQuery();
     
+    // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el click del botón ANTES de validaciones
+    const facturaProgressMsg = await ctx.reply('⚡ Procesando facturas CHUBB...\n⏳ Validando datos...');
+    
     // Verificar que tenemos datos para procesar
     if (!ctx.userState.chubbGrupos || !ctx.userState.chubbColumnMappings) {
-      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+      // Actualizar mensaje con error
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        '❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.'
+      );
+      return;
     }
     
     try {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
-      await ctx.reply('⏳ Procesando solicitud de generación de facturas...');
+      
+      // 📱 Actualizar progreso inicial
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        '⚡ Procesando facturas CHUBB...\n⏳ Preparando grupos de servicios...',
+        { parse_mode: 'Markdown' }
+      );
       
       const grupos = ctx.userState.chubbGrupos;
       const columnMappings = ctx.userState.chubbColumnMappings;
@@ -138,7 +202,15 @@ export function registerChubbHandler(bot) {
       // Generar facturas para cada grupo que tenga datos
       // Grupo 1: Servicios GRUA con Retención
       if (grupos.gruaConRetencion.length > 0) {
-        await ctx.reply(`⏳ Generando factura para servicios GRUA con retención (${grupos.gruaConRetencion.length} registros)...`);
+        // 📱 Actualizar progreso para servicios GRUA con retención
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          facturaProgressMsg.message_id,
+          null,
+          `🚚 Generando factura GRUA con retención...\n\n📊 ${grupos.gruaConRetencion.length} registros\n⏳ Procesando...`,
+          { parse_mode: 'Markdown' }
+        );
+        
         const facturaGruaConRetencion = await generarFacturaParaGrupo(
           grupos.gruaConRetencion,
           CLAVE_SAT_GRUA_CON_RETENCION,
@@ -149,13 +221,19 @@ export function registerChubbHandler(bot) {
         if (facturaGruaConRetencion) {
           facturas.push(facturaGruaConRetencion);
         }
-      } else {
-        await ctx.reply('ℹ️ No hay servicios GRUA con retención para facturar.');
       }
       
       // Grupo 2: Servicios GRUA sin Retención
       if (grupos.gruaSinRetencion.length > 0) {
-        await ctx.reply(`⏳ Generando factura para servicios GRUA sin retención (${grupos.gruaSinRetencion.length} registros)...`);
+        // 📱 Actualizar progreso para servicios GRUA sin retención
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          facturaProgressMsg.message_id,
+          null,
+          `🚚 Generando factura GRUA sin retención...\n\n📊 ${grupos.gruaSinRetencion.length} registros\n⏳ Procesando...`,
+          { parse_mode: 'Markdown' }
+        );
+        
         const facturaGruaSinRetencion = await generarFacturaParaGrupo(
           grupos.gruaSinRetencion,
           CLAVE_SAT_SERVICIOS_SIN_RETENCION,
@@ -166,13 +244,19 @@ export function registerChubbHandler(bot) {
         if (facturaGruaSinRetencion) {
           facturas.push(facturaGruaSinRetencion);
         }
-      } else {
-        await ctx.reply('ℹ️ No hay servicios GRUA sin retención para facturar.');
       }
       
       // Grupo 3: Otros Servicios sin Retención
       if (grupos.otrosServicios.length > 0) {
-        await ctx.reply(`⏳ Generando factura para otros servicios sin retención (${grupos.otrosServicios.length} registros)...`);
+        // 📱 Actualizar progreso para otros servicios
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          facturaProgressMsg.message_id,
+          null,
+          `🔧 Generando factura otros servicios...\n\n📊 ${grupos.otrosServicios.length} registros\n⏳ Procesando...`,
+          { parse_mode: 'Markdown' }
+        );
+        
         const facturaOtrosServicios = await generarFacturaParaGrupo(
           grupos.otrosServicios,
           CLAVE_SAT_SERVICIOS_SIN_RETENCION,
@@ -183,13 +267,20 @@ export function registerChubbHandler(bot) {
         if (facturaOtrosServicios) {
           facturas.push(facturaOtrosServicios);
         }
-      } else {
-        await ctx.reply('ℹ️ No hay otros servicios para facturar.');
       }
       
-      // Informar resultado final
+      // 📱 Actualizar progreso final
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        `✅ Proceso CHUBB completado\n\n🎯 ${facturas.length} facturas generadas\n📊 Todos los grupos procesados`,
+        { parse_mode: 'Markdown' }
+      );
+      
+      // 📱 Informar resultado final con indicador visual
       if (facturas.length > 0) {
-        await ctx.reply(`✅ Proceso completado. Se generaron ${facturas.length} facturas exitosamente.`);
+        await ctx.reply(`🎉 *Proceso CHUBB completado exitosamente*\n\n✅ Se generaron ${facturas.length} facturas\n📋 Todos los grupos procesados correctamente`, { parse_mode: 'Markdown' });
       } else {
         await ctx.reply('⚠️ No se generó ninguna factura. Por favor, verifica los datos del archivo Excel.');
       }
@@ -233,6 +324,9 @@ export function registerChubbHandler(bot) {
     console.log('Documento recibido:', ctx.message.document.file_name);
     console.log('Estado esperando:', ctx.userState?.esperando);
     
+    // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el documento ANTES de validaciones
+    let receivingMessage = null;
+    
     // Solo procesar si estamos esperando un archivo Excel para CHUBB
     if (!ctx.userState || ctx.userState.esperando !== 'archivo_excel_chubb') {
       console.log('No estamos esperando archivo Excel para CHUBB, pasando al siguiente handler');
@@ -240,17 +334,32 @@ export function registerChubbHandler(bot) {
       return next();
     }
 
+    // 📱 FEEDBACK INMEDIATO: Mostrar procesamiento tan pronto como detectemos que es nuestro contexto
+    receivingMessage = await ctx.reply('📥 Recibiendo archivo Excel de CHUBB...\n⏳ Validando archivo...');
+
     const document = ctx.message.document;
     
     // Verificar que sea un archivo Excel
     if (!document.file_name.match(/\.(xlsx|xls)$/i)) {
       console.log('Documento no es Excel, informando al usuario');
-      await ctx.reply('❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.');
+      // Actualizar el mensaje existente con el error
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        receivingMessage.message_id,
+        null,
+        '❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.'
+      );
       console.log('=========== FIN HANDLER CHUBB EXCEL (NO ES EXCEL) ===========');
       return; // No pasamos al siguiente handler porque es nuestro contexto pero formato incorrecto
     }
 
-    await ctx.reply('⏳ Recibiendo archivo, por favor espere...');
+    // 📱 MEJORA VISUAL: Actualizar que el archivo es válido
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      receivingMessage.message_id,
+      null,
+      `✅ Archivo Excel válido: ${document.file_name}\n⏳ Descargando archivo...`
+    );
 
     try {
       // Descargar el archivo
@@ -260,10 +369,16 @@ export function registerChubbHandler(bot) {
       
       await downloadFile(fileLink.href, filePath);
       
-      await ctx.reply(`✅ Archivo recibido: ${document.file_name}\n⏳ Procesando datos, esto puede tomar un momento...`);
+      // 📱 MEJORA VISUAL: Actualizar progreso con animación
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        receivingMessage.message_id,
+        null,
+        `✅ Archivo recibido: ${document.file_name}\n🔍 Validando estructura del Excel...\n⏳ Por favor espere...`
+      );
       
       // Procesar el archivo Excel y generar facturas
-      const result = await procesarArchivoChubb(ctx, filePath);
+      const result = await procesarArchivoChubb(ctx, filePath, receivingMessage.message_id);
       
       // Limpiar el archivo temporal
       try {
@@ -329,12 +444,17 @@ async function downloadFile(url, outputPath) {
  * @param {string} filePath - Ruta al archivo Excel
  * @returns {Promise} - Promesa que se resuelve cuando se procesan todas las facturas
  */
-async function procesarArchivoChubb(ctx, filePath) {
+async function procesarArchivoChubb(ctx, filePath, progressMessageId = null) {
   try {
-    // Leer el archivo Excel
+    // 📱 PASO 1: Leer archivo Excel
+    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
+    
+    // 📱 PASO 2: Detectar columnas
+    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
     
     // Obtener los nombres de las columnas para informar al usuario
     const range = XLSX.utils.decode_range(worksheet['!ref']);
@@ -346,21 +466,25 @@ async function procesarArchivoChubb(ctx, filePath) {
     
     console.log('Columnas detectadas en el Excel:', columnNames);
     
-    // Convertir a JSON
+    // 📱 PASO 3: Convertir a JSON
+    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Procesando datos', 'Convirtiendo a formato interno...');
+    
     const data = XLSX.utils.sheet_to_json(worksheet);
     
     if (data.length === 0) {
+      await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Error: Archivo vacío', '');
       await ctx.reply('❌ El archivo Excel no contiene datos. Por favor, revisa el archivo e intenta de nuevo.');
       return { success: false, error: 'Excel sin datos' };
     }
 
-    // Verificar que existan las columnas necesarias
-    await ctx.reply('⏳ Validando estructura del archivo Excel...');
+    // 📱 PASO 4: Validar estructura
+    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Validando estructura', `Verificando ${data.length} registros...`);
     
     // Mapear nombres de columnas que pueden variar
     const columnMappings = mapColumnNames(data[0]);
     
     if (!columnMappings) {
+      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Estructura inválida', 'Columnas requeridas faltantes');
       await ctx.reply('❌ El archivo Excel no tiene todas las columnas requeridas. Se necesitan columnas para: Número de Caso, Servicio, Monto y datos de retención.');
       return { success: false, error: 'Estructura de Excel inválida' };
     }
@@ -381,11 +505,13 @@ async function procesarArchivoChubb(ctx, filePath) {
     if (erroresNumericos.length > 0) {
       // Mostrar hasta 5 errores para no saturar el mensaje
       const erroresMostrados = erroresNumericos.slice(0, 5);
+      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Datos numéricos inválidos', `${erroresNumericos.length} errores encontrados`);
       await ctx.reply(`❌ Se encontraron errores en los datos numéricos:\n${erroresMostrados.join('\n')}\n${erroresNumericos.length > 5 ? `...y ${erroresNumericos.length - 5} más.` : ''}`);
       return { success: false, error: 'Datos numéricos inválidos' };
     }
     
-    await ctx.reply('✅ Estructura del archivo validada correctamente.');
+    // 📱 PASO 5: Clasificar datos
+    await updateProgressMessage(ctx, progressMessageId, 5, 6, 'Clasificando servicios', 'Agrupando por tipo de servicio...');
     
     // Clasificar los datos en grupos según las reglas usando el mapeo de columnas
     const grupos = clasificarDatos(data, columnMappings);
@@ -424,6 +550,9 @@ async function procesarArchivoChubb(ctx, filePath) {
       montosPorGrupo.otrosServicios = montoTotal;
       infoGrupos += `• Otros Servicios (Sin Retención):\n  - ${grupos.otrosServicios.length} registros\n  - Monto total: ${montoTotal.toFixed(2)} MXN\n\n`;
     }
+    
+    // 📱 PASO 6: Completado
+    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${totalRegistros} registros listos para facturar`);
     
     // Guardar temporalmente los datos en el estado del usuario para procesarlos después de la confirmación
     ctx.userState.chubbGrupos = grupos;
