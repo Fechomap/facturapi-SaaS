@@ -22,6 +22,52 @@ if (!prisma) {
 // Constante para la clave SAT de servicios de grúa
 const CLAVE_SAT_SERVICIOS_GRUA = '78101803';
 
+// 📱 UTILIDADES PARA PROGRESO VISUAL
+const PROGRESS_FRAMES = ['⏳', '⌛', '⏳', '⌛'];
+const PROGRESS_BARS = [
+  '▱▱▱▱▱▱▱▱▱▱',
+  '▰▱▱▱▱▱▱▱▱▱',
+  '▰▰▱▱▱▱▱▱▱▱',
+  '▰▰▰▱▱▱▱▱▱▱',
+  '▰▰▰▰▱▱▱▱▱▱',
+  '▰▰▰▰▰▱▱▱▱▱',
+  '▰▰▰▰▰▰▱▱▱▱',
+  '▰▰▰▰▰▰▰▱▱▱',
+  '▰▰▰▰▰▰▰▰▱▱',
+  '▰▰▰▰▰▰▰▰▰▱',
+  '▰▰▰▰▰▰▰▰▰▰'
+];
+
+/**
+ * Actualiza el mensaje de progreso con animación
+ */
+async function updateProgressMessage(ctx, messageId, step, total, currentTask, details = '') {
+  if (!messageId) return;
+  
+  const percentage = Math.round((step / total) * 100);
+  const progressBarIndex = Math.min(Math.floor((step / total) * 10), 9);
+  const frameIndex = step % PROGRESS_FRAMES.length;
+  
+  const progressText = `${PROGRESS_FRAMES[frameIndex]} **Procesando archivo AXA**\n\n` +
+                      `📊 Progreso: ${percentage}% ${PROGRESS_BARS[progressBarIndex]}\n` +
+                      `🔄 ${currentTask}\n` +
+                      (details ? `📝 ${details}\n` : '') +
+                      `\n⏱️ Por favor espere...`;
+  
+  try {
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      messageId,
+      null,
+      progressText,
+      { parse_mode: 'Markdown' }
+    );
+  } catch (error) {
+    // Si no se puede editar el mensaje, crear uno nuevo
+    console.log('No se pudo editar mensaje de progreso:', error.message);
+  }
+}
+
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -199,10 +245,20 @@ export function registerAxaHandler(bot) {
   bot.action('axa_confirmar_final', async (ctx) => {
     await ctx.answerCbQuery();
     
+    // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el click del botón ANTES de validaciones
+    const facturaProgressMsg = await ctx.reply('⚡ Procesando factura AXA...\n⏳ Validando datos...');
+    
     // Verificar que tenemos datos para procesar
     const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
     if (!tempData || !tempData.data || !tempData.columnMappings || ctx.userState.axaTipoServicio === undefined) {
-      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+      // Actualizar mensaje con error
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        '❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.'
+      );
+      return;
     }
     
     try {
@@ -211,19 +267,33 @@ export function registerAxaHandler(bot) {
       const tipoServicio = ctx.userState.axaTipoServicio;
       const conRetencion = ctx.userState.axaConRetencion;
       
-      await ctx.reply(`⏳ Procesando factura para servicios ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...`);
+      // 📱 Actualizar mensaje con tipo de servicio
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        `⚡ Procesando factura para servicios ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...\n⏳ Preparando datos...`,
+        { parse_mode: 'Markdown' }
+      );
       
       // Los datos ya fueron verificados arriba, solo los asignamos
       const data = tempData.data;
       const columnMappings = tempData.columnMappings;
       
-      // Generar una sola factura con todos los registros
-      await ctx.reply(`⏳ Generando factura para servicios AXA (${data.length} registros)...`);
-      const factura = await generarFacturaAxa(data, ctx, columnMappings, conRetencion);
+      // 📱 Actualizar progreso de facturación
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        `⚡ Generando factura para servicios AXA (${data.length} registros)...\n\n📊 Preparando datos para FacturAPI...`,
+        { parse_mode: 'Markdown' }
+      );
       
-      // Informar resultado final
+      const factura = await generarFacturaAxa(data, ctx, columnMappings, conRetencion, facturaProgressMsg.message_id);
+      
+      // 📱 Informar resultado final con indicador visual
       if (factura) {
-        await ctx.reply(`✅ Proceso completado. Se generó la factura exitosamente.`);
+        await ctx.reply(`🎯 *Proceso AXA completado exitosamente*\n\n✅ Factura generada correctamente\n📊 ${data.length} servicios procesados`, { parse_mode: 'Markdown' });
       } else {
         await ctx.reply('⚠️ No se generó la factura. Por favor, verifica los datos del archivo Excel.');
       }
@@ -272,6 +342,9 @@ export function registerAxaHandler(bot) {
     console.log('Documento recibido:', ctx.message.document.file_name);
     console.log('Estado esperando:', ctx.userState?.esperando);
     
+    // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el documento ANTES de validaciones
+    let receivingMessage = null;
+    
     // Solo procesar si estamos esperando un archivo Excel para AXA
     if (!ctx.userState || ctx.userState.esperando !== 'archivo_excel_axa') {
       console.log('No estamos esperando archivo Excel para AXA, pasando al siguiente handler');
@@ -279,17 +352,32 @@ export function registerAxaHandler(bot) {
       return next();
     }
 
+    // 📱 FEEDBACK INMEDIATO: Mostrar procesamiento tan pronto como detectemos que es nuestro contexto
+    receivingMessage = await ctx.reply('📥 Recibiendo archivo Excel de AXA...\n⏳ Validando archivo...');
+
     const document = ctx.message.document;
     
     // Verificar que sea un archivo Excel
     if (!document.file_name.match(/\.(xlsx|xls)$/i)) {
       console.log('Documento no es Excel, informando al usuario');
-      await ctx.reply('❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.');
+      // Actualizar el mensaje existente con el error
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        receivingMessage.message_id,
+        null,
+        '❌ El archivo debe ser de tipo Excel (.xlsx o .xls). Por favor, intenta de nuevo.'
+      );
       console.log('=========== FIN HANDLER AXA EXCEL (NO ES EXCEL) ===========');
       return; // No pasamos al siguiente handler porque es nuestro contexto pero formato incorrecto
     }
 
-    await ctx.reply('⏳ Recibiendo archivo, por favor espere...');
+    // 📱 MEJORA VISUAL: Actualizar que el archivo es válido
+    await ctx.telegram.editMessageText(
+      ctx.chat.id,
+      receivingMessage.message_id,
+      null,
+      `✅ Archivo Excel válido: ${document.file_name}\n⏳ Descargando archivo...`
+    );
 
     try {
       // Descargar el archivo
@@ -299,10 +387,16 @@ export function registerAxaHandler(bot) {
       
       await downloadFile(fileLink.href, filePath);
       
-      await ctx.reply(`✅ Archivo recibido: ${document.file_name}\n⏳ Procesando datos, esto puede tomar un momento...`);
+      // 📱 MEJORA VISUAL: Actualizar progreso con animación
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        receivingMessage.message_id,
+        null,
+        `✅ Archivo recibido: ${document.file_name}\n🔍 Validando estructura del Excel...\n⏳ Por favor espere...`
+      );
       
       // Procesar el archivo Excel y generar facturas
-      const result = await procesarArchivoAxa(ctx, filePath);
+      const result = await procesarArchivoAxa(ctx, filePath, receivingMessage.message_id);
       
       // Limpiar el archivo temporal
       try {
@@ -368,14 +462,18 @@ async function downloadFile(url, outputPath) {
  * @param {string} filePath - Ruta al archivo Excel
  * @returns {Promise} - Promesa que se resuelve cuando se procesan todas las facturas
  */
-async function procesarArchivoAxa(ctx, filePath) {
+async function procesarArchivoAxa(ctx, filePath, progressMessageId = null) {
   try {
-    // Leer el archivo Excel
+    // 📱 PASO 1: Leer archivo Excel
+    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
-    // Obtener los nombres de las columnas para informar al usuario
+    // 📱 PASO 2: Detectar columnas
+    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
+    
     const range = XLSX.utils.decode_range(worksheet['!ref']);
     const columnNames = [];
     for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -385,21 +483,25 @@ async function procesarArchivoAxa(ctx, filePath) {
     
     console.log('Columnas detectadas en el Excel AXA:', columnNames);
     
-    // Convertir a JSON
+    // 📱 PASO 3: Convertir a JSON
+    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Procesando datos', 'Convirtiendo a formato interno...');
+    
     const data = XLSX.utils.sheet_to_json(worksheet);
     
     if (data.length === 0) {
+      await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Error: Archivo vacío', '');
       await ctx.reply('❌ El archivo Excel no contiene datos. Por favor, revisa el archivo e intenta de nuevo.');
       return { success: false, error: 'Excel sin datos' };
     }
 
-    // Verificar que existan las columnas necesarias
-    await ctx.reply('⏳ Validando estructura del archivo Excel...');
+    // 📱 PASO 4: Validar estructura
+    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Validando estructura', `Verificando ${data.length} registros...`);
     
     // Mapear nombres de columnas que pueden variar
     const columnMappings = mapColumnNamesAxa(data[0]);
     
     if (!columnMappings) {
+      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Estructura inválida', 'Columnas requeridas faltantes');
       await ctx.reply('❌ El archivo Excel no tiene todas las columnas requeridas. Se necesitan columnas para: FACTURA, No. ORDEN, No. FOLIO, AUTORIZACION e IMPORTE.');
       return { success: false, error: 'Estructura de Excel inválida' };
     }
@@ -420,11 +522,13 @@ async function procesarArchivoAxa(ctx, filePath) {
     if (erroresNumericos.length > 0) {
       // Mostrar hasta 5 errores para no saturar el mensaje
       const erroresMostrados = erroresNumericos.slice(0, 5);
+      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Datos numéricos inválidos', `${erroresNumericos.length} errores encontrados`);
       await ctx.reply(`❌ Se encontraron errores en los datos numéricos:\n${erroresMostrados.join('\n')}\n${erroresNumericos.length > 5 ? `...y ${erroresNumericos.length - 5} más.` : ''}`);
       return { success: false, error: 'Datos numéricos inválidos' };
     }
     
-    await ctx.reply('✅ Estructura del archivo validada correctamente.');
+    // 📱 PASO 5: Calcular totales
+    await updateProgressMessage(ctx, progressMessageId, 5, 6, 'Calculando totales', `Procesando ${data.length} registros...`);
     
     // Calcular el monto total
     const montoTotal = data.reduce((total, item) => {
@@ -457,6 +561,9 @@ async function procesarArchivoAxa(ctx, filePath) {
         delete global.tempAxaData[userId];
       }
     }
+    
+    // 📱 PASO 6: Completado
+    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros listos para facturar`);
     
     // Preguntar sobre el tipo de servicios antes de la confirmación final
     await ctx.reply(
@@ -544,7 +651,7 @@ function mapColumnNamesAxa(firstRow) {
  * @param {boolean} conRetencion - Si aplica retención del 4%
  * @returns {Promise<Object>} - Factura generada
  */
-async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = false) {
+async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = false, progressMessageId = null) {
   if (items.length === 0) {
     console.log('No hay items para generar factura AXA');
     return null;
@@ -630,7 +737,18 @@ async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = fals
 
   // Llamar directamente a FacturAPI para generar la factura
   try {
-    await ctx.reply(`⏳ Generando factura para AXA...`);
+    // 📱 Actualizar progreso si se proporciona messageId
+    if (progressMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessageId,
+        null,
+        `🚀 Enviando factura a FacturAPI...\n\n📡 Conectando con el servidor...`,
+        { parse_mode: 'Markdown' }
+      );
+    } else {
+      await ctx.reply(`⏳ Generando factura para AXA...`);
+    }
     
     // Obtener el ID del tenant actual
     const tenantId = ctx.getTenantId();
@@ -647,15 +765,48 @@ async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = fals
     const facturapi = await facturapIService.getFacturapiClient(tenantId);
     console.log('Cliente FacturAPI obtenido correctamente');
     
+    // 📱 Actualizar progreso - Preparando datos
+    if (progressMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessageId,
+        null,
+        `🔄 Enviando ${facturaItems.length} servicios a FacturAPI...\n\n⏳ Procesando datos...`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    
     // Obtenemos el TenantService pero NO solicitamos ni asignamos el folio
     const TenantService = await import('../../services/tenant.service.js').then(m => m.default);
     
     // OPTIMIZACIÓN: Log reducido para mejor rendimiento
     console.log(`Enviando solicitud a FacturAPI: ${facturaItems.length} items, cliente: ${ctx.userState.axaClientId}`);
     
+    // 📱 Actualizar progreso - Enviando a FacturAPI
+    if (progressMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessageId,
+        null,
+        `🚀 Creando factura en FacturAPI...\n\n💫 Enviando datos al servidor...`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    
     // Crear la factura directamente en FacturAPI (sin enviar folio)
     const factura = await facturapi.invoices.create(facturaData);
     console.log('Factura AXA creada en FacturAPI, folio asignado automáticamente:', factura.folio_number);
+    
+    // 📱 Actualizar progreso - Factura creada
+    if (progressMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessageId,
+        null,
+        `✅ Factura creada exitosamente\n\n📋 Folio: ${factura.series}-${factura.folio_number}\n💰 Total: $${factura.total.toFixed(2)} MXN`,
+        { parse_mode: 'Markdown' }
+      );
+    }
     
     // Registrar la factura en la base de datos con el folio devuelto por FacturAPI
     try {
@@ -680,14 +831,14 @@ async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = fals
     ctx.userState.folioFactura = factura.folio_number;
     ctx.userState.facturaGenerada = true;
     
-    // Mostrar información de la factura generada
+    // 📱 Mensaje final con opciones de descarga
     await ctx.reply(
-      `✅ *Factura generada exitosamente*\n\n` +
+      `🎉 *Factura AXA generada exitosamente*\n\n` +
       `• Cliente: AXA ASSISTANCE MEXICO\n` +
       `• Folio: ${factura.series}-${factura.folio_number}\n` +
       `• Clave SAT: ${CLAVE_SAT_SERVICIOS_GRUA}\n` +
       `• Total: $${factura.total.toFixed(2)} MXN\n\n` +
-      `Seleccione una opción para descargar:`,
+      `📥 Seleccione una opción para descargar:`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
