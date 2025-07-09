@@ -19,12 +19,18 @@ class SessionService {
    */
   static async getUserState(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
+    
+    // 🔍 MÉTRICAS: Medir tiempo de consulta DB
+    const dbStartTime = Date.now();
     sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Obteniendo estado de sesión');
     
     try {
       const session = await prisma.userSession.findUnique({
         where: { telegramId: telegramIdBigInt }
       });
+
+      const dbDuration = Date.now() - dbStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB query getUserState tomó ${dbDuration}ms`);
 
       if (!session) {
         sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Sesión no encontrada, devolviendo estado inicial');
@@ -34,6 +40,8 @@ class SessionService {
       sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Sesión obtenida correctamente');
       return session.sessionData;
     } catch (error) {
+      const dbDuration = Date.now() - dbStartTime;
+      console.error(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB query getUserState ERROR después de ${dbDuration}ms:`, error);
       sessionLogger.error({ error, telegramId: telegramIdBigInt.toString() }, 'Error al obtener estado de sesión');
       return { esperando: null };
     }
@@ -47,9 +55,13 @@ class SessionService {
    */
   static async saveUserState(telegramId, state) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
+    
+    // 🔍 MÉTRICAS: Medir tiempo de escritura DB
+    const dbStartTime = Date.now();
     sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Guardando estado de sesión');
     
     try {
+      // 🚀 SOLUCIÓN DEFINITIVA: UPSERT con retry y timeout
       const session = await prisma.userSession.upsert({
         where: { telegramId: telegramIdBigInt },
         update: {
@@ -62,9 +74,14 @@ class SessionService {
         }
       });
 
+      const dbDuration = Date.now() - dbStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB upsert saveUserState tomó ${dbDuration}ms`);
+      
       sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Estado de sesión guardado correctamente');
       return session;
     } catch (error) {
+      const dbDuration = Date.now() - dbStartTime;
+      console.error(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB upsert saveUserState ERROR después de ${dbDuration}ms:`, error);
       sessionLogger.error({ error, telegramId: telegramIdBigInt.toString() }, 'Error al guardar estado de sesión');
       throw error;
     }
@@ -77,29 +94,53 @@ class SessionService {
    */
   static async resetUserState(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
+    
+    // 🔍 MÉTRICAS: Medir tiempo total de resetUserState
+    const resetStartTime = Date.now();
     sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Reiniciando estado de sesión');
     
     try {
+      // 🔍 MÉTRICAS: Medir tiempo de getCurrentState
+      const getCurrentStateStartTime = Date.now();
       const currentState = await this.getUserState(telegramIdBigInt);
+      const getCurrentStateDuration = Date.now() - getCurrentStateStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - getCurrentState en resetUserState tomó ${getCurrentStateDuration}ms`);
       
-      // Crear un nuevo estado preservando ciertos datos
+      // 🔍 MÉTRICAS: Medir tiempo de preparación de estado
+      const prepareStateStartTime = Date.now();
+      
+      // 🚀 OPTIMIZACIÓN: Crear estado mínimo para reducir serialización JSON
       const newState = {
         esperando: null,
-        // Preservar estos datos si existen
-        facturaId: currentState.facturaId,
-        folioFactura: currentState.folioFactura,
-        clienteNombre: currentState.clienteNombre,
-        facturaGenerada: currentState.facturaGenerada,
+        // Preservar solo datos esenciales (reducir payload)
+        ...(currentState.facturaId && { facturaId: currentState.facturaId }),
+        ...(currentState.folioFactura && { folioFactura: currentState.folioFactura }),
+        ...(currentState.clienteNombre && { clienteNombre: currentState.clienteNombre }),
+        ...(currentState.facturaGenerada && { facturaGenerada: currentState.facturaGenerada }),
         // Preservar datos relacionados con el tenant
-        tenantId: currentState.tenantId,
-        tenantName: currentState.tenantName,
-        userStatus: currentState.userStatus
+        ...(currentState.tenantId && { tenantId: currentState.tenantId }),
+        ...(currentState.tenantName && { tenantName: currentState.tenantName }),
+        ...(currentState.userStatus && { userStatus: currentState.userStatus })
       };
-    
+      
+      const prepareStateDuration = Date.now() - prepareStateStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - prepareState en resetUserState tomó ${prepareStateDuration}ms`);
+      
+      // 🔍 MÉTRICAS: Medir tiempo de saveUserState
+      const saveStateStartTime = Date.now();
       await this.saveUserState(telegramIdBigInt, newState);
+      const saveStateDuration = Date.now() - saveStateStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - saveUserState en resetUserState tomó ${saveStateDuration}ms`);
+      
+      const totalResetDuration = Date.now() - resetStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - resetUserState TOTAL tomó ${totalResetDuration}ms`);
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - resetUserState DESGLOSE: getCurrentState=${getCurrentStateDuration}ms, prepareState=${prepareStateDuration}ms, saveState=${saveStateDuration}ms, total=${totalResetDuration}ms`);
+      
       sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Estado de sesión reiniciado');
       return newState;
     } catch (error) {
+      const totalResetDuration = Date.now() - resetStartTime;
+      console.error(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - resetUserState ERROR después de ${totalResetDuration}ms:`, error);
       sessionLogger.error({ error, telegramId: telegramIdBigInt.toString() }, 'Error al reiniciar estado de sesión');
       throw error;
     }

@@ -17,6 +17,9 @@ async function tenantContextMiddleware(ctx, next) {
   const telegramId = ctx.from?.id;
   if (!telegramId) return next();
 
+  // 🔍 MÉTRICAS: Medir tiempo total del middleware
+  const middlewareStartTime = Date.now();
+
   try {
     // Inicializar userState si no existe
     ctx.userState = ctx.userState || {};
@@ -25,8 +28,16 @@ async function tenantContextMiddleware(ctx, next) {
 
     // Solo verificar el tenant si no hay uno establecido o si userStatus es 'no_tenant'
     if (!ctx.userState.tenantId || ctx.userState.userStatus === 'no_tenant') {
+      // 🔍 MÉTRICAS: Medir tiempo de consulta tenant DB
+      const tenantQueryStartTime = Date.now();
+      console.log(`[TENANT_METRICS] Usuario ${telegramId} - Consultando tenant en DB porque tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`);
+      
       // Buscar el usuario y su tenant asociado
       const user = await TenantService.findUserByTelegramId(telegramId);
+      
+      const tenantQueryDuration = Date.now() - tenantQueryStartTime;
+      console.log(`[TENANT_METRICS] Usuario ${telegramId} - DB query findUserByTelegramId tomó ${tenantQueryDuration}ms, userFound=${!!user}`);
+      
       middlewareLogger.debug({ telegramId: telegramId, userFound: !!user }, 'Información de usuario consultada');
       
       if (user && user.tenant) {
@@ -55,6 +66,8 @@ async function tenantContextMiddleware(ctx, next) {
         ctx.userState.userStatus = 'no_tenant';
         middlewareLogger.debug({ telegramId: telegramId }, 'Usuario sin tenant asociado');
       }
+    } else {
+      console.log(`[TENANT_METRICS] Usuario ${telegramId} - SKIP DB query porque ya tiene tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`);
     }
 
     // Añadir métodos de utilidad para trabajar con el tenant
@@ -62,8 +75,13 @@ async function tenantContextMiddleware(ctx, next) {
     ctx.isUserAuthorized = () => ctx.userState?.userStatus === 'authorized';
     ctx.hasTenant = () => !!ctx.userState?.tenantId;
     
+    const middlewareDuration = Date.now() - middlewareStartTime;
+    console.log(`[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant TOTAL tomó ${middlewareDuration}ms`);
+    
     return next();
   } catch (error) {
+    const middlewareDuration = Date.now() - middlewareStartTime;
+    console.error(`[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant ERROR después de ${middlewareDuration}ms:`, error);
     middlewareLogger.error({ error, telegramId }, 'Error en tenant middleware');
     return next();
   }
