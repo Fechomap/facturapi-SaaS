@@ -8,6 +8,8 @@ import routes from './api/routes/index.js';
 import { tenantMiddleware } from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
 import { generalRateLimit, invoiceRateLimit, queryRateLimit, authRateLimit } from './api/middlewares/rate-limit.middleware.js';
+import { sessionMiddleware } from './api/middlewares/session.middleware.js';
+import redisSessionService from './services/redis-session.service.js';
 import { startJobs } from './jobs/index.js';
 import NotificationService from './services/notification.service.js';
 import { createBot } from './bot/index.js';
@@ -90,6 +92,17 @@ async function initializeApp() {
 
   // Middleware para parsing JSON para el resto de rutas
   app.use(express.json());
+
+  // === INICIALIZAR REDIS PARA CLUSTERING ===
+  await redisSessionService.initialize();
+  serverLogger.info('📦 Servicio de sesiones inicializado para clustering');
+
+  // === SESIONES COMPARTIDAS PARA CLUSTERING ===
+  app.use(sessionMiddleware({
+    sessionName: 'facturapi_session',
+    maxAge: 3600, // 1 hora
+    secure: config.env === 'production'
+  }));
 
   // === RATE LIMITING PARA ESCALABILIDAD ===
   // Rate limiting general para toda la API

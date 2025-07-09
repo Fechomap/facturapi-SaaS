@@ -5,6 +5,7 @@ import invoiceRoutes from './invoice.routes.js';
 import productRoutes from './product.routes.js';
 import webhookRoutes from './webhook.routes.js';
 import authRoutes from './auth.routes.js'; // Añadir rutas de autenticación
+import clusterRoutes from './cluster.routes.js'; // Rutas de monitoreo de cluster
 
 const router = express.Router();
 
@@ -19,6 +20,7 @@ router.get('/', (req, res) => {
 
 // Registrar todas las rutas bajo sus respectivos prefijos
 router.use('/auth', authRoutes); // Añadir rutas de autenticación
+router.use('/cluster', clusterRoutes); // Rutas de monitoreo de cluster
 router.use('/clientes', clientRoutes);
 router.use('/facturas', invoiceRoutes);
 router.use('/productos', productRoutes);

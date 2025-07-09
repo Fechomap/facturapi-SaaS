@@ -6,8 +6,10 @@
     "main": "server.js",
     "scripts": {
         "start": "node server.js",
+        "start:cluster": "node cluster.js",
         "start:bot": "node bot.js",
         "start:all": "concurrently \"npm run start\" \"npm run start:bot\"",
+        "start:cluster:all": "concurrently \"npm run start:cluster\" \"npm run start:bot\"",
         "start:mcp": "node scripts/start-mcp-server.js",
         "dev": "NODE_ENV=development nodemon server.js",
         "dev:bot": "NODE_ENV=development nodemon bot.js",
@@ -27,8 +29,10 @@
         "format": "prettier --write .",
         "build": "prisma generate",
         "railway:build": "npx prisma generate",
-        "railway:start": "node server.js",
+        "railway:start": "node cluster.js",
         "railway:start:bot": "node bot.js",
+        "test:redis": "node scripts/test-redis.js",
+        "test:clustering": "node scripts/test-clustering.js",
         "railway:init-db": "node scripts/init-railway-db.js",
         "init-db": "node scripts/init-db.js",
         "reset-db": "prisma migrate reset --force && prisma migrate deploy"
@@ -50,6 +54,8 @@
         "pg": "^8.11.3",
         "pino": "^8.17.0",
         "pino-pretty": "^10.3.1",
+        "pm2": "^5.3.0",
+        "redis": "^4.7.1",
         "stripe": "^17.7.0",
         "telegraf": "^4.16.2",
         "xlsx": "^0.18.5"
