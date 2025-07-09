@@ -89,11 +89,15 @@ export const sessionMiddleware = (options = {}) => {
 
       // Middleware para guardar automáticamente al final de la request
       const originalSend = res.send;
-      res.send = function(data) {
-        // Guardar sesión antes de enviar respuesta
-        req.saveSession().catch(error => {
+      res.send = async function(data) {
+        try {
+          // Guardar sesión antes de enviar respuesta (CRÍTICO: usar await)
+          await req.saveSession();
+          sessionLogger.debug(`Sesión auto-guardada exitosamente: ${req.sessionId}`);
+        } catch (error) {
           sessionLogger.error('Error al auto-guardar sesión:', error);
-        });
+          // Continuar con el envío aunque falle el guardado
+        }
         
         return originalSend.call(this, data);
       };

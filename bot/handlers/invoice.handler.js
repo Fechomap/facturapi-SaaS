@@ -367,17 +367,64 @@ export function registerInvoiceHandler(bot) {
       }
       await ctx.reply('⏳ Generando factura, por favor espere...');
 
-      // Generar la factura con el tenant actual
-      const factura = await InvoiceService.generateInvoice({
-        ...ctx.userState,
-        userId: ctx.from.id  // Añadir ID del usuario para auditoría
-      }, ctx.getTenantId());  // Pasar el ID del tenant
+      // NUEVO: Implementar reintentos para evitar fallos aleatorios
+      const maxRetries = 3;
+      let factura = null;
+      let lastError = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          invoiceHandlerLogger.info(`Intento ${attempt}/${maxRetries} de generar factura`, {
+            transactionId,
+            tenantId: ctx.getTenantId(),
+            userId: ctx.from.id
+          });
+
+          // Generar la factura con el tenant actual
+          factura = await InvoiceService.generateInvoice({
+            ...ctx.userState,
+            userId: ctx.from.id  // Añadir ID del usuario para auditoría
+          }, ctx.getTenantId());  // Pasar el ID del tenant
+
+          // Si llegamos aquí, la factura se generó exitosamente
+          invoiceHandlerLogger.info(`Factura generada exitosamente en intento ${attempt}`, {
+            facturaId: factura.id,
+            folio: factura.folio_number
+          });
+          break;
+
+        } catch (attemptError) {
+          lastError = attemptError;
+          invoiceHandlerLogger.warn(`Intento ${attempt}/${maxRetries} falló`, {
+            error: attemptError.message,
+            transactionId
+          });
+
+          // Si no es el último intento, esperar antes de reintentar
+          if (attempt < maxRetries) {
+            const delay = attempt * 2000; // 2s, 4s, 6s
+            invoiceHandlerLogger.info(`Esperando ${delay}ms antes del siguiente intento`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+
+      // Si después de todos los intentos no hay factura, lanzar el último error
+      if (!factura) {
+        throw lastError || new Error('Error desconocido al generar factura');
+      }
 
       // Guardar datos de la factura generada
       ctx.userState.facturaId = factura.id;
       ctx.userState.series = factura.series; // Usar el mismo nombre que se usa en descargarFactura
       ctx.userState.folioFactura = factura.folio_number;
       ctx.userState.facturaGenerada = true;
+      
+      // CRÍTICO: También guardar en session para persistencia entre workers
+      ctx.session.facturaId = factura.id;
+      ctx.session.series = factura.series;
+      ctx.session.folioFactura = factura.folio_number;
+      ctx.session.facturaGenerada = true;
 
       // Usar la vista para mostrar la factura creada
       const { message, keyboard, parse_mode } = invoiceCreatedView(factura);
@@ -466,9 +513,16 @@ export function registerInvoiceHandler(bot) {
     const facturaId = ctx.match[1];
     const folioNumero = ctx.match[2];  // Extraer el número de folio del regex
 
+    // NUEVO: Buscar serie en userState o session
+    let series = ctx.userState?.series;
+    if (!series && ctx.session?.series) {
+      series = ctx.session.series;
+      ctx.userState.series = series; // Restaurar en userState
+    }
+
     console.log('Estado del usuario al descargar PDF:', ctx.userState);
     console.log('ID de factura solicitado:', facturaId);
-    console.log('Serie en estado del usuario:', ctx.userState?.series || 'No disponible');
+    console.log('Serie encontrada:', series || 'No disponible');
 
     const processId = `pdf_${facturaId}`;
     if (ctx.isProcessActive(processId)) {
@@ -511,9 +565,16 @@ export function registerInvoiceHandler(bot) {
     const facturaId = ctx.match[1];
     const folioNumero = ctx.match[2];  // Extraer el número de folio del regex
 
+    // NUEVO: Buscar serie en userState o session
+    let series = ctx.userState?.series;
+    if (!series && ctx.session?.series) {
+      series = ctx.session.series;
+      ctx.userState.series = series; // Restaurar en userState
+    }
+
     console.log('Estado del usuario al descargar XML:', ctx.userState);
     console.log('ID de factura solicitado:', facturaId);
-    console.log('Serie en estado del usuario:', ctx.userState?.series || 'No disponible');
+    console.log('Serie encontrada:', series || 'No disponible');
 
     const processId = `xml_${facturaId}`;
     if (ctx.isProcessActive(processId)) {

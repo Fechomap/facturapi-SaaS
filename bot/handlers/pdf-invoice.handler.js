@@ -73,7 +73,13 @@ export function registerPDFInvoiceHandler(bot) {
       await showSimpleAnalysisResults(ctx, analysisResult.analysis, validation);
       
     } catch (error) {
-      console.error('Error procesando PDF:', error);
+      console.error('Error procesando PDF:', {
+        error: error.message,
+        stack: error.stack,
+        userId: ctx.from.id,
+        fileName: fileName,
+        timestamp: new Date().toISOString()
+      });
       await ctx.reply(`❌ Error al procesar el PDF: ${error.message}`);
     }
   });
@@ -83,9 +89,27 @@ export function registerPDFInvoiceHandler(bot) {
     await ctx.answerCbQuery();
     const analysisId = ctx.match[1];
     
-    const analysisData = ctx.userState?.pdfAnalysis;
+    // CRÍTICO: Asegurar que userState y session estén inicializados
+    if (!ctx.userState) {
+      ctx.userState = {};
+    }
+    if (!ctx.session) {
+      ctx.session = {};
+    }
+    
+    // NUEVO: Buscar primero en userState, luego en session
+    let analysisData = ctx.userState?.pdfAnalysis;
+    
     if (!analysisData || analysisData.id !== analysisId) {
-      return ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
+      // Intentar recuperar de session (puede estar en otro worker)
+      analysisData = ctx.session?.pdfAnalysis;
+      
+      if (!analysisData || analysisData.id !== analysisId) {
+        return ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
+      }
+      
+      // Restaurar en userState para uso local
+      ctx.userState.pdfAnalysis = analysisData;
     }
     
     await generateSimpleInvoice(ctx, analysisData);
@@ -96,9 +120,27 @@ export function registerPDFInvoiceHandler(bot) {
     await ctx.answerCbQuery();
     const analysisId = ctx.match[1];
     
-    const analysisData = ctx.userState?.pdfAnalysis;
+    // CRÍTICO: Asegurar que userState y session estén inicializados
+    if (!ctx.userState) {
+      ctx.userState = {};
+    }
+    if (!ctx.session) {
+      ctx.session = {};
+    }
+    
+    // NUEVO: Buscar primero en userState, luego en session
+    let analysisData = ctx.userState?.pdfAnalysis;
+    
     if (!analysisData || analysisData.id !== analysisId) {
-      return ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
+      // Intentar recuperar de session (puede estar en otro worker)
+      analysisData = ctx.session?.pdfAnalysis;
+      
+      if (!analysisData || analysisData.id !== analysisId) {
+        return ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
+      }
+      
+      // Restaurar en userState para uso local
+      ctx.userState.pdfAnalysis = analysisData;
     }
     
     await startManualEditFlow(ctx, analysisData);
@@ -111,13 +153,35 @@ export function registerPDFInvoiceHandler(bot) {
 async function showSimpleAnalysisResults(ctx, analysis, validation) {
   const analysisId = `simple_${Date.now()}_${ctx.from.id}`;
   
-  // Guardar en estado del usuario
-  ctx.userState.pdfAnalysis = {
+  // CRÍTICO: Asegurar que userState y session estén inicializados
+  if (!ctx.userState) {
+    ctx.userState = {};
+  }
+  if (!ctx.session) {
+    ctx.session = {};
+  }
+  
+  // NUEVO: Guardar en estado del usuario Y en sesión para persistencia entre workers
+  const analysisData = {
     id: analysisId,
     analysis,
     validation,
     timestamp: Date.now()
   };
+  
+  ctx.userState.pdfAnalysis = analysisData;
+  
+  // CRÍTICO: Persistir en sesión para compartir entre workers
+  ctx.session.pdfAnalysis = analysisData;
+  
+  // Asegurar que se guarde inmediatamente (solo en contexto de API)
+  try {
+    if (ctx.saveSession && typeof ctx.saveSession === 'function') {
+      await ctx.saveSession();
+    }
+  } catch (error) {
+    console.error('Error guardando análisis PDF en sesión:', error);
+  }
   
   let message = '🔍 **Análisis Completado**\n\n';
   
@@ -175,6 +239,14 @@ async function showSimpleAnalysisResults(ctx, analysis, validation) {
  */
 async function generateSimpleInvoice(ctx, analysisData) {
   const { analysis } = analysisData;
+  
+  // CRÍTICO: Asegurar que userState y session estén inicializados
+  if (!ctx.userState) {
+    ctx.userState = {};
+  }
+  if (!ctx.session) {
+    ctx.session = {};
+  }
   
   await ctx.reply('⏳ Preparando facturación...');
   
@@ -238,10 +310,16 @@ async function generateSimpleInvoice(ctx, analysisData) {
     console.log('Factura generada exitosamente:', factura.id, 'Folio:', factura.folio_number);
     
     // Actualizar el estado con la información de la factura generada
-    // El middleware de sesión guardará automáticamente estos cambios
+    // CRÍTICO: Guardar también en session para persistencia entre workers
     ctx.userState.facturaId = factura.id;
     ctx.userState.folioFactura = factura.folio_number;
     ctx.userState.series = factura.series || 'A';
+    
+    // Asegurar persistencia en sesión
+    ctx.session.facturaId = factura.id;
+    ctx.session.folioFactura = factura.folio_number;
+    ctx.session.series = factura.series || 'A';
+    ctx.session.facturaGenerada = true;
     
     // Mostrar resultado al usuario
     await ctx.reply(
@@ -265,7 +343,14 @@ async function generateSimpleInvoice(ctx, analysisData) {
     delete ctx.userState.pdfAnalysis;
     
   } catch (error) {
-    console.error('Error generando factura:', error);
+    console.error('Error generando factura:', {
+      error: error.message,
+      stack: error.stack,
+      userId: ctx.from.id,
+      tenantId: ctx.getTenantId(),
+      analysisId: analysisData?.id,
+      timestamp: new Date().toISOString()
+    });
     await ctx.reply(`❌ Error al generar la factura: ${error.message}`);
   }
 }
@@ -275,6 +360,11 @@ async function generateSimpleInvoice(ctx, analysisData) {
  */
 async function startManualEditFlow(ctx, analysisData) {
   const { analysis } = analysisData;
+  
+  // CRÍTICO: Asegurar que userState esté inicializado
+  if (!ctx.userState) {
+    ctx.userState = {};
+  }
   
   // Prellenar datos conocidos
   ctx.userState.clienteNombre = analysis.clientName || '';
