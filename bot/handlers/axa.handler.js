@@ -43,8 +43,7 @@ export function registerAxaHandler(bot) {
       delete ctx.userState.chubbColumnMappings;
       delete ctx.userState.chubbMontosPorGrupo;
       delete ctx.userState.chubbClientId;
-      delete ctx.userState.axaData;
-      delete ctx.userState.axaColumnMappings;
+      delete ctx.userState.axaSummary;
       delete ctx.userState.axaClientId;
       delete ctx.userState.clienteId;
       delete ctx.userState.clienteNombre;
@@ -60,16 +59,28 @@ export function registerAxaHandler(bot) {
       // Obtener todos los clientes del tenant
       console.log('Buscando cliente AXA para el tenant:', tenantId);
       
-      // Buscar el cliente AXA por nombre en la base de datos
-      const axaClient = await prisma.tenantCustomer.findFirst({
-        where: {
-          tenantId: tenantId,
-          legalName: {
-            contains: 'AXA'
-          },
-          isActive: true
+      // OPTIMIZACIÓN: Cache de cliente AXA para evitar búsquedas repetitivas
+      const cacheKey = `axa_client_${tenantId}`;
+      let axaClient = global.clientCache && global.clientCache[cacheKey];
+      
+      if (!axaClient || Date.now() - (axaClient.cachedAt || 0) > 300000) { // Cache por 5 minutos
+        // Buscar el cliente AXA por nombre en la base de datos
+        axaClient = await prisma.tenantCustomer.findFirst({
+          where: {
+            tenantId: tenantId,
+            legalName: {
+              contains: 'AXA'
+            },
+            isActive: true
+          }
+        });
+        
+        // Guardar en cache si se encontró
+        if (axaClient) {
+          global.clientCache = global.clientCache || {};
+          global.clientCache[cacheKey] = { ...axaClient, cachedAt: Date.now() };
         }
-      });
+      }
       
       if (!axaClient) {
         // Si no se encuentra, intentar configurar los clientes predefinidos
@@ -127,7 +138,8 @@ export function registerAxaHandler(bot) {
     await ctx.answerCbQuery();
     
     // Verificar que tenemos datos para procesar
-    if (!ctx.userState.axaData || !ctx.userState.axaColumnMappings) {
+    const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
+    if (!tempData || !tempData.data || !tempData.columnMappings) {
       return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
     
@@ -140,7 +152,7 @@ export function registerAxaHandler(bot) {
     await ctx.reply(
       `🚛 *Servicios Realizados seleccionados*\n\n` +
       `• Se aplicará retención del 4%\n` +
-      `• ${ctx.userState.axaData.length} registros\n\n` +
+      `• ${ctx.userState.axaSummary?.totalRecords || 0} registros\n\n` +
       `¿Confirma la generación de la factura?`,
       {
         parse_mode: 'Markdown',
@@ -157,7 +169,8 @@ export function registerAxaHandler(bot) {
     await ctx.answerCbQuery();
     
     // Verificar que tenemos datos para procesar
-    if (!ctx.userState.axaData || !ctx.userState.axaColumnMappings) {
+    const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
+    if (!tempData || !tempData.data || !tempData.columnMappings) {
       return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
     
@@ -170,7 +183,7 @@ export function registerAxaHandler(bot) {
     await ctx.reply(
       `💀 *Servicios Muertos seleccionados*\n\n` +
       `• Sin retención\n` +
-      `• ${ctx.userState.axaData.length} registros\n\n` +
+      `• ${ctx.userState.axaSummary?.totalRecords || 0} registros\n\n` +
       `¿Confirma la generación de la factura?`,
       {
         parse_mode: 'Markdown',
@@ -187,7 +200,8 @@ export function registerAxaHandler(bot) {
     await ctx.answerCbQuery();
     
     // Verificar que tenemos datos para procesar
-    if (!ctx.userState.axaData || !ctx.userState.axaColumnMappings || ctx.userState.axaTipoServicio === undefined) {
+    const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
+    if (!tempData || !tempData.data || !tempData.columnMappings || ctx.userState.axaTipoServicio === undefined) {
       return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
     
@@ -199,8 +213,9 @@ export function registerAxaHandler(bot) {
       
       await ctx.reply(`⏳ Procesando factura para servicios ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...`);
       
-      const data = ctx.userState.axaData;
-      const columnMappings = ctx.userState.axaColumnMappings;
+      // Los datos ya fueron verificados arriba, solo los asignamos
+      const data = tempData.data;
+      const columnMappings = tempData.columnMappings;
       
       // Generar una sola factura con todos los registros
       await ctx.reply(`⏳ Generando factura para servicios AXA (${data.length} registros)...`);
@@ -213,11 +228,13 @@ export function registerAxaHandler(bot) {
         await ctx.reply('⚠️ No se generó la factura. Por favor, verifica los datos del archivo Excel.');
       }
       
-      // Limpiar el estado
-      delete ctx.userState.axaData;
-      delete ctx.userState.axaColumnMappings;
+      // Limpiar el estado y datos temporales
+      delete ctx.userState.axaSummary;
       delete ctx.userState.axaTipoServicio;
       delete ctx.userState.axaConRetencion;
+      if (global.tempAxaData && global.tempAxaData[ctx.from.id]) {
+        delete global.tempAxaData[ctx.from.id];
+      }
       ctx.userState.esperando = null;
       
     } catch (error) {
@@ -234,11 +251,13 @@ export function registerAxaHandler(bot) {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
       await ctx.reply('❌ Operación cancelada. No se generó factura.');
       
-      // Limpiar el estado
-      delete ctx.userState.axaData;
-      delete ctx.userState.axaColumnMappings;
+      // Limpiar el estado y datos temporales
+      delete ctx.userState.axaSummary;
       delete ctx.userState.axaTipoServicio;
       delete ctx.userState.axaConRetencion;
+      if (global.tempAxaData && global.tempAxaData[ctx.from.id]) {
+        delete global.tempAxaData[ctx.from.id];
+      }
       ctx.userState.esperando = null;
     } catch (error) {
       console.error('Error al cancelar operación:', error);
@@ -416,9 +435,28 @@ async function procesarArchivoAxa(ctx, filePath) {
     let infoResumen = `📊 Resumen de datos procesados:\n\n`;
     infoResumen += `• Servicios de Grúa AXA:\n  - ${data.length} registros\n  - Monto total: ${montoTotal.toFixed(2)} MXN\n\n`;
     
-    // Guardar temporalmente los datos en el estado del usuario para procesarlos después de la confirmación
-    ctx.userState.axaData = data;
-    ctx.userState.axaColumnMappings = columnMappings;
+    // OPTIMIZACIÓN: Guardar SOLO números en el estado, sin objetos
+    ctx.userState.axaSummary = {
+      totalRecords: data.length,
+      totalAmount: montoTotal
+      // NO guardar firstRecord - innecesario y añade peso
+    };
+    
+    // Guardar datos temporalmente en memoria del proceso (no en sesión)
+    // Esto evita serializar/deserializar grandes cantidades de datos
+    global.tempAxaData = global.tempAxaData || {};
+    global.tempAxaData[ctx.from.id] = {
+      data,
+      columnMappings,
+      timestamp: Date.now()
+    };
+    
+    // Limpiar datos antiguos (más de 10 minutos)
+    for (const userId in global.tempAxaData) {
+      if (Date.now() - global.tempAxaData[userId].timestamp > 600000) {
+        delete global.tempAxaData[userId];
+      }
+    }
     
     // Preguntar sobre el tipo de servicios antes de la confirmación final
     await ctx.reply(
@@ -523,45 +561,50 @@ async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = fals
     return null;
   }
   
-  // Construir array de ítems para la factura
-  const facturaItems = items.map(item => {
-    const factura = item[columnMappings.factura] || 'N/A';
-    const orden = item[columnMappings.orden] || 'N/A';
-    const folio = item[columnMappings.folio] || 'N/A';
-    const autorizacion = item[columnMappings.autorizacion] || 'N/A';
-    const importe = parseFloat(item[columnMappings.importe]);
+  // OPTIMIZACIÓN: Construir array de ítems en chunks para mejor rendimiento
+  const chunkSize = 10;
+  const facturaItems = [];
+  
+  // Pre-definir estructura de impuestos para evitar recrearla
+  const baseTaxes = [{ type: "IVA", rate: 0.16, factor: "Tasa" }];
+  const taxesWithRetention = [
+    ...baseTaxes,
+    { type: "IVA", rate: 0.04, factor: "Tasa", withholding: true }
+  ];
+  
+  // Procesar items en chunks
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, Math.min(i + chunkSize, items.length));
     
-    // Descripción usando la plantilla de AXA: "ARRASTRE DE GRUA FACTURA xxx No. ORDEN xxx No. FOLIO xxx AUTORIZACION xxx"
-    const descripcion = `ARRASTRE DE GRUA FACTURA ${factura} No. ORDEN ${orden} No. FOLIO ${folio} AUTORIZACION ${autorizacion}`;
-    
-    // Configurar los impuestos - IVA siempre se aplica
-    const taxes = [
-      { type: "IVA", rate: 0.16, factor: "Tasa" }
-    ];
-    
-    // Agregar retención de IVA del 4% si aplica (solo para servicios realizados)
-    if (conRetencion) {
-      taxes.push({
-        type: "IVA",
-        rate: 0.04,
-        factor: "Tasa",
-        withholding: true
+    chunk.forEach(item => {
+      const factura = item[columnMappings.factura] || 'N/A';
+      const orden = item[columnMappings.orden] || 'N/A';
+      const folio = item[columnMappings.folio] || 'N/A';
+      const autorizacion = item[columnMappings.autorizacion] || 'N/A';
+      const importe = parseFloat(item[columnMappings.importe]);
+      
+      // Usar template literal optimizado
+      const descripcion = `ARRASTRE DE GRUA FACTURA ${factura} No. ORDEN ${orden} No. FOLIO ${folio} AUTORIZACION ${autorizacion}`;
+      
+      facturaItems.push({
+        quantity: 1,
+        product: {
+          description: descripcion,
+          product_key: CLAVE_SAT_SERVICIOS_GRUA,
+          unit_key: "E48",
+          unit_name: "SERVICIO",
+          price: importe,
+          tax_included: false,
+          taxes: conRetencion ? taxesWithRetention : baseTaxes
+        }
       });
-    }
+    });
     
-    return {
-      quantity: 1,
-      product: {
-        description: descripcion,
-        product_key: CLAVE_SAT_SERVICIOS_GRUA,
-        unit_key: "E48",  // Clave de unidad para SERVICIO
-        unit_name: "SERVICIO",
-        price: importe,
-        tax_included: false,
-        taxes: taxes
-      }
-    };
-  });
+    // Pequeña pausa para no bloquear el event loop en datasets grandes
+    if (i + chunkSize < items.length && items.length > 50) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+  }
   
   // Construir los datos de la factura
   const facturaData = {
@@ -607,7 +650,8 @@ async function generarFacturaAxa(items, ctx, columnMappings, conRetencion = fals
     // Obtenemos el TenantService pero NO solicitamos ni asignamos el folio
     const TenantService = await import('../../services/tenant.service.js').then(m => m.default);
     
-    console.log('Enviando solicitud a FacturAPI con datos:', JSON.stringify(facturaData, null, 2));
+    // OPTIMIZACIÓN: Log reducido para mejor rendimiento
+    console.log(`Enviando solicitud a FacturAPI: ${facturaItems.length} items, cliente: ${ctx.userState.axaClientId}`);
     
     // Crear la factura directamente en FacturAPI (sin enviar folio)
     const factura = await facturapi.invoices.create(facturaData);
