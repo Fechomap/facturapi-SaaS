@@ -14,19 +14,19 @@ export function registerStartCommand(bot) {
     console.log(`[START_METRICS] Usuario ${telegramId} - Comando /start iniciado`);
     
     try {
-      // 🚀 OPTIMIZACIÓN: Eliminar resetState() innecesario
-      // El comando /start NO necesita resetear el estado
+      // 🚀 SUPER OPTIMIZACIÓN: Usar directamente la información de tenant que ya fue cargada por el middleware
+      // Evitamos completamente una consulta adicional a la base de datos
       
-      // 🔍 MÉTRICAS: Medir tiempo de hasTenant
+      // 🔍 MÉTRICAS: Verificar si hay tenant (instantáneo, sin consulta DB)
       const tenantCheckStartTime = Date.now();
-      const hasTenant = ctx.hasTenant();
+      const hasTenant = !!ctx.userState?.tenantId;
       const tenantCheckDuration = Date.now() - tenantCheckStartTime;
-      console.log(`[START_METRICS] Usuario ${telegramId} - hasTenant() tomó ${tenantCheckDuration}ms, resultado: ${hasTenant}`);
+      console.log(`[START_METRICS] Usuario ${telegramId} - verificar tenant tomó ${tenantCheckDuration}ms, resultado: ${hasTenant}`);
       
       // 🔍 MÉTRICAS: Medir tiempo de respuesta
       const replyStartTime = Date.now();
       
-      // Comprobar si el usuario ya está asociado a un tenant
+      // Usar directamente los datos del estado parcial que ya tenemos en ctx.userState
       if (hasTenant) {
         await ctx.reply(
           `¡Bienvenido de nuevo, ${ctx.from.first_name}!\nEstás conectado como usuario de ${ctx.userState.tenantName}.\nSelecciona una opción:`,

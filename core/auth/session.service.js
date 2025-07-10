@@ -13,6 +13,53 @@ const activeProcesses = new Set();
  */
 class SessionService {
   /**
+   * Método optimizado para obtener SOLO información de tenant
+   * Usado principalmente por el comando /start para mejorar rendimiento
+   * @param {BigInt|string|number} telegramId - ID de Telegram del usuario
+   * @returns {Promise<Object>} - Solo información de tenant {tenantId, tenantName}
+   */
+  static async getTenantOnly(telegramId) {
+    const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
+    
+    // 🔍 MÉTRICAS: Medir tiempo de consulta DB optimizada
+    const dbStartTime = Date.now();
+    sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Obteniendo solo información de tenant');
+    
+    try {
+      // Consulta directa a la tabla tenant_user para mayor rendimiento
+      const tenantUser = await prisma.tenantUser.findUnique({
+        where: { telegramId: telegramIdBigInt },
+        select: {
+          tenant: {
+            select: {
+              id: true,
+              businessName: true
+            }
+          }
+        }
+      });
+
+      const dbDuration = Date.now() - dbStartTime;
+      console.log(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB query getTenantOnly tomó ${dbDuration}ms`);
+
+      if (!tenantUser || !tenantUser.tenant) {
+        return { hasTenant: false };
+      }
+
+      return { 
+        hasTenant: true, 
+        tenantId: tenantUser.tenant.id,
+        tenantName: tenantUser.tenant.businessName 
+      };
+    } catch (error) {
+      const dbDuration = Date.now() - dbStartTime;
+      console.error(`[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB query getTenantOnly ERROR después de ${dbDuration}ms:`, error);
+      sessionLogger.error({ error, telegramId: telegramIdBigInt.toString() }, 'Error al obtener información de tenant');
+      return { hasTenant: false };
+    }
+  }
+
+  /**
    * Obtiene el estado de sesión de un usuario
    * @param {BigInt|string|number} telegramId - ID de Telegram del usuario
    * @returns {Promise<Object>} - Estado de la sesión
@@ -257,14 +304,47 @@ class SessionService {
       const userId = ctx.from?.id;
       if (!userId) return next();
       
-      // Obtener el estado del usuario
-      const userState = await this.getUserState(userId);
+      // 🚀 OPTIMIZACIÓN: Detectar el comando /start para usar la consulta optimizada
+      const isStartCommand = ctx.message?.text === '/start' || ctx.message?.text?.startsWith('/start ');
+      
+      let userState;
+      if (isStartCommand) {
+        // Para el comando /start, no cargar todo el estado sino solo la información de tenant
+        // Esta información será suficiente para decidir qué menú mostrar
+        const tenantInfo = await this.getTenantOnly(userId);
+        
+        // Inicializar un estado mínimo con la información de tenant
+        userState = { esperando: null };
+        
+        // Si hay un tenant, añadir la información al estado
+        if (tenantInfo.hasTenant) {
+          userState.tenantId = tenantInfo.tenantId;
+          userState.tenantName = tenantInfo.tenantName;
+          userState.userStatus = 'authorized'; // Asumimos que si hay tenant, el usuario está autorizado
+        }
+        
+        // Marcar que este estado es parcial para poder cargarlo completamente si es necesario después
+        userState._isPartialState = true;
+      } else {
+        // Para otros comandos, cargar el estado completo como siempre
+        userState = await this.getUserState(userId);
+      }
       
       // Añadir el estado del usuario al contexto
       ctx.userState = userState;
       
       // Añadir funciones de utilidad
       ctx.resetState = async () => await this.resetUserState(userId);
+      
+      // Añadir función para cargar el estado completo si es necesario
+      ctx.loadFullState = async () => {
+        if (ctx.userState._isPartialState) {
+          sessionLogger.debug({ telegramId: userId }, 'Cargando estado completo desde estado parcial');
+          ctx.userState = await this.getUserState(userId);
+          return true;
+        }
+        return false;
+      };
       
       // Añadir funciones para manejo de procesos activos
       ctx.isProcessActive = (processId) => this.isProcessActive(processId);
@@ -280,7 +360,10 @@ class SessionService {
       } finally {
         // Guardar el estado después de procesar la solicitud
         // Solo si ha cambiado para evitar sobrescrituras innecesarias
-        if (ctx.userState && JSON.stringify(ctx.userState) !== initialState) {
+        // Y solo si no es un estado parcial (para evitar sobrescribir datos importantes)
+        if (ctx.userState && 
+            !ctx.userState._isPartialState && 
+            JSON.stringify(ctx.userState) !== initialState) {
           sessionLogger.debug({ telegramId: userId }, 'Guardando estado actualizado');
           await this.saveUserState(userId, ctx.userState);
         }
