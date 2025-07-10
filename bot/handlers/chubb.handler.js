@@ -14,6 +14,9 @@ import libPrisma from '../../lib/prisma.js';
 // Importar utilidades de detección Excel
 import { debeDetectarExcel, esArchivoExcelValido } from '../../core/utils/excel-detection.utils.js';
 
+// Importar utilidades de limpieza de estado
+import { cleanupFlowChange } from '../../core/utils/state-cleanup.utils.js';
+
 // Usar la instancia que esté disponible
 const prisma = libPrisma || configPrisma;
 
@@ -85,10 +88,10 @@ export function registerChubbHandler(bot) {
     await ctx.answerCbQuery();
     
     try {
-      // Limpiar cualquier estado previo de otros clientes
-      delete ctx.userState.axaData;
-      delete ctx.userState.axaColumnMappings;
-      delete ctx.userState.axaClientId;
+      // 🚀 OPTIMIZACIÓN: Limpieza segura y eficiente de estado
+      cleanupFlowChange(ctx, 'chubb');
+      
+      // Limpiar estado específico de CHUBB anterior
       delete ctx.userState.chubbGrupos;
       delete ctx.userState.chubbColumnMappings;
       delete ctx.userState.chubbMontosPorGrupo;

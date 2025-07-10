@@ -9,6 +9,9 @@ import InvoiceService from '../../services/invoice.service.js';
 import facturapIService from '../../services/facturapi.service.js';
 import prisma from '../../lib/prisma.js';
 
+// Importar utilidades de limpieza de estado
+import { safeCleanupPdfAnalysis } from '../../core/utils/state-cleanup.utils.js';
+
 // 📱 UTILIDADES PARA PROGRESO VISUAL
 const PROGRESS_FRAMES = ['⏳', '⌛', '⏳', '⌛'];
 const PROGRESS_BARS = [
@@ -89,6 +92,9 @@ export function registerPDFInvoiceHandler(bot) {
       await ctx.reply('❌ Para procesar facturas, primero debes registrar tu empresa.');
       return;
     }
+    
+    // 🚀 OPTIMIZACIÓN: Limpiar pdfAnalysis anterior antes de procesar nuevo
+    safeCleanupPdfAnalysis(ctx, 'new_pdf');
     
     // 📱 FEEDBACK INMEDIATO: Mostrar progreso tan pronto como se detecte el PDF
     const progressMessage = await ctx.reply('📥 Recibiendo PDF...\n⏳ Validando archivo...');

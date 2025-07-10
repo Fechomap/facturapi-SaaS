@@ -2,6 +2,9 @@
 import { Markup } from 'telegraf';
 import { mainMenu, reportsMenu } from '../views/menu.view.js';
 
+// Importar utilidades de limpieza de estado
+import { cleanupFlowChange } from '../../core/utils/state-cleanup.utils.js';
+
 /**
  * Registra el comando menu (/menu) y acciones relacionadas
  * @param {Object} bot - Instancia del bot
@@ -30,6 +33,9 @@ export function registerMenuCommand(bot) {
   bot.action('menu_principal', (ctx) => {
     console.log('Acción menu_principal activada. Estado actual:', ctx.userState);
     
+    // 🚀 OPTIMIZACIÓN: Limpieza básica al ir al menú principal
+    cleanupFlowChange(ctx, 'menu');
+    
     ctx.answerCbQuery();
     
     if (ctx.hasTenant()) {
@@ -52,6 +58,9 @@ export function registerMenuCommand(bot) {
     await ctx.answerCbQuery();
     
     console.log('Acción volver_menu_principal activada. Estado actual:', ctx.userState);
+    
+    // 🚀 OPTIMIZACIÓN: Limpieza completa incluyendo pdfAnalysis
+    cleanupFlowChange(ctx, 'menu');
     
     // Guardar información importante del tenant antes de resetear
     const tenantId = ctx.userState?.tenantId;
