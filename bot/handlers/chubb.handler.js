@@ -11,6 +11,9 @@ import { prisma as configPrisma } from '../../config/database.js';
 // También intentar importar desde lib
 import libPrisma from '../../lib/prisma.js';
 
+// Importar utilidades de detección Excel
+import { debeDetectarExcel, esArchivoExcelValido } from '../../core/utils/excel-detection.utils.js';
+
 // Usar la instancia que esté disponible
 const prisma = libPrisma || configPrisma;
 
@@ -156,6 +159,8 @@ export function registerChubbHandler(bot) {
       
       // Continuar con el procesamiento normal
       ctx.userState.esperando = 'archivo_excel_chubb';
+      
+      
       await ctx.reply('Por favor, sube el archivo Excel con los datos de CHUBB para generar las facturas.');
       
     } catch (error) {
@@ -361,8 +366,8 @@ export function registerChubbHandler(bot) {
     // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el documento ANTES de validaciones
     let receivingMessage = null;
     
-    // Solo procesar si estamos esperando un archivo Excel para CHUBB
-    if (!ctx.userState || ctx.userState.esperando !== 'archivo_excel_chubb') {
+    // 🔍 DETECCIÓN ROBUSTA: Verificar múltiples fuentes para evitar bug de timing
+    if (!debeDetectarExcel(ctx, 'chubb')) {
       console.log('No estamos esperando archivo Excel para CHUBB, pasando al siguiente handler');
       console.log('=========== FIN HANDLER CHUBB EXCEL (PASANDO) ===========');
       return next();
@@ -373,8 +378,8 @@ export function registerChubbHandler(bot) {
 
     const document = ctx.message.document;
     
-    // Verificar que sea un archivo Excel
-    if (!document.file_name.match(/\.(xlsx|xls)$/i)) {
+    // 📋 VALIDACIÓN: Verificar que sea un archivo Excel válido
+    if (!esArchivoExcelValido(document)) {
       console.log('Documento no es Excel, informando al usuario');
       // Actualizar el mensaje existente con el error
       await ctx.telegram.editMessageText(

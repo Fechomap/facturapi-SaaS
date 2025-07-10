@@ -11,6 +11,9 @@ import { prisma as configPrisma } from '../../config/database.js';
 // También intentar importar desde lib
 import libPrisma from '../../lib/prisma.js';
 
+// Importar utilidades de detección Excel
+import { debeDetectarExcel, esArchivoExcelValido } from '../../core/utils/excel-detection.utils.js';
+
 // Usar la instancia que esté disponible
 const prisma = libPrisma || configPrisma;
 
@@ -182,6 +185,8 @@ export function registerAxaHandler(bot) {
       
       // Continuar con el procesamiento normal
       ctx.userState.esperando = 'archivo_excel_axa';
+      
+      
       await ctx.reply('Por favor, sube el archivo Excel con los datos de AXA para generar las facturas.');
       
     } catch (error) {
@@ -218,7 +223,20 @@ export function registerAxaHandler(bot) {
     console.log('🚀 FASE 3: Usando datos precalculados CON retención');
     console.log(`🚀 FASE 3: Total con retención: $${tempData.facturaConRetencion.total.toFixed(2)}`);
     
-    // Guardar el tipo de servicio en el estado
+    // 🚀 OPTIMIZACIÓN ELEGANTE: Usar cache global como CHUBB (evitar doble guardado)
+    console.log('🔵 BOTÓN CON RETENCIÓN: Guardando en cache global...');
+    
+    // Asegurar que el tempData existe y actualizar selección
+    if (global.tempAxaData && global.tempAxaData[ctx.from.id]) {
+      global.tempAxaData[ctx.from.id].seleccionUsuario = {
+        tipoServicio: 'realizados',
+        conRetencion: true,
+        timestamp: Date.now()
+      };
+      console.log('🔵 BOTÓN CON RETENCIÓN: Selección guardada en cache global');
+    }
+    
+    // Guardar mínimo en userState para compatibilidad (middleware guardará automáticamente)
     ctx.userState.axaTipoServicio = 'realizados';
     ctx.userState.axaConRetencion = true;
     
@@ -272,7 +290,20 @@ export function registerAxaHandler(bot) {
     console.log('🚀 FASE 3: Usando datos precalculados SIN retención');
     console.log(`🚀 FASE 3: Total sin retención: $${tempData.facturaSinRetencion.total.toFixed(2)}`);
     
-    // Guardar el tipo de servicio en el estado
+    // 🚀 OPTIMIZACIÓN ELEGANTE: Usar cache global como CHUBB (evitar doble guardado)
+    console.log('🟡 BOTÓN SIN RETENCIÓN: Guardando en cache global...');
+    
+    // Asegurar que el tempData existe y actualizar selección
+    if (global.tempAxaData && global.tempAxaData[ctx.from.id]) {
+      global.tempAxaData[ctx.from.id].seleccionUsuario = {
+        tipoServicio: 'muertos',
+        conRetencion: false,
+        timestamp: Date.now()
+      };
+      console.log('🟡 BOTÓN SIN RETENCIÓN: Selección guardada en cache global');
+    }
+    
+    // Guardar mínimo en userState para compatibilidad (middleware guardará automáticamente)
     ctx.userState.axaTipoServicio = 'muertos';
     ctx.userState.axaConRetencion = false;
     
@@ -335,10 +366,26 @@ export function registerAxaHandler(bot) {
       return;
     }
     
-    if (ctx.userState.axaTipoServicio === undefined || ctx.userState.axaConRetencion === undefined) {
-      console.log('🚨 BOTÓN CONFIRMAR: axaTipoServicio o axaConRetencion undefined');
-      console.log('🚨 axaTipoServicio:', ctx.userState.axaTipoServicio);
-      console.log('🚨 axaConRetencion:', ctx.userState.axaConRetencion);
+    // 🚀 OPTIMIZACIÓN: Fallback entre userState y cache global
+    let tipoServicio = ctx.userState.axaTipoServicio;
+    let conRetencion = ctx.userState.axaConRetencion;
+    
+    // Si no está en userState, buscar en cache global
+    if ((tipoServicio === undefined || conRetencion === undefined) && tempData.seleccionUsuario) {
+      console.log('🟢 BOTÓN CONFIRMAR: Recuperando de cache global como fallback');
+      tipoServicio = tempData.seleccionUsuario.tipoServicio === 'realizados' ? 'realizados' : 'muertos';
+      conRetencion = tempData.seleccionUsuario.conRetencion;
+      
+      // Actualizar userState con los valores del cache
+      ctx.userState.axaTipoServicio = tipoServicio;
+      ctx.userState.axaConRetencion = conRetencion;
+    }
+    
+    if (tipoServicio === undefined || conRetencion === undefined) {
+      console.log('🚨 BOTÓN CONFIRMAR: No se encontró selección en userState ni cache');
+      console.log('🚨 userState - axaTipoServicio:', ctx.userState.axaTipoServicio);
+      console.log('🚨 userState - axaConRetencion:', ctx.userState.axaConRetencion);
+      console.log('🚨 cache - seleccionUsuario:', tempData.seleccionUsuario);
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         facturaProgressMsg.message_id,
@@ -353,8 +400,7 @@ export function registerAxaHandler(bot) {
     try {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
       
-      const tipoServicio = ctx.userState.axaTipoServicio;
-      const conRetencion = ctx.userState.axaConRetencion;
+      // Usar las variables ya validadas (de userState o cache global)
       
       // 🚀 FASE 3: Seleccionar datos precalculados según tipo
       const facturaData = conRetencion ? tempData.facturaConRetencion : tempData.facturaSinRetencion;
@@ -455,8 +501,8 @@ export function registerAxaHandler(bot) {
     // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el documento ANTES de validaciones
     let receivingMessage = null;
     
-    // Solo procesar si estamos esperando un archivo Excel para AXA
-    if (!ctx.userState || ctx.userState.esperando !== 'archivo_excel_axa') {
+    // 🚀 DETECCIÓN ROBUSTA: Usar función utilitaria para solucionar bug de timing
+    if (!debeDetectarExcel(ctx, 'axa')) {
       console.log('No estamos esperando archivo Excel para AXA, pasando al siguiente handler');
       console.log('=========== FIN HANDLER AXA EXCEL (PASANDO) ===========');
       return next();
@@ -468,8 +514,8 @@ export function registerAxaHandler(bot) {
 
     const document = ctx.message.document;
     
-    // Verificar que sea un archivo Excel
-    if (!document.file_name.match(/\.(xlsx|xls)$/i)) {
+    // Verificar que sea un archivo Excel usando función utilitaria
+    if (!esArchivoExcelValido(document)) {
       console.log('Documento no es Excel, informando al usuario');
       // Actualizar el mensaje existente con el error
       await ctx.telegram.editMessageText(
