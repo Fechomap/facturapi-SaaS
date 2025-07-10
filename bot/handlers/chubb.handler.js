@@ -172,7 +172,9 @@ export function registerChubbHandler(bot) {
     const facturaProgressMsg = await ctx.reply('⚡ Procesando facturas CHUBB...\n⏳ Validando datos...');
     
     // Verificar que tenemos datos para procesar
-    if (!ctx.userState.chubbGrupos || !ctx.userState.chubbColumnMappings) {
+    // 🚀 OPTIMIZACIÓN: Verificar datos en cache global
+    const chubbData = global.tempChubbData && global.tempChubbData[ctx.from.id];
+    if (!chubbData || !chubbData.grupos || !chubbData.columnMappings) {
       // Actualizar mensaje con error
       await ctx.telegram.editMessageText(
         ctx.chat.id,
@@ -195,8 +197,9 @@ export function registerChubbHandler(bot) {
         { parse_mode: 'Markdown' }
       );
       
-      const grupos = ctx.userState.chubbGrupos;
-      const columnMappings = ctx.userState.chubbColumnMappings;
+      // 🚀 OPTIMIZACIÓN: Obtener datos del cache global
+      const grupos = chubbData.grupos;
+      const columnMappings = chubbData.columnMappings;
       const facturas = [];
       
       // Generar facturas para cada grupo que tenga datos
@@ -216,7 +219,8 @@ export function registerChubbHandler(bot) {
           CLAVE_SAT_GRUA_CON_RETENCION,
           true, // con retención
           ctx,
-          columnMappings
+          columnMappings,
+          chubbData
         );
         if (facturaGruaConRetencion) {
           facturas.push(facturaGruaConRetencion);
@@ -239,7 +243,8 @@ export function registerChubbHandler(bot) {
           CLAVE_SAT_SERVICIOS_SIN_RETENCION,
           false, // sin retención
           ctx,
-          columnMappings
+          columnMappings,
+          chubbData
         );
         if (facturaGruaSinRetencion) {
           facturas.push(facturaGruaSinRetencion);
@@ -262,7 +267,8 @@ export function registerChubbHandler(bot) {
           CLAVE_SAT_SERVICIOS_SIN_RETENCION,
           false, // sin retención
           ctx,
-          columnMappings
+          columnMappings,
+          chubbData
         );
         if (facturaOtrosServicios) {
           facturas.push(facturaOtrosServicios);
@@ -278,22 +284,48 @@ export function registerChubbHandler(bot) {
         { parse_mode: 'Markdown' }
       );
       
-      // 📱 Informar resultado final con indicador visual
+      // 📱 Informar resultado final CON BOTONES DE DESCARGA
       if (facturas.length > 0) {
-        await ctx.reply(`🎉 *Proceso CHUBB completado exitosamente*\n\n✅ Se generaron ${facturas.length} facturas\n📋 Todos los grupos procesados correctamente`, { parse_mode: 'Markdown' });
+        let mensaje = `🎉 *Proceso CHUBB completado exitosamente*\n\n✅ Se generaron ${facturas.length} facturas:\n\n`;
+        
+        // Crear botones para cada factura
+        const botones = [];
+        facturas.forEach((factura, index) => {
+          mensaje += `📋 Factura ${index + 1}: ${factura.series}-${factura.folio_number} ($${factura.total.toFixed(2)})\n`;
+          botones.push([
+            Markup.button.callback(`📄 PDF ${factura.series}-${factura.folio_number}`, `pdf_${factura.id}_${factura.folio_number}`),
+            Markup.button.callback(`🔠 XML ${factura.series}-${factura.folio_number}`, `xml_${factura.id}_${factura.folio_number}`)
+          ]);
+        });
+        
+        mensaje += `\n📥 Seleccione una opción para descargar:`;
+        
+        await ctx.reply(mensaje, {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard(botones)
+        });
       } else {
         await ctx.reply('⚠️ No se generó ninguna factura. Por favor, verifica los datos del archivo Excel.');
       }
       
-      // Limpiar el estado
-      delete ctx.userState.chubbGrupos;
-      delete ctx.userState.chubbColumnMappings;
-      delete ctx.userState.chubbMontosPorGrupo;
+      // 🚀 OPTIMIZACIÓN: Limpiar datos del cache global  
+      if (global.tempChubbData && global.tempChubbData[ctx.from.id]) {
+        delete global.tempChubbData[ctx.from.id];
+      }
+      delete ctx.userState.chubbDataRef;
+      delete ctx.userState.chubbClientId;
       ctx.userState.esperando = null;
       
     } catch (error) {
       console.error('Error al procesar confirmación de facturas CHUBB:', error);
       await ctx.reply(`❌ Error al generar facturas: ${error.message}`);
+      
+      // 🚀 OPTIMIZACIÓN: Limpiar datos del cache global en caso de error
+      if (global.tempChubbData && global.tempChubbData[ctx.from.id]) {
+        delete global.tempChubbData[ctx.from.id];
+      }
+      delete ctx.userState.chubbDataRef;
+      delete ctx.userState.chubbClientId;
       ctx.userState.esperando = null;
     }
   });
@@ -305,10 +337,12 @@ export function registerChubbHandler(bot) {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
       await ctx.reply('❌ Operación cancelada. No se generaron facturas.');
       
-      // Limpiar el estado
-      delete ctx.userState.chubbGrupos;
-      delete ctx.userState.chubbColumnMappings;
-      delete ctx.userState.chubbMontosPorGrupo;
+      // 🚀 OPTIMIZACIÓN: Limpiar datos del cache global
+      if (global.tempChubbData && global.tempChubbData[ctx.from.id]) {
+        delete global.tempChubbData[ctx.from.id];
+      }
+      delete ctx.userState.chubbDataRef;
+      delete ctx.userState.chubbClientId;
       ctx.userState.esperando = null;
     } catch (error) {
       console.error('Error al cancelar operación:', error);
@@ -555,9 +589,18 @@ async function procesarArchivoChubb(ctx, filePath, progressMessageId = null) {
     await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${totalRegistros} registros listos para facturar`);
     
     // Guardar temporalmente los datos en el estado del usuario para procesarlos después de la confirmación
-    ctx.userState.chubbGrupos = grupos;
-    ctx.userState.chubbColumnMappings = columnMappings;
-    ctx.userState.chubbMontosPorGrupo = montosPorGrupo;
+    // 🚀 OPTIMIZACIÓN: Guardar datos pesados en cache global, no en userState
+    global.tempChubbData = global.tempChubbData || {};
+    global.tempChubbData[ctx.from.id] = {
+      grupos: grupos,
+      columnMappings: columnMappings,
+      montosPorGrupo: montosPorGrupo,
+      clientId: ctx.userState.chubbClientId,
+      timestamp: Date.now()
+    };
+    
+    // Solo guardar referencia mínima en userState
+    ctx.userState.chubbDataRef = ctx.from.id;
     
     // Solicitar confirmación al usuario antes de generar las facturas
     await ctx.reply(
@@ -705,7 +748,7 @@ function clasificarDatos(data, columnMappings) {
  * @param {Object} columnMappings - Mapeo de nombres de columnas
  * @returns {Promise<Object>} - Factura generada
  */
-async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, columnMappings) {
+async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, columnMappings, chubbData) {
   if (items.length === 0) {
     console.log(`No hay items para generar factura con clave ${claveSAT}`);
     return null;
@@ -765,7 +808,7 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
   
   // Construir los datos de la factura
   const facturaData = {
-    customer: ctx.userState.chubbClientId,
+    customer: chubbData.clientId,
     items: facturaItems,
     use: "G03",  // Uso de CFDI
     payment_form: "99",  // Forma de pago
@@ -836,7 +879,9 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
     ctx.userState.folioFactura = factura.folio_number;
     ctx.userState.facturaGenerada = true;
     
-    // Mostrar información de la factura generada
+    // Mensaje individual comentado para evitar duplicación
+    // El mensaje consolidado se muestra al final del proceso completo
+    /*
     await ctx.reply(
       `✅ *Factura generada exitosamente*\n\n` +
       `• Cliente: CHUBB\n` +
@@ -853,6 +898,7 @@ async function generarFacturaParaGrupo(items, claveSAT, conRetencion, ctx, colum
         ])
       }
     );
+    */
     
     return factura;
     

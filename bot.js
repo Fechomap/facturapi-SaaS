@@ -3,6 +3,8 @@ import { initConfig, config } from './config/index.js';
 import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
 import { createBot } from './bot/index.js';
+import cron from 'node-cron';
+import cleanupExpiredSessions from './scripts/cleanup-sessions.js';
 
 // Logger específico para el bot
 const botLogger = logger.child({ module: 'telegram-bot' });
@@ -20,6 +22,12 @@ async function startBot() {
     
     // Crear e inicializar el bot usando el módulo modular
     const bot = createBot(botLogger);
+    
+    // 🧹 OPTIMIZACIÓN: Job automático de limpieza de sesiones cada hora
+    cron.schedule('0 * * * *', async () => {
+      botLogger.info('Ejecutando limpieza automática de sesiones...');
+      await cleanupExpiredSessions();
+    });
     
     // Iniciar el bot según el entorno
     if (config.env === 'production' && config.isRailway) {

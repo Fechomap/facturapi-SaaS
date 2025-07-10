@@ -48,12 +48,86 @@ class SessionService {
   }
 
   /**
-   * Guarda el estado de sesión de un usuario
+   * Cache en memoria para reducir escrituras a DB
+   */
+  static sessionCache = new Map();
+  static pendingWrites = new Map();
+  static writeTimer = null;
+
+  /**
+   * Guarda el estado de sesión de un usuario (con cache)
    * @param {BigInt|string|number} telegramId - ID de Telegram del usuario
    * @param {Object} state - Estado a guardar
    * @returns {Promise<Object>} - Sesión actualizada
    */
   static async saveUserState(telegramId, state) {
+    const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
+    const cacheKey = telegramIdBigInt.toString();
+    
+    // 🚀 OPTIMIZACIÓN: Guardar en cache inmediatamente
+    this.sessionCache.set(cacheKey, {
+      sessionData: state,
+      updatedAt: new Date()
+    });
+    
+    // Agregar a cola de escrituras pendientes
+    this.pendingWrites.set(cacheKey, { telegramIdBigInt, state });
+    
+    // Programar escritura en batch (cada 500ms)
+    if (!this.writeTimer) {
+      this.writeTimer = setTimeout(() => this.flushPendingWrites(), 500);
+    }
+    
+    sessionLogger.debug({ telegramId: cacheKey }, 'Estado guardado en cache');
+    return { sessionData: state };
+  }
+
+  /**
+   * Escribe todas las sesiones pendientes a la DB
+   */
+  static async flushPendingWrites() {
+    if (this.pendingWrites.size === 0) return;
+    
+    const writes = Array.from(this.pendingWrites.entries());
+    this.pendingWrites.clear();
+    this.writeTimer = null;
+    
+    console.log(`[SESSION_BATCH] Escribiendo ${writes.length} sesiones a DB`);
+    const startTime = Date.now();
+    
+    // Escribir en paralelo con límite
+    const batchSize = 5;
+    for (let i = 0; i < writes.length; i += batchSize) {
+      const batch = writes.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(async ([_, { telegramIdBigInt, state }]) => {
+          try {
+            await prisma.userSession.upsert({
+              where: { telegramId: telegramIdBigInt },
+              update: {
+                sessionData: state,
+                updatedAt: new Date()
+              },
+              create: {
+                telegramId: telegramIdBigInt,
+                sessionData: state
+              }
+            });
+          } catch (error) {
+            console.error(`Error guardando sesión ${telegramIdBigInt}:`, error);
+          }
+        })
+      );
+    }
+    
+    const duration = Date.now() - startTime;
+    console.log(`[SESSION_BATCH] ${writes.length} sesiones escritas en ${duration}ms`);
+  }
+
+  /**
+   * Guarda el estado original (sin cache) para compatibilidad
+   */
+  static async saveUserStateImmediate(telegramId, state) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     
     // 🔍 MÉTRICAS: Medir tiempo de escritura DB

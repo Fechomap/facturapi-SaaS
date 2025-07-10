@@ -105,30 +105,41 @@ export function registerAxaHandler(bot) {
       // Obtener todos los clientes del tenant
       console.log('Buscando cliente AXA para el tenant:', tenantId);
       
-      // OPTIMIZACIÓN: Cache de cliente AXA para evitar búsquedas repetitivas
-      const cacheKey = `axa_client_${tenantId}`;
-      let axaClient = global.clientCache && global.clientCache[cacheKey];
+      // 🚀 OPTIMIZACIÓN FASE 1: Precarga cliente AXA directo por RFC (sin cache innecesario)
+      console.log('🔍 FASE 1: Obteniendo cliente AXA directo por RFC para tenant:', tenantId);
+      const startTime = Date.now();
       
-      if (!axaClient || Date.now() - (axaClient.cachedAt || 0) > 300000) { // Cache por 5 minutos
-        // Buscar el cliente AXA por nombre en la base de datos
-        axaClient = await prisma.tenantCustomer.findFirst({
+      // Buscar cliente AXA por RFC único (más eficiente que contains)
+      const axaClient = await prisma.tenantCustomer.findFirst({
+        where: {
+          tenantId: tenantId,
+          rfc: 'AAM850528H51', // RFC único de AXA ASSISTANCE MEXICO
+          isActive: true
+        }
+      });
+      
+      const searchDuration = Date.now() - startTime;
+      console.log(`✅ FASE 1: Cliente AXA obtenido en ${searchDuration}ms ${axaClient ? '(encontrado)' : '(no encontrado)'}`);
+      
+      // Fallback: Si no se encuentra por RFC, intentar por nombre exacto
+      let axaClientFallback = axaClient;
+      if (!axaClientFallback) {
+        console.log('⚠️ FASE 1: RFC no encontrado, intentando por nombre exacto...');
+        const fallbackStartTime = Date.now();
+        
+        axaClientFallback = await prisma.tenantCustomer.findFirst({
           where: {
             tenantId: tenantId,
-            legalName: {
-              contains: 'AXA'
-            },
+            legalName: 'AXA ASSISTANCE MEXICO',
             isActive: true
           }
         });
         
-        // Guardar en cache si se encontró
-        if (axaClient) {
-          global.clientCache = global.clientCache || {};
-          global.clientCache[cacheKey] = { ...axaClient, cachedAt: Date.now() };
-        }
+        const fallbackDuration = Date.now() - fallbackStartTime;
+        console.log(`✅ FASE 1: Fallback completado en ${fallbackDuration}ms ${axaClientFallback ? '(encontrado)' : '(no encontrado)'}`);
       }
       
-      if (!axaClient) {
+      if (!axaClientFallback) {
         // Si no se encuentra, intentar configurar los clientes predefinidos
         await ctx.reply('⚠️ No se encontró el cliente AXA. Intentando configurar clientes predefinidos...');
         
@@ -163,10 +174,10 @@ export function registerAxaHandler(bot) {
           return ctx.reply('❌ Error: No se pudo configurar el cliente AXA. Por favor, contacta al administrador.');
         }
       } else {
-        // Usar el cliente encontrado
-        ctx.userState.axaClientId = axaClient.facturapiCustomerId;
-        ctx.userState.clienteNombre = axaClient.legalName;
-        console.log(`Cliente AXA encontrado: ${axaClient.legalName} (ID: ${axaClient.facturapiCustomerId})`);
+        // Usar el cliente encontrado (optimizado)
+        ctx.userState.axaClientId = axaClientFallback.facturapiCustomerId;
+        ctx.userState.clienteNombre = axaClientFallback.legalName;
+        console.log(`🎯 FASE 1: Cliente AXA cargado exitosamente: ${axaClientFallback.legalName} (ID: ${axaClientFallback.facturapiCustomerId})`);
       }
       
       // Continuar con el procesamiento normal
@@ -179,26 +190,46 @@ export function registerAxaHandler(bot) {
     }
   });
   
-  // Manejador para servicios realizados (con retención)
+  // 🚀 FASE 3: Manejador para servicios realizados (con retención) - USA DATOS PRECALCULADOS
   bot.action('axa_servicios_realizados', async (ctx) => {
+    const startTime = Date.now();
+    console.log('🔵 BOTÓN CON RETENCIÓN: Iniciando...');
+    
     await ctx.answerCbQuery();
     
-    // Verificar que tenemos datos para procesar
+    // 🔍 FASE 3: Verificar que tenemos datos PRECALCULADOS (COMO CHUBB)
+    console.log('🔵 BOTÓN CON RETENCIÓN: Verificando tempData...');
     const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
-    if (!tempData || !tempData.data || !tempData.columnMappings) {
-      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+    if (!tempData) {
+      console.log('🚨 BOTÓN CON RETENCIÓN: global.tempAxaData[ctx.from.id] es NULL/undefined');
+      return ctx.reply('❌ No hay datos precalculados para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
+    if (!tempData.facturaConRetencion) {
+      console.log('🚨 BOTÓN CON RETENCIÓN: tempData.facturaConRetencion es NULL/undefined');
+      console.log('🚨 Llaves disponibles en tempData:', Object.keys(tempData));
+      return ctx.reply('❌ No hay datos de factura CON retención precalculados. Por favor, suba nuevamente el archivo Excel.');
+    }
+    if (!tempData.facturaConRetencion.facturaData) {
+      console.log('🚨 BOTÓN CON RETENCIÓN: tempData.facturaConRetencion.facturaData es NULL/undefined');
+      return ctx.reply('❌ No hay datos de FacturAPI precalculados. Por favor, suba nuevamente el archivo Excel.');
+    }
+    
+    console.log('🔵 BOTÓN CON RETENCIÓN: TempData OK, preparando respuesta...');
+    console.log('🚀 FASE 3: Usando datos precalculados CON retención');
+    console.log(`🚀 FASE 3: Total con retención: $${tempData.facturaConRetencion.total.toFixed(2)}`);
     
     // Guardar el tipo de servicio en el estado
     ctx.userState.axaTipoServicio = 'realizados';
     ctx.userState.axaConRetencion = true;
     
-    // Mostrar confirmación final
+    console.log('🔵 BOTÓN CON RETENCIÓN: Enviando mensaje de confirmación...');
+    // Mostrar confirmación final CON DATOS PRECALCULADOS
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
     await ctx.reply(
       `🚛 *Servicios Realizados seleccionados*\n\n` +
       `• Se aplicará retención del 4%\n` +
-      `• ${ctx.userState.axaSummary?.totalRecords || 0} registros\n\n` +
+      `• ${tempData.facturaConRetencion.items.length} registros\n` +
+      `• **Total: $${tempData.facturaConRetencion.total.toFixed(2)}**\n\n` +
       `¿Confirma la generación de la factura?`,
       {
         parse_mode: 'Markdown',
@@ -208,28 +239,51 @@ export function registerAxaHandler(bot) {
         ])
       }
     );
+    
+    const duration = Date.now() - startTime;
+    console.log(`🔵 BOTÓN CON RETENCIÓN: Completado en ${duration}ms`);
   });
 
-  // Manejador para servicios muertos (sin retención)
+  // 🚀 FASE 3: Manejador para servicios muertos (sin retención) - USA DATOS PRECALCULADOS
   bot.action('axa_servicios_muertos', async (ctx) => {
+    const startTime = Date.now();
+    console.log('🟡 BOTÓN SIN RETENCIÓN: Iniciando...');
+    
     await ctx.answerCbQuery();
     
-    // Verificar que tenemos datos para procesar
+    // 🔍 FASE 3: Verificar que tenemos datos PRECALCULADOS (COMO CHUBB)
+    console.log('🟡 BOTÓN SIN RETENCIÓN: Verificando tempData...');
     const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
-    if (!tempData || !tempData.data || !tempData.columnMappings) {
-      return ctx.reply('❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.');
+    if (!tempData) {
+      console.log('🚨 BOTÓN SIN RETENCIÓN: global.tempAxaData[ctx.from.id] es NULL/undefined');
+      return ctx.reply('❌ No hay datos precalculados para generar facturas. Por favor, suba nuevamente el archivo Excel.');
     }
+    if (!tempData.facturaSinRetencion) {
+      console.log('🚨 BOTÓN SIN RETENCIÓN: tempData.facturaSinRetencion es NULL/undefined');
+      console.log('🚨 Llaves disponibles en tempData:', Object.keys(tempData));
+      return ctx.reply('❌ No hay datos de factura SIN retención precalculados. Por favor, suba nuevamente el archivo Excel.');
+    }
+    if (!tempData.facturaSinRetencion.facturaData) {
+      console.log('🚨 BOTÓN SIN RETENCIÓN: tempData.facturaSinRetencion.facturaData es NULL/undefined');
+      return ctx.reply('❌ No hay datos de FacturAPI precalculados. Por favor, suba nuevamente el archivo Excel.');
+    }
+    
+    console.log('🟡 BOTÓN SIN RETENCIÓN: TempData OK, preparando respuesta...');
+    console.log('🚀 FASE 3: Usando datos precalculados SIN retención');
+    console.log(`🚀 FASE 3: Total sin retención: $${tempData.facturaSinRetencion.total.toFixed(2)}`);
     
     // Guardar el tipo de servicio en el estado
     ctx.userState.axaTipoServicio = 'muertos';
     ctx.userState.axaConRetencion = false;
     
-    // Mostrar confirmación final
+    console.log('🟡 BOTÓN SIN RETENCIÓN: Enviando mensaje de confirmación...');
+    // Mostrar confirmación final CON DATOS PRECALCULADOS
     await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
     await ctx.reply(
       `💀 *Servicios Muertos seleccionados*\n\n` +
       `• Sin retención\n` +
-      `• ${ctx.userState.axaSummary?.totalRecords || 0} registros\n\n` +
+      `• ${tempData.facturaSinRetencion.items.length} registros\n` +
+      `• **Total: $${tempData.facturaSinRetencion.total.toFixed(2)}**\n\n` +
       `¿Confirma la generación de la factura?`,
       {
         parse_mode: 'Markdown',
@@ -239,27 +293,62 @@ export function registerAxaHandler(bot) {
         ])
       }
     );
+    
+    const duration = Date.now() - startTime;
+    console.log(`🟡 BOTÓN SIN RETENCIÓN: Completado en ${duration}ms`);
   });
 
-  // Manejador para confirmar la generación de facturas AXA (después de seleccionar tipo)
+  // 🚀 FASE 3: Manejador OPTIMIZADO para confirmar generación - USA DATOS PRECALCULADOS
   bot.action('axa_confirmar_final', async (ctx) => {
+    const startTime = Date.now();
+    console.log('🟢 BOTÓN CONFIRMAR: Iniciando...');
+    
     await ctx.answerCbQuery();
     
-    // 📱 FEEDBACK INMEDIATO: Mostrar que se detectó el click del botón ANTES de validaciones
-    const facturaProgressMsg = await ctx.reply('⚡ Procesando factura AXA...\n⏳ Validando datos...');
+    // 📱 FEEDBACK INMEDIATO
+    const facturaProgressMsg = await ctx.reply('⚡ Procesando factura AXA...\n⏳ Validando datos precalculados...');
     
-    // Verificar que tenemos datos para procesar
+    // 🔍 FASE 3: Verificar que tenemos datos PRECALCULADOS (COMO CHUBB)
+    console.log('🟢 BOTÓN CONFIRMAR: Verificando tempData y userState...');
     const tempData = global.tempAxaData && global.tempAxaData[ctx.from.id];
-    if (!tempData || !tempData.data || !tempData.columnMappings || ctx.userState.axaTipoServicio === undefined) {
-      // Actualizar mensaje con error
+    
+    if (!tempData) {
+      console.log('🚨 BOTÓN CONFIRMAR: global.tempAxaData[ctx.from.id] es NULL/undefined');
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         facturaProgressMsg.message_id,
         null,
-        '❌ No hay datos pendientes para generar facturas. Por favor, suba nuevamente el archivo Excel.'
+        '❌ No hay datos precalculados. Por favor, suba nuevamente el archivo Excel.'
       );
       return;
     }
+    
+    if (!tempData.facturaConRetencion || !tempData.facturaSinRetencion) {
+      console.log('🚨 BOTÓN CONFIRMAR: Falta facturaConRetencion o facturaSinRetencion');
+      console.log('🚨 Llaves disponibles en tempData:', Object.keys(tempData));
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        '❌ Datos de facturación incompletos. Por favor, suba nuevamente el archivo Excel.'
+      );
+      return;
+    }
+    
+    if (ctx.userState.axaTipoServicio === undefined || ctx.userState.axaConRetencion === undefined) {
+      console.log('🚨 BOTÓN CONFIRMAR: axaTipoServicio o axaConRetencion undefined');
+      console.log('🚨 axaTipoServicio:', ctx.userState.axaTipoServicio);
+      console.log('🚨 axaConRetencion:', ctx.userState.axaConRetencion);
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        facturaProgressMsg.message_id,
+        null,
+        '❌ Tipo de servicio no definido. Por favor, selecciona el tipo de servicio nuevamente.'
+      );
+      return;
+    }
+    
+    console.log('🟢 BOTÓN CONFIRMAR: Todas las validaciones pasaron correctamente');
     
     try {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(e => console.log('No se pudo editar mensaje:', e.message));
@@ -267,48 +356,69 @@ export function registerAxaHandler(bot) {
       const tipoServicio = ctx.userState.axaTipoServicio;
       const conRetencion = ctx.userState.axaConRetencion;
       
-      // 📱 Actualizar mensaje con tipo de servicio
+      // 🚀 FASE 3: Seleccionar datos precalculados según tipo
+      const facturaData = conRetencion ? tempData.facturaConRetencion : tempData.facturaSinRetencion;
+      
+      console.log(`🚀 FASE 3: Usando factura precalculada ${conRetencion ? 'CON' : 'SIN'} retención`);
+      console.log(`🚀 FASE 3: Items: ${facturaData.items.length}, Total: $${facturaData.total.toFixed(2)}`);
+      
+      // 📱 Actualizar mensaje con datos precisos
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         facturaProgressMsg.message_id,
         null,
-        `⚡ Procesando factura para servicios ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...\n⏳ Preparando datos...`,
+        `⚡ Factura ${tipoServicio} ${conRetencion ? '(con retención 4%)' : '(sin retención)'}...\n` +
+        `📊 ${facturaData.items.length} items, Total: $${facturaData.total.toFixed(2)}\n` +
+        `🚀 Enviando a FacturAPI...`,
         { parse_mode: 'Markdown' }
       );
       
-      // Los datos ya fueron verificados arriba, solo los asignamos
-      const data = tempData.data;
-      const columnMappings = tempData.columnMappings;
+      // 🚀 FASE 3: Envío DIRECTO a FacturAPI (sin recálculos)
+      console.log('🚀 FASE 3: Llamando a enviarFacturaDirectaAxa...');
+      const factura = await enviarFacturaDirectaAxa(facturaData.facturaData, ctx, facturaProgressMsg.message_id);
+      console.log('🚀 FASE 3: Factura recibida de función:', factura ? factura.id : 'NULL');
       
-      // 📱 Actualizar progreso de facturación
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        facturaProgressMsg.message_id,
-        null,
-        `⚡ Generando factura para servicios AXA (${data.length} registros)...\n\n📊 Preparando datos para FacturAPI...`,
-        { parse_mode: 'Markdown' }
-      );
-      
-      const factura = await generarFacturaAxa(data, ctx, columnMappings, conRetencion, facturaProgressMsg.message_id);
-      
-      // 📱 Informar resultado final con indicador visual
+      // 📱 Resultado final CON BOTONES DE DESCARGA
       if (factura) {
-        await ctx.reply(`🎯 *Proceso AXA completado exitosamente*\n\n✅ Factura generada correctamente\n📊 ${data.length} servicios procesados`, { parse_mode: 'Markdown' });
+        console.log('🚀 FASE 3: Enviando mensaje de éxito CON BOTONES al usuario...');
+        await ctx.reply(
+          `🎯 *Proceso AXA completado exitosamente*\n\n` +
+          `✅ Factura generada: ${factura.id}\n` +
+          `📊 ${facturaData.items.length} servicios procesados\n` +
+          `💰 Total: $${facturaData.total.toFixed(2)}\n` +
+          `📋 Folio: ${factura.folio_number}\n\n` +
+          `📥 Seleccione una opción para descargar:`,
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('📄 Descargar PDF', `pdf_${factura.id}_${factura.folio_number}`)],
+              [Markup.button.callback('🔠 Descargar XML', `xml_${factura.id}_${factura.folio_number}`)]
+            ])
+          }
+        );
+        console.log('🚀 FASE 3: Mensaje de éxito CON BOTONES enviado');
       } else {
-        await ctx.reply('⚠️ No se generó la factura. Por favor, verifica los datos del archivo Excel.');
+        console.log('🚨 FASE 3: Factura es NULL, enviando mensaje de error...');
+        await ctx.reply('⚠️ No se generó la factura. Error en FacturAPI.');
       }
       
-      // Limpiar el estado y datos temporales
+      // 🧹 Limpiar datos temporales como CHUBB
+      console.log('🟢 BOTÓN CONFIRMAR: Limpiando datos temporales...');
       delete ctx.userState.axaSummary;
       delete ctx.userState.axaTipoServicio;
       delete ctx.userState.axaConRetencion;
       if (global.tempAxaData && global.tempAxaData[ctx.from.id]) {
         delete global.tempAxaData[ctx.from.id];
+        console.log('🟢 BOTÓN CONFIRMAR: global.tempAxaData limpiado');
       }
       ctx.userState.esperando = null;
       
+      const duration = Date.now() - startTime;
+      console.log(`🟢 BOTÓN CONFIRMAR: Completado exitosamente en ${duration}ms`);
+      
     } catch (error) {
-      console.error('Error al procesar confirmación de factura AXA:', error);
+      const duration = Date.now() - startTime;
+      console.error(`🚨 BOTÓN CONFIRMAR: Error después de ${duration}ms:`, error);
       await ctx.reply(`❌ Error al generar factura: ${error.message}`);
       ctx.userState.esperando = null;
     }
@@ -351,6 +461,7 @@ export function registerAxaHandler(bot) {
       console.log('=========== FIN HANDLER AXA EXCEL (PASANDO) ===========');
       return next();
     }
+
 
     // 📱 FEEDBACK INMEDIATO: Mostrar procesamiento tan pronto como detectemos que es nuestro contexto
     receivingMessage = await ctx.reply('📥 Recibiendo archivo Excel de AXA...\n⏳ Validando archivo...');
@@ -539,20 +650,124 @@ async function procesarArchivoAxa(ctx, filePath, progressMessageId = null) {
     let infoResumen = `📊 Resumen de datos procesados:\n\n`;
     infoResumen += `• Servicios de Grúa AXA:\n  - ${data.length} registros\n  - Monto total: ${montoTotal.toFixed(2)} MXN\n\n`;
     
-    // OPTIMIZACIÓN: Guardar SOLO números en el estado, sin objetos
+    // 🚀 OPTIMIZACIÓN CHUBB: Guardar SOLO números en el estado, datos pesados en cache global
     ctx.userState.axaSummary = {
       totalRecords: data.length,
       totalAmount: montoTotal
       // NO guardar firstRecord - innecesario y añade peso
     };
     
-    // Guardar datos temporalmente en memoria del proceso (no en sesión)
-    // Esto evita serializar/deserializar grandes cantidades de datos
+    // 🚀 FASE 2: PRECÁLCULO de ambas opciones (con/sin retención)
+    console.log('🔄 FASE 2: Iniciando precálculo de facturas con y sin retención...');
+    const precalculoStartTime = Date.now();
+    
+    // Configuración de impuestos
+    const baseTaxes = [{ type: "IVA", rate: 0.16, factor: "Tasa" }];
+    const taxesWithRetention = [
+      ...baseTaxes,
+      { type: "IVA", rate: 0.04, factor: "Tasa", withholding: true }
+    ];
+    
+    // Precalcular items para ambas opciones
+    const itemsConRetencion = [];
+    const itemsSinRetencion = [];
+    let subtotal = 0;
+    
+    for (const row of data) {
+      const factura = row[columnMappings.factura] || '';
+      const orden = row[columnMappings.orden] || '';
+      const folio = row[columnMappings.folio] || '';
+      const autorizacion = row[columnMappings.autorizacion] || '';
+      const importe = parseFloat(row[columnMappings.importe]) || 0;
+      
+      subtotal += importe;
+      
+      // Item base
+      const itemBase = {
+        quantity: 1,
+        product: {
+          description: `ARRASTRE DE GRUA FACTURA ${factura} No. ORDEN ${orden} No. FOLIO ${folio} AUTORIZACION ${autorizacion}`,
+          product_key: '78101803', // CLAVE_SAT_SERVICIOS_GRUA
+          unit_key: "E48",
+          unit_name: "SERVICIO",
+          price: importe,
+          tax_included: false
+        }
+      };
+      
+      // Item CON retención
+      itemsConRetencion.push({
+        ...itemBase,
+        product: { ...itemBase.product, taxes: taxesWithRetention }
+      });
+      
+      // Item SIN retención
+      itemsSinRetencion.push({
+        ...itemBase,
+        product: { ...itemBase.product, taxes: baseTaxes }
+      });
+    }
+    
+    // 🧮 CÁLCULO CORRECTO DE TOTALES FINALES
+    // Subtotal: $60,183.16
+    // IVA 16%: +$9,629.31
+    // Retención 4%: -$2,407.33
+    
+    const iva16 = subtotal * 0.16;           // IVA 16%
+    const retencion4 = subtotal * 0.04;      // Retención 4%
+    
+    const totalSinRetencion = subtotal + iva16;                    // $60,183.16 + $9,629.31 = $69,812.47
+    const totalConRetencion = subtotal + iva16 - retencion4;       // $60,183.16 + $9,629.31 - $2,407.33 = $67,405.14
+    
+    // Estructuras completas para FacturAPI
+    const facturaBaseData = {
+      customer: ctx.userState.axaClientId,
+      use: "G03",
+      payment_form: "99",
+      payment_method: "PPD",
+      currency: "MXN",
+      exchange: 1
+    };
+    
+    const facturaConRetencionData = {
+      ...facturaBaseData,
+      items: itemsConRetencion
+    };
+    
+    const facturaSinRetencionData = {
+      ...facturaBaseData,
+      items: itemsSinRetencion
+    };
+    
+    const precalculoDuration = Date.now() - precalculoStartTime;
+    console.log(`✅ FASE 2: Precálculo completado en ${precalculoDuration}ms`);
+    console.log(`📊 FASE 2: Subtotal base: $${subtotal.toFixed(2)}`);
+    console.log(`📊 FASE 2: CON retención (IVA 16% - Ret 4%): ${itemsConRetencion.length} items, Total: $${totalConRetencion.toFixed(2)}`);
+    console.log(`📊 FASE 2: SIN retención (IVA 16% solamente): ${itemsSinRetencion.length} items, Total: $${totalSinRetencion.toFixed(2)}`);
+    
+    // Guardar datos precalculados en memoria del proceso
     global.tempAxaData = global.tempAxaData || {};
     global.tempAxaData[ctx.from.id] = {
+      // Datos originales (para compatibilidad)
       data,
       columnMappings,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      
+      // 🚀 NUEVOS DATOS PRECALCULADOS FASE 2
+      clientId: ctx.userState.axaClientId,
+      subtotal: subtotal,
+      iva16: iva16,
+      retencion4: retencion4,
+      facturaConRetencion: {
+        items: itemsConRetencion,
+        total: totalConRetencion,  // $67,405.14 (Subtotal + IVA 16% - Retención 4%)
+        facturaData: facturaConRetencionData
+      },
+      facturaSinRetencion: {
+        items: itemsSinRetencion,
+        total: totalSinRetencion,  // $69,812.47 (Subtotal + IVA 16%)
+        facturaData: facturaSinRetencionData
+      }
     };
     
     // Limpiar datos antiguos (más de 10 minutos)
@@ -562,10 +777,21 @@ async function procesarArchivoAxa(ctx, filePath, progressMessageId = null) {
       }
     }
     
-    // 📱 PASO 6: Completado
+    // 📱 PASO 6: Completado - OPTIMIZACIÓN: Solo mostrar botones CUANDO cache esté listo
     await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros listos para facturar`);
     
-    // Preguntar sobre el tipo de servicios antes de la confirmación final
+    // 🚀 VERIFICAR que cache global esté listo antes de mostrar botones
+    const tempDataCheck = global.tempAxaData && global.tempAxaData[ctx.from.id];
+    if (!tempDataCheck || !tempDataCheck.facturaConRetencion || !tempDataCheck.facturaSinRetencion) {
+      console.log('🚨 ERROR: Cache global AXA no está listo, no mostrar botones aún');
+      await ctx.reply('❌ Error interno: Los cálculos no están listos. Por favor, intenta subir el archivo nuevamente.');
+      return { success: false, error: 'Cache no listo' };
+    }
+    
+    console.log('✅ Cache global AXA verificado, mostrando botones');
+    console.log(`✅ Datos en cache: CON retención: $${tempDataCheck.facturaConRetencion.total.toFixed(2)}, SIN retención: $${tempDataCheck.facturaSinRetencion.total.toFixed(2)}`);
+    
+    // Preguntar sobre el tipo de servicios SOLO cuando cache esté listo
     await ctx.reply(
       `${infoResumen}\n¿Qué tipo de servicios son?`,
       Markup.inlineKeyboard([
@@ -641,6 +867,68 @@ function mapColumnNamesAxa(firstRow) {
   
   console.log('No se encontraron todas las columnas requeridas para AXA:', columnMapping);
   return null;
+}
+
+/**
+ * 🚀 FASE 3: Envía factura precalculada directamente a FacturAPI (SIN RECÁLCULOS)
+ * @param {Object} facturaData - Datos de factura precalculados de FASE 2
+ * @param {Object} ctx - Contexto de Telegram
+ * @param {number} progressMessageId - ID del mensaje de progreso
+ * @returns {Promise<Object>} - Factura generada
+ */
+async function enviarFacturaDirectaAxa(facturaData, ctx, progressMessageId = null) {
+  try {
+    console.log('🚀 FASE 3: Enviando factura precalculada a FacturAPI');
+    console.log(`🚀 FASE 3: Items en factura: ${facturaData.items.length}`);
+    
+    // Obtener tenant y cliente FacturAPI
+    const tenantId = ctx.getTenantId();
+    if (!tenantId) {
+      throw new Error('No se pudo obtener el ID del tenant');
+    }
+    
+    const facturapIService = await import('../../services/facturapi.service.js').then(m => m.default);
+    const facturapi = await facturapIService.getFacturapiClient(tenantId);
+    
+    // 📱 Actualizar progreso
+    if (progressMessageId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMessageId,
+        null,
+        `🚀 Enviando a FacturAPI...\n📡 Conectando con servidor...`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+    
+    // 🚀 FASE 3: Envío DIRECTO (datos ya preparados en FASE 2)
+    console.log('🚀 FASE 3: Enviando solicitud directa a FacturAPI...');
+    const factura = await facturapi.invoices.create(facturaData);
+    
+    console.log(`🚀 FASE 3: Factura creada exitosamente: ${factura.id}`);
+    console.log(`🚀 FASE 3: Folio asignado: ${factura.folio_number}`);
+    
+    // Registrar factura en BD
+    console.log('🚀 FASE 3: Registrando factura en BD...');
+    const TenantService = await import('../../services/tenant.service.js').then(m => m.default);
+    await TenantService.registerInvoice(
+      tenantId,
+      factura.id,
+      factura.series,
+      factura.folio_number,
+      null,
+      factura.total,
+      ctx.from.id
+    );
+    console.log('🚀 FASE 3: Factura registrada en BD exitosamente');
+    
+    console.log('🚀 FASE 3: Retornando factura...');
+    return factura;
+    
+  } catch (error) {
+    console.error('🚨 FASE 3: Error al enviar factura a FacturAPI:', error);
+    throw error;
+  }
 }
 
 /**

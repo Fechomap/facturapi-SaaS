@@ -28,6 +28,7 @@
         "test:subscription": "node tests/test-subscription-flow.js",
         "test:subscription:shell": "./tests/run-subscription-test.sh",
         "test:full": "./scripts/run-full-test.sh",
+        "cleanup:sessions": "node scripts/cleanup-sessions.js",
         "setup:mcp": "./scripts/setup-mcp.sh",
         "migrate": "prisma migrate dev",
         "studio": "prisma studio",
