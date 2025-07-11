@@ -273,21 +273,49 @@ async function cleanupSpecificTenants() {
   console.log(`✅ Eliminado tenant: ${deletedTenant.businessName}`);
 }
 
-// Función para obtener estadísticas de la base de datos
+// Función para obtener estadísticas de la base de datos (optimizada con Promise.all)
 async function getDatabaseStats() {
+  const [
+    tenants,
+    users,
+    invoices,
+    customers,
+    documents,
+    subscriptions,
+    plans,
+    folios,
+    settings,
+    payments,
+    auditLogs,
+    sessions,
+  ] = await Promise.all([
+    prisma.tenant.count(),
+    prisma.tenantUser.count(),
+    prisma.tenantInvoice.count(),
+    prisma.tenantCustomer.count(),
+    prisma.tenantDocument.count(),
+    prisma.tenantSubscription.count(),
+    prisma.subscriptionPlan.count(),
+    prisma.tenantFolio.count(),
+    prisma.tenantSetting.count(),
+    prisma.tenantPayment.count(),
+    prisma.auditLog.count(),
+    prisma.userSession.count(),
+  ]);
+
   return {
-    tenants: await prisma.tenant.count(),
-    users: await prisma.tenantUser.count(),
-    invoices: await prisma.tenantInvoice.count(),
-    customers: await prisma.tenantCustomer.count(),
-    documents: await prisma.tenantDocument.count(),
-    subscriptions: await prisma.tenantSubscription.count(),
-    plans: await prisma.subscriptionPlan.count(),
-    folios: await prisma.tenantFolio.count(),
-    settings: await prisma.tenantSetting.count(),
-    payments: await prisma.tenantPayment.count(),
-    auditLogs: await prisma.auditLog.count(),
-    sessions: await prisma.userSession.count(),
+    tenants,
+    users,
+    invoices,
+    customers,
+    documents,
+    subscriptions,
+    plans,
+    folios,
+    settings,
+    payments,
+    auditLogs,
+    sessions,
   };
 }
 

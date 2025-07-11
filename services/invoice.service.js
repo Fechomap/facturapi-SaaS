@@ -179,12 +179,24 @@ class InvoiceService {
   }
 
   /**
-   * Busca facturas según criterios
+   * Busca facturas según criterios con paginación a nivel de BD
    * @param {Object} criteria - Criterios de búsqueda
-   * @returns {Promise<Array>} - Facturas encontradas
+   * @param {number} criteria.page - Página (default: 1)
+   * @param {number} criteria.limit - Límite por página (default: 10)
+   * @returns {Promise<Object>} - {data: facturas, pagination: info}
    */
   static async searchInvoices(criteria) {
-    const { tenantId, startDate, endDate, customerId, status, minAmount, maxAmount } = criteria;
+    const { 
+      tenantId, 
+      startDate, 
+      endDate, 
+      customerId, 
+      status, 
+      minAmount, 
+      maxAmount,
+      page = 1,
+      limit = 10
+    } = criteria;
 
     // Construir la consulta Prisma
     const whereClause = { tenantId };
@@ -225,19 +237,39 @@ class InvoiceService {
       }
     }
 
-    // Ejecutar consulta
-    const invoices = await prisma.tenantInvoice.findMany({
-      where: whereClause,
-      include: {
-        customer: true,
-        documents: true,
-      },
-      orderBy: {
-        invoiceDate: 'desc',
-      },
-    });
+    // Calcular skip para paginación
+    const skip = (page - 1) * limit;
 
-    return invoices;
+    // Ejecutar consultas en paralelo: datos + total
+    const [invoices, total] = await Promise.all([
+      prisma.tenantInvoice.findMany({
+        where: whereClause,
+        include: {
+          customer: true,
+          documents: true,
+        },
+        orderBy: {
+          invoiceDate: 'desc',
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.tenantInvoice.count({
+        where: whereClause,
+      }),
+    ]);
+
+    return {
+      data: invoices,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
   }
 }
 

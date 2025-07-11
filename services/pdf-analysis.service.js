@@ -1,5 +1,5 @@
 // services/pdf-analysis.service.js
-import fs from 'fs';
+import fs from 'fs/promises';
 import logger from '../core/utils/logger.js';
 
 // Logger específico para análisis de PDF
@@ -8,8 +8,8 @@ const pdfAnalysisLogger = logger.child({ module: 'pdf-analysis-service' });
 class PDFAnalysisService {
   static async analyzePDF(filePath) {
     try {
-      // Leer el archivo PDF
-      const dataBuffer = fs.readFileSync(filePath);
+      // Leer el archivo PDF de forma asíncrona (no bloquea event loop)
+      const dataBuffer = await fs.readFile(filePath);
 
       // Importación dinámica para evitar el problema con el archivo de prueba
       const pdfParse = (await import('pdf-parse')).default;

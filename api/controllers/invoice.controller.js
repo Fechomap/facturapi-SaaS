@@ -191,26 +191,26 @@ class InvoiceController {
 
       invoiceLogger.debug({ tenantId, page, limit }, 'Buscando facturas');
 
-      // Crear objeto de criterios para la búsqueda
+      // Crear objeto de criterios para la búsqueda con paginación
       const criteria = {
         tenantId,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         status,
+        page,
+        limit,
       };
 
-      // Usar el servicio para obtener facturas reales de la base de datos
-      const invoices = await InvoiceService.searchInvoices(criteria);
+      // Usar el servicio para obtener facturas con paginación real
+      const result = await InvoiceService.searchInvoices(criteria);
 
-      invoiceLogger.info({ tenantId, count: invoices.length }, 'Facturas encontradas');
-
-      // Aplicar paginación manual si es necesario
-      const startIndex = (page - 1) * limit;
-      const endIndex = page * limit;
-      const paginatedInvoices = invoices.slice(startIndex, endIndex);
+      invoiceLogger.info(
+        { tenantId, count: result.data.length, total: result.pagination.total }, 
+        'Facturas encontradas con paginación'
+      );
 
       // Transformar datos para mantener compatibilidad con el frontend
-      const formattedInvoices = paginatedInvoices.map((invoice) => ({
+      const formattedInvoices = result.data.map((invoice) => ({
         id: invoice.facturapiInvoiceId || `inv_${invoice.id}`,
         series: invoice.series || 'A',
         folio_number: invoice.folioNumber,
@@ -232,11 +232,7 @@ class InvoiceController {
 
       res.json({
         data: formattedInvoices,
-        pagination: {
-          total: invoices.length,
-          page,
-          limit,
-        },
+        pagination: result.pagination,
       });
     } catch (error) {
       next(error);
@@ -737,12 +733,13 @@ class InvoiceController {
         maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
       };
 
-      // Llamar al servicio para buscar
-      const invoices = await InvoiceService.searchInvoices(criteria);
+      // Llamar al servicio para buscar (con paginación)
+      const result = await InvoiceService.searchInvoices(criteria);
 
       res.json({
-        data: invoices,
-        count: invoices.length,
+        data: result.data,
+        count: result.data.length,
+        pagination: result.pagination,
       });
     } catch (error) {
       next(error);

@@ -235,8 +235,21 @@ class RedisSessionService {
         const info = await this.redis.info('memory');
         stats.redisMemory = info;
 
-        // Contar sesiones activas
-        const keys = await this.redis.keys('session:*');
+        // Contar sesiones activas usando SCAN (seguro para producción)
+        const keys = [];
+        let cursor = '0';
+        do {
+          const [newCursor, foundKeys] = await this.redis.scan(
+            cursor,
+            'MATCH',
+            'session:*',
+            'COUNT',
+            100
+          );
+          cursor = newCursor;
+          keys.push(...foundKeys);
+        } while (cursor !== '0');
+        
         stats.activeSessions = keys.length;
       } else {
         // Estadísticas de memoria
