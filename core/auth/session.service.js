@@ -1,6 +1,8 @@
 // core/auth/session.service.js
 import { prisma } from '../../config/database.js';
 import logger from '../utils/logger.js';
+import redisSessionService from '../../services/redis-session.service.js';
+import facturapiQueueService from '../../services/facturapi-queue.service.js';
 
 // Logger específico para el servicio de sesión
 const sessionLogger = logger.child({ module: 'session-service' });
@@ -66,10 +68,17 @@ class SessionService {
    */
   static async getUserState(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
-    
-    // 🔍 MÉTRICAS: Medir tiempo de consulta DB
+    const cacheKey = `session:${telegramIdBigInt.toString()}`;
+
+    // Intentar obtener la sesión de Redis
+    const redisResult = await redisSessionService.getSession(cacheKey);
+    if (redisResult.success) {
+      return redisResult.data;
+    }
+
+    // Si no está en Redis, obtener de la base de datos
     const dbStartTime = Date.now();
-    sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Obteniendo estado de sesión');
+    sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Obteniendo estado de sesión de la base de datos');
     
     try {
       const session = await prisma.userSession.findUnique({
@@ -84,7 +93,10 @@ class SessionService {
         return { esperando: null };
       }
 
-      sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Sesión obtenida correctamente');
+      // Guardar en Redis para futuras solicitudes
+      await redisSessionService.setSession(cacheKey, session.sessionData);
+
+      sessionLogger.debug({ telegramId: telegramIdBigInt.toString() }, 'Sesión obtenida correctamente de la base de datos');
       return session.sessionData;
     } catch (error) {
       const dbDuration = Date.now() - dbStartTime;
@@ -109,23 +121,18 @@ class SessionService {
    */
   static async saveUserState(telegramId, state) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
-    const cacheKey = telegramIdBigInt.toString();
-    
-    // 🚀 OPTIMIZACIÓN: Guardar en cache inmediatamente
-    this.sessionCache.set(cacheKey, {
-      sessionData: state,
-      updatedAt: new Date()
-    });
-    
-    // Agregar a cola de escrituras pendientes
-    this.pendingWrites.set(cacheKey, { telegramIdBigInt, state });
-    
-    // Programar escritura en batch (cada 500ms)
-    if (!this.writeTimer) {
-      this.writeTimer = setTimeout(() => this.flushPendingWrites(), 500);
-    }
-    
-    sessionLogger.debug({ telegramId: cacheKey }, 'Estado guardado en cache');
+    const cacheKey = `session:${telegramIdBigInt.toString()}`;
+
+    // Guardar en Redis
+    await redisSessionService.setSession(cacheKey, state);
+
+    // Encolar el guardado en la base de datos
+    facturapiQueueService.enqueue(
+      () => this.saveUserStateImmediate(telegramId, state),
+      'save-user-state',
+      { telegramId: telegramIdBigInt.toString() }
+    );
+
     return { sessionData: state };
   }
 

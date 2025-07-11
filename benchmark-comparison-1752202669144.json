@@ -1,0 +1,55 @@
+{
+  "timestamp": "2025-07-11T02:57:49.144Z",
+  "before": "benchmark-results-before-1752202383857.json",
+  "after": "benchmark-results-after-1752202497330.json",
+  "improvements": [
+    {
+      "operation": "getNextFolio",
+      "before": 1986.8345207500001,
+      "after": 1666.0306020000003,
+      "improvement": 320.80391874999987,
+      "improvementPct": 16.146484037779913
+    },
+    {
+      "operation": "getUserState_cold",
+      "before": 65.3579313000002,
+      "after": 69.61409784999887,
+      "improvement": -4.256166549998667,
+      "improvementPct": -6.512088839627417
+    },
+    {
+      "operation": "getUserState_warm",
+      "before": 64.95834789999935,
+      "after": 65.31635630000055,
+      "improvement": -0.3580084000011965,
+      "improvementPct": -0.551135322210373
+    },
+    {
+      "operation": "getFacturapiClient",
+      "before": 70.10044585000068,
+      "after": 68.85562084999984,
+      "improvement": 1.2448250000008443,
+      "improvementPct": 1.775773299166302
+    },
+    {
+      "operation": "findCustomer",
+      "before": 66.48821865000063,
+      "after": 69.03631044999929,
+      "improvement": -2.5480917999986588,
+      "improvementPct": -3.8323959518482824
+    },
+    {
+      "operation": "incrementInvoiceCount",
+      "before": 1425.010475049999,
+      "after": 152.0305792000003,
+      "improvement": 1272.9798958499987,
+      "improvementPct": 89.33126584949026
+    }
+  ],
+  "totalImprovement": {
+    "before": 3678.7499395,
+    "after": 2090.883566649999,
+    "improvement": 1587.866372850001,
+    "improvementPct": 43.16320486479755
+  }
+}

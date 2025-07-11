@@ -1,0 +1,79 @@
+{
+  "phase": "AFTER",
+  "timestamp": "2025-07-11T02:54:02.471Z",
+  "environment": "development",
+  "results": [
+    {
+      "operation": "getNextFolio",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 195.12979100000302,
+      "max": 13106.884957999999,
+      "avg": 1666.0306020000003,
+      "median": 232.40327099999922,
+      "p95": 6170.173541,
+      "stdDev": 3041.4724355888206
+    },
+    {
+      "operation": "getUserState_cold",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 63.01820900000166,
+      "max": 137.75487499999872,
+      "avg": 69.61409784999887,
+      "median": 64.84558299999844,
+      "p95": 86.68779099999665,
+      "stdDev": 16.380954773377592
+    },
+    {
+      "operation": "getUserState_warm",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 62.86124999999447,
+      "max": 68.18820799999958,
+      "avg": 65.31635630000055,
+      "median": 64.73087550000128,
+      "p95": 67.80774999999994,
+      "stdDev": 1.4614390285840815
+    },
+    {
+      "operation": "getFacturapiClient",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 62.961208000000624,
+      "max": 145.7367499999964,
+      "avg": 68.85562084999984,
+      "median": 64.63789550000365,
+      "p95": 69.23441699999967,
+      "stdDev": 17.696880946165777
+    },
+    {
+      "operation": "findCustomer",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 62.86737500000163,
+      "max": 130.84704200000124,
+      "avg": 69.03631044999929,
+      "median": 65.14983299999949,
+      "p95": 70.38254099999904,
+      "stdDev": 14.339272827834982
+    },
+    {
+      "operation": "incrementInvoiceCount",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 130.5425419999956,
+      "max": 263.1256250000006,
+      "avg": 152.0305792000003,
+      "median": 138.30052100000103,
+      "p95": 201.5520830000023,
+      "stdDev": 32.29168469763671
+    }
+  ]
+}

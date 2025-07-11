@@ -175,34 +175,41 @@ export function registerPDFInvoiceHandler(bot) {
     // CRÍTICO: Responder al callback query INMEDIATAMENTE después del feedback visual
     await ctx.answerCbQuery();
     
-    // CRÍTICO: Asegurar que userState y session estén inicializados
-    if (!ctx.userState) {
-      ctx.userState = {};
-    }
-    if (!ctx.session) {
-      ctx.session = {};
-    }
+    // CRÍTICO: Reintentar si los datos no están listos
+    let retries = 3;
+    let analysisData = null;
     
-    // NUEVO: Buscar primero en userState, luego en session
-    let analysisData = ctx.userState?.pdfAnalysis;
-    
-    if (!analysisData || analysisData.id !== analysisId) {
-      // Intentar recuperar de session (puede estar en otro worker)
-      analysisData = ctx.session?.pdfAnalysis;
+    while (retries > 0) {
+      analysisData = ctx.userState?.pdfAnalysis;
       
-      if (!analysisData || analysisData.id !== analysisId) {
-        // Actualizar mensaje con error
-        await ctx.telegram.editMessageText(
-          ctx.chat.id,
-          invoiceProgressMsg.message_id,
-          null,
-          '❌ Los datos han expirado. Sube el PDF nuevamente.'
-        );
-        return;
+      if (analysisData && analysisData.id === analysisId) {
+        break; // Datos encontrados
       }
       
-      // Restaurar en userState para uso local
-      ctx.userState.pdfAnalysis = analysisData;
+      // Esperar un poco antes de reintentar
+      await new Promise(resolve => setTimeout(resolve, 500)); // 500ms de espera
+      
+      // Forzar recarga de sesión (si la función existe)
+      if (ctx.reloadSession) {
+        try {
+          await ctx.reloadSession();
+        } catch (error) {
+          console.error('Error recargando sesión:', error);
+        }
+      }
+      
+      retries--;
+    }
+    
+    // Si después de los reintentos no hay datos, mostrar error
+    if (!analysisData || analysisData.id !== analysisId) {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        invoiceProgressMsg.message_id,
+        null,
+        '❌ Los datos han expirado o no se encontraron. Sube el PDF nuevamente.'
+      );
+      return;
     }
     
     await generateSimpleInvoice(ctx, analysisData, invoiceProgressMsg.message_id);
@@ -489,26 +496,21 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
       );
     }
     
-    // Actualizar el estado con la información de la factura generada
-    // CRÍTICO: Guardar también en session para persistencia entre workers
-    ctx.userState.facturaId = factura.id;
-    ctx.userState.folioFactura = factura.folio_number;
-    ctx.userState.series = factura.series || 'A';
-    
-    // Asegurar persistencia en sesión
-    ctx.session.facturaId = factura.id;
-    ctx.session.folioFactura = factura.folio_number;
-    ctx.session.series = factura.series || 'A';
-    ctx.session.facturaGenerada = true;
-    
-    // Mostrar resultado al usuario
+    // Mostrar resultado al usuario de inmediato
     await ctx.reply(
-      `✅ **Factura Generada Exitosamente**\n\n` +
-      `Serie-Folio: ${ctx.userState.series}-${ctx.userState.folioFactura}\n` +
-      `Cliente: ${analysis.clientName}\n` +
-      `Pedido: ${analysis.orderNumber}\n` +
-      `Total: $${analysis.totalAmount.toFixed(2)} MXN\n\n` +
-      `_La factura ha sido procesada correctamente._`,
+      `✅ **Factura Generada Exitosamente**
+
+` +
+      `Serie-Folio: ${factura.series}-${factura.folio_number}
+` +
+      `Cliente: ${analysis.clientName}
+` +
+      `Pedido: ${analysis.orderNumber}
+` +
+      `Total: ${analysis.totalAmount.toFixed(2)} MXN
+
+` +
+      `_La factura se está registrando en segundo plano._`,
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
@@ -518,7 +520,7 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
         ])
       }
     );
-    
+
     // Limpiar datos del análisis
     delete ctx.userState.pdfAnalysis;
     

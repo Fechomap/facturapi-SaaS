@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma.js';
 import TenantService from './tenant.service.js';
 import facturapIService from './facturapi.service.js';
+import facturapiQueueService from './facturapi-queue.service.js'; // Importar el servicio de cola
 import logger from '../core/utils/logger.js';
 
 // Logger específico para el servicio de facturas
@@ -89,36 +90,19 @@ class InvoiceService {
         }
       }
       
+      
+      
       // Obtener el próximo folio
       await TenantService.getNextFolio(tenantId, 'A');
       
       // Verificar si el cliente requiere retención (SOS, INFOASIST, ARSA)
-      let requiresWithholding = false;
-      try {
-        // Intentar obtener el cliente para verificar si requiere retención
-        const cliente = await facturapi.customers.retrieve(data.clienteId);
-        const clientName = cliente.legal_name || '';
-        
-        // Verificar si es uno de los clientes que requieren retención
-        requiresWithholding = 
-          clientName.includes('INFOASIST') || 
-          clientName.includes('ARSA') || 
-          clientName.includes('S.O.S') || 
-          clientName.includes('SOS');
-        
-        console.log(`Cliente: ${clientName}, Requiere retención: ${requiresWithholding}`);
-      } catch (error) {
-        console.warn(`No se pudo verificar si el cliente requiere retención: ${error.message}`);
-        // Si hay problema con la obtención del cliente, verificamos por clienteNombre en data
-        if (data.clienteNombre) {
-          requiresWithholding = 
-            data.clienteNombre.includes('INFOASIST') || 
-            data.clienteNombre.includes('ARSA') || 
-            data.clienteNombre.includes('S.O.S') || 
-            data.clienteNombre.includes('SOS');
-          console.log(`Usando nombre alternativo: ${data.clienteNombre}, Requiere retención: ${requiresWithholding}`);
-        }
-      }
+      // OPTIMIZACIÓN: Verificar por nombre sin llamada adicional a FacturAPI
+      const requiresWithholding = ['INFOASIST', 'ARSA', 'S.O.S', 'SOS'].some(name => 
+        data.clienteNombre?.includes(name) || 
+        (typeof data.clienteId === 'string' && data.clienteId.includes(name))
+      );
+      
+      console.log(`Cliente: ${data.clienteNombre || data.clienteId}, Requiere retención: ${requiresWithholding}`);
       
       // Configurar los impuestos según corresponda
       const taxes = requiresWithholding ? 
@@ -161,15 +145,19 @@ class InvoiceService {
       console.log('Factura creada en FacturAPI:', factura.id);
       console.log('Folio asignado por FacturAPI:', factura.folio_number); // Logging para verificar
       
-      // Registrar la factura en la base de datos con el folio asignado por FacturAPI
-      await TenantService.registerInvoice(
-        tenantId,
-        factura.id,
-        factura.series,
-        factura.folio_number, // Usar el folio devuelto por FacturAPI
-        null, // customerId (en un caso real se obtendría)
-        factura.total,
-        data.userId || null
+      // Encolar el registro de la factura en segundo plano
+      facturapiQueueService.enqueue(
+        () => TenantService.registerInvoice(
+          tenantId,
+          factura.id,
+          factura.series,
+          factura.folio_number,
+          facturapiClienteId,
+          factura.total,
+          data.userId || null
+        ),
+        'register-invoice',
+        { tenantId, facturapiInvoiceId: factura.id }
       );
       
       return factura;

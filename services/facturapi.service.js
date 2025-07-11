@@ -5,6 +5,9 @@ import facturapiQueueService from './facturapi-queue.service.js';
 // Variable para almacenar el módulo Facturapi una vez importado
 let FacturapiModule = null;
 
+// Cache para clientes FacturAPI
+const clientCache = new Map();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutos
 
 /**
  * Servicio para interactuar con FacturAPI en modo multi-tenant
@@ -17,6 +20,15 @@ class FacturapiService {
    */
   static async getFacturapiClient(tenantId) {
     try {
+      // ✅ CACHE: Verificar si ya tenemos el cliente en cache
+      const cacheKey = tenantId;
+      const cached = clientCache.get(cacheKey);
+      
+      if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+        console.log(`🚀 Cliente FacturAPI obtenido desde cache para tenant ${tenantId}`);
+        return cached.client;
+      }
+      
       // Obtener el tenant y sus credenciales
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId }
@@ -71,7 +83,13 @@ class FacturapiService {
         // Crear instancia con la API key
         const client = new FacturapiConstructor(apiKey);
         
-        console.log(`Cliente FacturAPI creado exitosamente para tenant ${tenantId}`);
+        // ✅ CACHE: Guardar cliente en cache
+        clientCache.set(cacheKey, {
+          client,
+          timestamp: Date.now()
+        });
+        
+        console.log(`Cliente FacturAPI creado exitosamente para tenant ${tenantId} y guardado en cache`);
         return client;
       } catch (error) {
         console.error(`Error al crear cliente FacturAPI para tenant ${tenantId}:`, error);

@@ -5,6 +5,7 @@ import logger from './core/utils/logger.js';
 import { createBot } from './bot/index.js';
 import cron from 'node-cron';
 import cleanupExpiredSessions from './scripts/cleanup-sessions.js';
+import redisSessionService from './services/redis-session.service.js'; // Importar el servicio de Redis
 
 // Logger específico para el bot
 const botLogger = logger.child({ module: 'telegram-bot' });
@@ -19,6 +20,10 @@ async function startBot() {
     // Conectar a la base de datos
     await connectDatabase();
     botLogger.info('Conexión a base de datos establecida');
+
+    // Inicializar Redis
+    await redisSessionService.initialize();
+    botLogger.info('Servicio de Redis inicializado');
     
     // Crear e inicializar el bot usando el módulo modular
     const bot = createBot(botLogger);

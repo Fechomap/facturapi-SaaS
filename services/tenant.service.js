@@ -43,42 +43,47 @@ class TenantService {
   
   /**
    * Obtiene el próximo folio disponible para un tenant
+   * VERSIÓN OPTIMIZADA: Una sola query atómica
    * @param {string} tenantId - ID del tenant
    * @param {string} series - Serie del folio (default: 'A')
    * @returns {Promise<number>} - Próximo número de folio
    */
   static async getNextFolio(tenantId, series = 'A') {
-    // Buscar folio existente
-    let folio = await prisma.tenantFolio.findUnique({
-      where: {
-        tenantId_series: {
-          tenantId,
-          series
-        }
-      }
-    });
-    
-    // Si no existe, crear uno nuevo
-    if (!folio) {
-      folio = await prisma.tenantFolio.create({
-        data: {
-          tenantId,
-          series,
-          currentNumber: 800 // Valor inicial
-        }
+    try {
+      // OPTIMIZACIÓN: SQL directo para operación atómica
+      const result = await prisma.$queryRaw`
+        INSERT INTO tenant_folios (tenant_id, series, current_number, created_at, updated_at)
+        VALUES (${tenantId}::uuid, ${series}, 801, NOW(), NOW())
+        ON CONFLICT (tenant_id, series) 
+        DO UPDATE SET 
+          current_number = tenant_folios.current_number + 1,
+          updated_at = NOW()
+        RETURNING current_number - 1 as folio;
+      `;
+      
+      return result[0]?.folio || 800;
+    } catch (error) {
+      tenantServiceLogger.error({ tenantId, series, error: error.message }, 'Error al obtener próximo folio');
+      
+      // Fallback al método anterior si falla
+      const folio = await prisma.tenantFolio.findUnique({
+        where: { tenantId_series: { tenantId, series } }
       });
+      
+      if (!folio) {
+        const newFolio = await prisma.tenantFolio.create({
+          data: { tenantId, series, currentNumber: 801 }
+        });
+        return 800;
+      }
+      
+      await prisma.tenantFolio.update({
+        where: { id: folio.id },
+        data: { currentNumber: { increment: 1 } }
+      });
+      
+      return folio.currentNumber - 1;
     }
-    
-    // Obtener el valor actual
-    const currentValue = folio.currentNumber;
-    
-    // Incrementar para el próximo uso
-    await prisma.tenantFolio.update({
-      where: { id: folio.id },
-      data: { currentNumber: { increment: 1 } }
-    });
-    
-    return currentValue;
   }
   
   /**
@@ -299,6 +304,7 @@ class TenantService {
     }
   }
 
+  
   /**
    * Incrementa el contador de facturas usadas en la suscripción actual
    * @param {string} tenantId - ID del tenant

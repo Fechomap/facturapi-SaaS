@@ -1,31 +1,38 @@
 // core/middleware/session-batch.middleware.js
 // Middleware para hacer batch de operaciones de sesión
 
+import SessionService from '../auth/session.service.js';
+
 const pendingUpdates = new Map();
-let batchTimer = null;
+let isProcessing = false;
 
 /**
  * Procesa todas las actualizaciones pendientes en batch
  */
 async function processBatch() {
-  if (pendingUpdates.size === 0) return;
+  if (pendingUpdates.size === 0 || isProcessing) return;
+  
+  isProcessing = true;
   
   const updates = Array.from(pendingUpdates.entries());
   pendingUpdates.clear();
   
   console.log(`[SESSION_BATCH] Procesando ${updates.length} actualizaciones en batch`);
   
-  // Procesar todas las actualizaciones en paralelo
-  await Promise.all(
-    updates.map(async ([userId, state]) => {
-      try {
-        const SessionService = await import('../auth/session.service.js');
-        await SessionService.default.saveUserState(userId, state);
-      } catch (error) {
-        console.error(`[SESSION_BATCH] Error guardando estado para ${userId}:`, error);
-      }
-    })
-  );
+  try {
+    await Promise.all(
+      updates.map(([userId, state]) => 
+        SessionService.saveUserState(userId, state)
+          .catch(error => console.error(`[SESSION_BATCH] Error guardando estado para ${userId}:`, error))
+      )
+    );
+  } finally {
+    isProcessing = false;
+    // Volver a procesar si hay nuevas actualizaciones
+    if (pendingUpdates.size > 0) {
+      process.nextTick(processBatch);
+    }
+  }
 }
 
 /**
@@ -33,8 +40,6 @@ async function processBatch() {
  */
 export function sessionBatchMiddleware(ctx, next) {
   // Interceptar guardado de estado
-  const originalSave = ctx.saveSession;
-  
   ctx.saveSession = async () => {
     const userId = ctx.from?.id;
     if (!userId || !ctx.userState) return;
@@ -42,12 +47,9 @@ export function sessionBatchMiddleware(ctx, next) {
     // Agregar a la cola de actualizaciones
     pendingUpdates.set(userId, { ...ctx.userState });
     
-    // Programar batch si no está programado
-    if (!batchTimer) {
-      batchTimer = setTimeout(async () => {
-        await processBatch();
-        batchTimer = null;
-      }, 100); // Procesar cada 100ms
+    // Disparar el procesamiento en el siguiente tick del event loop
+    if (!isProcessing) {
+      process.nextTick(processBatch);
     }
   };
   
