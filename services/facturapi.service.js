@@ -1,9 +1,8 @@
 import prisma from '../lib/prisma.js';
 import axios from 'axios';
 import facturapiQueueService from './facturapi-queue.service.js';
-
-// Variable para almacenar el módulo Facturapi una vez importado
-let FacturapiModule = null;
+import facturapiModule from 'facturapi';
+const Facturapi = facturapiModule.default;
 
 // Cache para clientes FacturAPI
 const clientCache = new Map();
@@ -73,24 +72,8 @@ class FacturapiService {
       }
 
       try {
-        // Importar Facturapi solo una vez
-        if (!FacturapiModule) {
-          FacturapiModule = await import('facturapi');
-          console.log('Módulo Facturapi importado correctamente');
-        }
-
-        // Usar la estructura correcta para el constructor
-        const FacturapiConstructor = FacturapiModule.default.default;
-        if (typeof FacturapiConstructor !== 'function') {
-          console.error(
-            'El constructor de Facturapi no es una función:',
-            typeof FacturapiConstructor
-          );
-          throw new Error('No se pudo encontrar un constructor válido para Facturapi');
-        }
-
         // Crear instancia con la API key
-        const client = new FacturapiConstructor(apiKey);
+        const client = new Facturapi(apiKey);
 
         // ✅ CACHE: Guardar cliente en cache
         clientCache.set(cacheKey, {

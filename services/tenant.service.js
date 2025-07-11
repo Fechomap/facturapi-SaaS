@@ -53,18 +53,40 @@ class TenantService {
    */
   static async getNextFolio(tenantId, series = 'A') {
     try {
-      // OPTIMIZACIÓN: SQL directo para operación atómica
-      const result = await prisma.$queryRaw`
-        INSERT INTO tenant_folios (tenant_id, series, current_number, created_at, updated_at)
-        VALUES (${tenantId}::uuid, ${series}, 801, NOW(), NOW())
-        ON CONFLICT (tenant_id, series) 
-        DO UPDATE SET 
-          current_number = tenant_folios.current_number + 1,
-          updated_at = NOW()
-        RETURNING current_number - 1 as folio;
-      `;
+      // OPTIMIZACIÓN: Usar transacción con SELECT FOR UPDATE para evitar condiciones de carrera
+      const result = await prisma.$transaction(async (tx) => {
+        // Buscar o crear el registro con bloqueo
+        let folio = await tx.tenantFolio.findUnique({
+          where: {
+            tenantId_series: {
+              tenantId,
+              series
+            }
+          }
+        });
 
-      return result[0]?.folio || 800;
+        if (!folio) {
+          // Si no existe, crear con valor inicial
+          folio = await tx.tenantFolio.create({
+            data: {
+              tenantId,
+              series,
+              currentNumber: 801
+            }
+          });
+          return 800;
+        }
+
+        // Actualizar e incrementar
+        const updated = await tx.tenantFolio.update({
+          where: { id: folio.id },
+          data: { currentNumber: { increment: 1 } }
+        });
+
+        return folio.currentNumber;
+      });
+
+      return result;
     } catch (error) {
       tenantServiceLogger.error(
         { tenantId, series, error: error.message },
@@ -193,7 +215,7 @@ class TenantService {
           facturapiInvoiceId,
           series,
           folioNumber,
-          customerId, // Si es null, Prisma lo manejará adecuadamente
+          customerId: customerId ? parseInt(customerId, 10) : null, // Convertir a int
           total,
           status: 'valid',
           createdById, // Si es null, Prisma lo manejará

@@ -32,10 +32,14 @@ class InvoiceService {
 
     try {
       // Obtener el cliente de FacturAPI usando la API key almacenada en el tenant
+      console.log(`[INVOICE_METRICS] Iniciando facturapIService.getFacturapiClient()`);
+      const clientStartTime = Date.now();
       const facturapi = await facturapIService.getFacturapiClient(tenantId);
+      console.log(`[INVOICE_METRICS] facturapIService.getFacturapiClient() tomó ${Date.now() - clientStartTime}ms`);
 
       // Verificar si el clienteId es un código corto o un ID hexadecimal
       let facturapiClienteId = data.clienteId;
+      let localCustomerDbId = data.localCustomerDbId; // ID de PostgreSQL para FK
       const hexRegex = /^[0-9a-f]{24}$/i;
 
       // Si el clienteId no es un ID hexadecimal válido, buscar el cliente por nombre
@@ -71,9 +75,10 @@ class InvoiceService {
 
           if (localCustomer) {
             // ✅ Encontrado en BD local (0.1 segundos)
-            facturapiClienteId = localCustomer.facturapiCustomerId;
+            facturapiClienteId = localCustomer.facturapiCustomerId; // Para FacturAPI
+            localCustomerDbId = localCustomer.id; // Para BD PostgreSQL FK
             console.log(
-              `✅ Cliente encontrado en BD local: ${localCustomer.legalName} (ID: ${facturapiClienteId})`
+              `✅ Cliente encontrado en BD local: ${localCustomer.legalName} (FacturAPI ID: ${facturapiClienteId}, DB ID: ${localCustomerDbId})`
             );
           } else {
             // ⚠️ Solo como fallback, buscar en FacturAPI (30 segundos)
@@ -87,6 +92,7 @@ class InvoiceService {
             if (clientes && clientes.data && clientes.data.length > 0) {
               // Usar el primer cliente que coincida
               facturapiClienteId = clientes.data[0].id;
+              localCustomerDbId = null; // No hay FK local para clientes de FacturAPI
               console.log(
                 `Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${facturapiClienteId})`
               );
@@ -102,8 +108,15 @@ class InvoiceService {
         }
       }
 
-      // Obtener el próximo folio
+      // OPTIMIZACIÓN: Comentar la obtención del folio - FacturAPI lo asigna automáticamente
+      // El folio se obtiene de FacturAPI después de crear la factura
+      // Esto elimina 2-3 segundos de latencia con BD remota
+      /*
+      console.log(`[INVOICE_METRICS] Iniciando TenantService.getNextFolio()`);
+      const folioStartTime = Date.now();
       await TenantService.getNextFolio(tenantId, 'A');
+      console.log(`[INVOICE_METRICS] TenantService.getNextFolio() tomó ${Date.now() - folioStartTime}ms`);
+      */
 
       // Verificar si el cliente requiere retención (SOS, INFOASIST, ARSA)
       // OPTIMIZACIÓN: Verificar por nombre sin llamada adicional a FacturAPI
@@ -149,8 +162,15 @@ class InvoiceService {
 
       console.log('Enviando solicitud a FacturAPI para crear factura:', facturaData);
 
+      // 🔍 MÉTRICAS: Medir tiempo de FacturAPI
+      const facturapiStartTime = Date.now();
+      console.log(`[FACTURAPI_METRICS] Iniciando llamada a FacturAPI.invoices.create()`);
+      
       // Llamar a FacturAPI para crear la factura
       const factura = await facturapi.invoices.create(facturaData);
+      
+      const facturapiDuration = Date.now() - facturapiStartTime;
+      console.log(`[FACTURAPI_METRICS] FacturAPI.invoices.create() tomó ${facturapiDuration}ms`);
 
       console.log('Factura creada en FacturAPI:', factura.id);
       console.log('Folio asignado por FacturAPI:', factura.folio_number); // Logging para verificar
@@ -163,7 +183,7 @@ class InvoiceService {
             factura.id,
             factura.series,
             factura.folio_number,
-            facturapiClienteId,
+            localCustomerDbId, // Usar ID de PostgreSQL para FK
             factura.total,
             data.userId || null
           ),

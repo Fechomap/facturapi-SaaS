@@ -151,15 +151,43 @@ class SessionService {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     const cacheKey = `session:${telegramIdBigInt.toString()}`;
 
-    // Guardar en Redis
+    // Guardar en Redis INMEDIATAMENTE
     await redisSessionService.setSession(cacheKey, state);
 
-    // Encolar el guardado en la base de datos
-    facturapiQueueService.enqueue(
-      () => this.saveUserStateImmediate(telegramId, state),
-      'save-user-state',
-      { telegramId: telegramIdBigInt.toString() }
-    );
+    // 🚀 OPTIMIZACIÓN AGRESIVA: Solo escribir a DB si es realmente importante
+    const isImportantState = state.facturaGenerada || state.esperando || !state.tenantId;
+    
+    if (!isImportantState) {
+      // Para estados temporales (análisis PDF, etc.), solo Redis
+      console.log(`[SESSION_SKIP] Saltando DB write para estado temporal de usuario ${telegramIdBigInt}`);
+      return { sessionData: state };
+    }
+
+    // 🔧 DEBOUNCING MEJORADO: Solo para estados importantes
+    const queueKey = `save-user-state-${telegramIdBigInt.toString()}`;
+    
+    // Cancelar operación pendiente si existe
+    if (this.pendingSaves) {
+      const existingTimeout = this.pendingSaves.get(queueKey);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        this.pendingSaves.delete(queueKey);
+      }
+    } else {
+      this.pendingSaves = new Map();
+    }
+    
+    // Programar nueva operación con debounce de 2000ms (muy agresivo)
+    const timeoutId = setTimeout(() => {
+      facturapiQueueService.enqueue(
+        () => this.saveUserStateImmediate(telegramId, state),
+        'save-user-state',
+        { telegramId: telegramIdBigInt.toString() }
+      );
+      this.pendingSaves.delete(queueKey);
+    }, 2000);
+    
+    this.pendingSaves.set(queueKey, timeoutId);
 
     return { sessionData: state };
   }
@@ -363,6 +391,16 @@ class SessionService {
   }
 
   /**
+   * Determina si un cambio de estado es significativo
+   */
+  static isSignificantStateChange(oldState, newState) {
+    // Solo cambios ESENCIALES
+    const significantFields = ['esperando', 'facturaGenerada', 'tenantId', 'userStatus'];
+    
+    return significantFields.some(field => oldState[field] !== newState[field]);
+  }
+
+  /**
    * Crea un middleware para la sesión de Telegram
    * @returns {Function} - Middleware de Telegraf
    */
@@ -430,16 +468,26 @@ class SessionService {
         // Manejar la solicitud actual
         await next();
       } finally {
-        // Guardar el estado después de procesar la solicitud
-        // Solo si ha cambiado para evitar sobrescrituras innecesarias
-        // Y solo si no es un estado parcial (para evitar sobrescribir datos importantes)
+        // 🚀 OPTIMIZACIÓN: Solo guardar si es un cambio SIGNIFICATIVO
         if (
           ctx.userState &&
           !ctx.userState._isPartialState &&
           JSON.stringify(ctx.userState) !== initialState
         ) {
-          sessionLogger.debug({ telegramId: userId }, 'Guardando estado actualizado');
-          await this.saveUserState(userId, ctx.userState);
+          // Verificar si es un cambio importante que merece escritura DB
+          const isSignificantChange = this.isSignificantStateChange(
+            JSON.parse(initialState || '{}'), 
+            ctx.userState
+          );
+          
+          if (isSignificantChange) {
+            sessionLogger.debug({ telegramId: userId }, 'Guardando estado actualizado');
+            await this.saveUserState(userId, ctx.userState);
+          } else {
+            sessionLogger.debug({ telegramId: userId }, 'Cambio menor, saltando DB write');
+            // Solo Redis para cambios menores
+            await redisSessionService.setSession(`session:${userId}`, ctx.userState);
+          }
         }
       }
     };

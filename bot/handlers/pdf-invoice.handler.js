@@ -414,6 +414,8 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
 
     // ✅ OPTIMIZACIÓN: Buscar cliente primero en BD local, luego en FacturAPI
     let clienteId = null;
+    let localCustomerDbId = null;
+    let clienteNombre = null;
     try {
       // 1. Buscar primero en BD local (mucho más rápido)
       console.log(`🔍 Buscando cliente en BD local: "${analysis.clientName}"`);
@@ -426,9 +428,11 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
 
       if (localCustomer) {
         // ✅ Encontrado en BD local (0.1 segundos)
-        clienteId = localCustomer.facturapiCustomerId;
+        clienteId = localCustomer.facturapiCustomerId; // Para FacturAPI
+        localCustomerDbId = localCustomer.id; // Para BD local (PostgreSQL FK)
+        clienteNombre = localCustomer.legalName; // Para detección de retención
         console.log(
-          `✅ Cliente encontrado en BD local: ${localCustomer.legalName} (ID: ${clienteId})`
+          `✅ Cliente encontrado en BD local: ${localCustomer.legalName} (FacturAPI ID: ${clienteId}, DB ID: ${localCustomerDbId})`
         );
       } else {
         // ⚠️ Solo como fallback, buscar en FacturAPI (30 segundos)
@@ -455,6 +459,7 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
         if (clientes && clientes.data && clientes.data.length > 0) {
           // Usar el primer cliente que coincida
           clienteId = clientes.data[0].id;
+          clienteNombre = clientes.data[0].legal_name; // Para detección de retención
           console.log(
             `Cliente encontrado en FacturAPI: ${clientes.data[0].legal_name} (ID: ${clienteId})`
           );
@@ -481,7 +486,9 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
 
     // Datos para la factura (usando siempre 78101803 como clave SAT)
     const facturaData = {
-      clienteId: clienteId,
+      clienteId: clienteId, // Para FacturAPI
+      localCustomerDbId: localCustomerDbId, // Para BD PostgreSQL FK
+      clienteNombre: clienteNombre, // Para detección de retención
       numeroPedido: analysis.orderNumber,
       claveProducto: '78101803', // Clave SAT fija para todos los clientes
       monto: analysis.totalAmount,
@@ -501,8 +508,15 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
       );
     }
 
+    // 🔍 MÉTRICAS: Medir tiempo total de generación
+    const totalStartTime = Date.now();
+    console.log(`[INVOICE_METRICS] Iniciando InvoiceService.generateInvoice()`);
+    
     // Generar la factura real en FacturAPI
     const factura = await InvoiceService.generateInvoice(facturaData, tenantId);
+    
+    const totalDuration = Date.now() - totalStartTime;
+    console.log(`[INVOICE_METRICS] InvoiceService.generateInvoice() TOTAL tomó ${totalDuration}ms`);
     console.log('Factura generada exitosamente:', factura.id, 'Folio:', factura.folio_number);
 
     // 📱 Finalizar progreso con éxito
