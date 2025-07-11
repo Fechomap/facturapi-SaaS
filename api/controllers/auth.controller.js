@@ -21,7 +21,7 @@ export async function login(req, res) {
   if (!email || !tenantId) {
     return res.status(400).json({
       success: false,
-      message: 'Email y Tenant ID son requeridos'
+      message: 'Email y Tenant ID son requeridos',
     });
   }
 
@@ -29,13 +29,13 @@ export async function login(req, res) {
   try {
     // Buscar el tenant por ID
     const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId }
+      where: { id: tenantId },
     });
 
     if (!tenant) {
       return res.status(401).json({
         success: false,
-        message: 'Tenant ID no encontrado'
+        message: 'Tenant ID no encontrado',
       });
     }
 
@@ -43,15 +43,15 @@ export async function login(req, res) {
     if (tenant.email !== email) {
       return res.status(401).json({
         success: false,
-        message: 'Email no coincide con el Tenant ID proporcionado'
+        message: 'Email no coincide con el Tenant ID proporcionado',
       });
     }
 
     // Buscar un usuario asociado a este tenant
     const user = await prisma.tenantUser.findFirst({
       where: {
-        tenantId: tenantId
-      }
+        tenantId: tenantId,
+      },
     });
 
     // Si no hay usuario, creamos uno básico para el token
@@ -59,21 +59,21 @@ export async function login(req, res) {
       id: 0,
       role: 'admin',
       firstName: tenant.contactName || '',
-      lastName: ''
+      lastName: '',
     };
 
     // Generar token JWT
     const token = jwt.sign(
-      { 
+      {
         userId: userData.id,
         email: tenant.email,
         role: userData.role || 'admin',
-        tenantId: tenant.id
-      }, 
-      JWT_SECRET, 
+        tenantId: tenant.id,
+      },
+      JWT_SECRET,
       { expiresIn: '8h' }
     );
-    
+
     return res.json({
       success: true,
       token,
@@ -81,18 +81,18 @@ export async function login(req, res) {
         id: userData.id,
         email: tenant.email,
         name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-        role: userData.role || 'admin'
+        role: userData.role || 'admin',
       },
       tenant: {
         id: tenant.id,
-        name: tenant.businessName
-      }
+        name: tenant.businessName,
+      },
     });
   } catch (error) {
     authLogger.error({ error: error.message, stack: error.stack }, 'Error en login');
     return res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor',
     });
   }
 }
@@ -104,15 +104,15 @@ export async function login(req, res) {
  */
 export function register(req, res) {
   const { email, name } = req.body;
-  
+
   // Aquí implementarías la lógica real de registro
   return res.json({
     success: true,
     message: 'Usuario registrado correctamente',
     user: {
       email,
-      name
-    }
+      name,
+    },
   });
 }
 
@@ -126,6 +126,6 @@ export function verifyToken(req, res) {
   // Solo devolvemos la información del usuario
   return res.json({
     success: true,
-    user: req.user
+    user: req.user,
   });
 }

@@ -25,20 +25,23 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
-      
+
       // --- Verificar estado de la suscripción del Tenant ---
       const subscriptionStatus = req.tenant?.subscriptionStatus; // Asume que el middleware añade esto
       const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
 
       if (!isActive) {
-        invoiceLogger.warn({ tenantId, subscriptionStatus }, 'Intento de crear factura bloqueado por suscripción inactiva');
+        invoiceLogger.warn(
+          { tenantId, subscriptionStatus },
+          'Intento de crear factura bloqueado por suscripción inactiva'
+        );
         return res.status(403).json({
           error: 'SubscriptionError',
           message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,
-          subscriptionStatus: subscriptionStatus
+          subscriptionStatus: subscriptionStatus,
         });
       }
       // --- Fin verificación suscripción ---
@@ -49,7 +52,7 @@ class InvoiceController {
       if (!customer || !items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requieren campos customer e items (array no vacío)'
+          message: 'Se requieren campos customer e items (array no vacío)',
         });
       }
 
@@ -60,10 +63,10 @@ class InvoiceController {
         folio_number: 1001,
         customer: customer,
         items: items,
-        subtotal: items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0),
+        subtotal: items.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
         total: 0, // Calculado después
         created_at: new Date().toISOString(),
-        status: 'valid'
+        status: 'valid',
       };
 
       // Calcular impuestos y total
@@ -102,7 +105,7 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
@@ -111,11 +114,14 @@ class InvoiceController {
       const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trial';
 
       if (!isActive) {
-        invoiceLogger.warn({ tenantId, subscriptionStatus }, 'Intento de crear factura simple bloqueado por suscripción inactiva');
+        invoiceLogger.warn(
+          { tenantId, subscriptionStatus },
+          'Intento de crear factura simple bloqueado por suscripción inactiva'
+        );
         return res.status(403).json({
           error: 'SubscriptionError',
           message: `Tu suscripción (${subscriptionStatus}) no está activa. No puedes generar nuevas facturas.`,
-          subscriptionStatus: subscriptionStatus
+          subscriptionStatus: subscriptionStatus,
         });
       }
       // --- Fin verificación suscripción ---
@@ -126,7 +132,7 @@ class InvoiceController {
       if (!cliente_id || !producto_id) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requieren cliente_id y producto_id'
+          message: 'Se requieren cliente_id y producto_id',
         });
       }
 
@@ -136,18 +142,20 @@ class InvoiceController {
         series: 'A',
         folio_number: 1001,
         customer: cliente_id,
-        items: [{
-          quantity: cantidad,
-          product: {
-            id: producto_id,
-            price: 100, // Precio simulado
-            description: 'Producto simulado'
-          }
-        }],
+        items: [
+          {
+            quantity: cantidad,
+            product: {
+              id: producto_id,
+              price: 100, // Precio simulado
+              description: 'Producto simulado',
+            },
+          },
+        ],
         subtotal: 100 * cantidad,
         total: 116 * cantidad, // Precio con IVA
         created_at: new Date().toISOString(),
-        status: 'valid'
+        status: 'valid',
       };
 
       // Responder con la factura creada
@@ -170,7 +178,7 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
@@ -188,7 +196,7 @@ class InvoiceController {
         tenantId,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
-        status
+        status,
       };
 
       // Usar el servicio para obtener facturas reales de la base de datos
@@ -202,22 +210,24 @@ class InvoiceController {
       const paginatedInvoices = invoices.slice(startIndex, endIndex);
 
       // Transformar datos para mantener compatibilidad con el frontend
-      const formattedInvoices = paginatedInvoices.map(invoice => ({
+      const formattedInvoices = paginatedInvoices.map((invoice) => ({
         id: invoice.facturapiInvoiceId || `inv_${invoice.id}`,
         series: invoice.series || 'A',
         folio_number: invoice.folioNumber,
-        customer: invoice.customer ? {
-          id: invoice.customer.id.toString(),
-          legal_name: invoice.customer.legalName,
-          tax_id: invoice.customer.rfc
-        } : {
-          id: 'unknown',
-          legal_name: 'Cliente',
-          tax_id: 'XAXX010101000'
-        },
+        customer: invoice.customer
+          ? {
+              id: invoice.customer.id.toString(),
+              legal_name: invoice.customer.legalName,
+              tax_id: invoice.customer.rfc,
+            }
+          : {
+              id: 'unknown',
+              legal_name: 'Cliente',
+              tax_id: 'XAXX010101000',
+            },
         total: parseFloat(invoice.total) || 0, // Convertir a número
         status: invoice.status || 'valid',
-        created_at: invoice.createdAt?.toISOString() || new Date().toISOString()
+        created_at: invoice.createdAt?.toISOString() || new Date().toISOString(),
       }));
 
       res.json({
@@ -225,8 +235,8 @@ class InvoiceController {
         pagination: {
           total: invoices.length,
           page,
-          limit
-        }
+          limit,
+        },
       });
     } catch (error) {
       next(error);
@@ -247,14 +257,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el ID de la factura'
+          message: 'Se requiere el ID de la factura',
         });
       }
 
@@ -266,7 +276,7 @@ class InvoiceController {
         customer: {
           id: 'client_1',
           legal_name: 'Cliente Ejemplo',
-          tax_id: 'AAA010101AAA'
+          tax_id: 'AAA010101AAA',
         },
         items: [
           {
@@ -274,14 +284,14 @@ class InvoiceController {
             product: {
               description: 'Producto de ejemplo',
               price: 1000,
-              tax_included: false
-            }
-          }
+              tax_included: false,
+            },
+          },
         ],
         subtotal: 1000,
         total: 1160,
         status: 'valid',
-        created_at: '2023-01-01T12:00:00Z'
+        created_at: '2023-01-01T12:00:00Z',
       };
 
       res.json(invoice);
@@ -304,14 +314,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el ID de la factura'
+          message: 'Se requiere el ID de la factura',
         });
       }
 
@@ -321,7 +331,7 @@ class InvoiceController {
       if (!motive) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el motivo de cancelación'
+          message: 'Se requiere el motivo de cancelación',
         });
       }
 
@@ -330,7 +340,7 @@ class InvoiceController {
       if (!validMotives.includes(motive)) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Motivo de cancelación inválido. Debe ser 01, 02, 03 o 04'
+          message: 'Motivo de cancelación inválido. Debe ser 01, 02, 03 o 04',
         });
       }
 
@@ -338,14 +348,14 @@ class InvoiceController {
       const invoice = await prisma.tenantInvoice.findFirst({
         where: {
           tenantId,
-          facturapiInvoiceId: invoiceId
-        }
+          facturapiInvoiceId: invoiceId,
+        },
       });
 
       if (!invoice) {
         return res.status(404).json({
           error: 'NotFoundError',
-          message: `No se encontró la factura con ID ${invoiceId}`
+          message: `No se encontró la factura con ID ${invoiceId}`,
         });
       }
 
@@ -354,7 +364,7 @@ class InvoiceController {
       if (!apiKey) {
         return res.status(500).json({
           error: 'ApiKeyError',
-          message: 'No se pudo obtener la API key para este tenant'
+          message: 'No se pudo obtener la API key para este tenant',
         });
       }
 
@@ -368,9 +378,9 @@ class InvoiceController {
           method: 'DELETE',
           url: `https://www.facturapi.io/v2/invoices/${invoiceId}?motive=${motive}`,
           headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          }
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
         });
 
         console.log('Respuesta de FacturAPI al cancelar:', facturapResponse.data);
@@ -378,19 +388,18 @@ class InvoiceController {
         // Actualizar estado en la base de datos local
         await prisma.tenantInvoice.update({
           where: {
-            id: invoice.id
+            id: invoice.id,
           },
           data: {
             status: 'canceled',
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         });
 
         res.json({
           success: true,
-          message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}`
+          message: `Factura ${invoiceId} cancelada correctamente con motivo ${motive}`,
         });
-
       } catch (facturapierror) {
         console.error('Error al cancelar factura en FacturAPI:', facturapierror);
 
@@ -398,17 +407,16 @@ class InvoiceController {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
             message: 'Error al cancelar la factura en FacturAPI',
-            details: facturapierror.response.data
+            details: facturapierror.response.data,
           });
         }
 
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
-          details: facturapierror.message
+          details: facturapierror.message,
         });
       }
-
     } catch (error) {
       console.error('Error en cancelInvoice:', error);
       next(error);
@@ -429,14 +437,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el ID de la factura'
+          message: 'Se requiere el ID de la factura',
         });
       }
 
@@ -446,7 +454,8 @@ class InvoiceController {
       // Simulación de envío
       res.json({
         success: true,
-        message: `Factura ${invoiceId} enviada por email exitosamente` + (email ? ` a ${email}` : '')
+        message:
+          `Factura ${invoiceId} enviada por email exitosamente` + (email ? ` a ${email}` : ''),
       });
     } catch (error) {
       next(error);
@@ -467,14 +476,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el ID de la factura'
+          message: 'Se requiere el ID de la factura',
         });
       }
 
@@ -483,7 +492,7 @@ class InvoiceController {
       if (!apiKey) {
         return res.status(500).json({
           error: 'ApiKeyError',
-          message: 'No se pudo obtener la API key para este tenant'
+          message: 'No se pudo obtener la API key para este tenant',
         });
       }
 
@@ -494,8 +503,8 @@ class InvoiceController {
           url: `https://www.facturapi.io/v2/invoices/${invoiceId}/pdf`,
           responseType: 'arraybuffer', // Cambiado a arraybuffer en lugar de stream
           headers: {
-            'Authorization': `Bearer ${apiKey}`
-          }
+            Authorization: `Bearer ${apiKey}`,
+          },
         });
 
         // Configurar encabezados de respuesta
@@ -511,14 +520,14 @@ class InvoiceController {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
             message: 'Error al obtener el PDF de FacturAPI',
-            details: facturapierror.response.data
+            details: facturapierror.response.data,
           });
         }
 
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
-          details: facturapierror.message
+          details: facturapierror.message,
         });
       }
     } catch (error) {
@@ -541,14 +550,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!invoiceId) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el ID de la factura'
+          message: 'Se requiere el ID de la factura',
         });
       }
 
@@ -557,7 +566,7 @@ class InvoiceController {
       if (!apiKey) {
         return res.status(500).json({
           error: 'ApiKeyError',
-          message: 'No se pudo obtener la API key para este tenant'
+          message: 'No se pudo obtener la API key para este tenant',
         });
       }
 
@@ -568,8 +577,8 @@ class InvoiceController {
           url: `https://www.facturapi.io/v2/invoices/${invoiceId}/xml`,
           responseType: 'arraybuffer', // Cambiado a arraybuffer en lugar de stream
           headers: {
-            'Authorization': `Bearer ${apiKey}`
-          }
+            Authorization: `Bearer ${apiKey}`,
+          },
         });
 
         // Configurar encabezados de respuesta
@@ -585,14 +594,14 @@ class InvoiceController {
           return res.status(facturapierror.response.status).json({
             error: 'FacturAPIError',
             message: 'Error al obtener el XML de FacturAPI',
-            details: facturapierror.response.data
+            details: facturapierror.response.data,
           });
         }
 
         return res.status(500).json({
           error: 'FacturAPIError',
           message: 'Error de conexión con FacturAPI',
-          details: facturapierror.message
+          details: facturapierror.message,
         });
       }
     } catch (error) {
@@ -615,14 +624,14 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       if (!folio) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'Se requiere el número de folio'
+          message: 'Se requiere el número de folio',
         });
       }
 
@@ -631,7 +640,7 @@ class InvoiceController {
       if (isNaN(folioNumber)) {
         return res.status(400).json({
           error: 'ValidationError',
-          message: 'El folio debe ser un número válido'
+          message: 'El folio debe ser un número válido',
         });
       }
 
@@ -641,17 +650,19 @@ class InvoiceController {
       const invoiceRecord = await prisma.tenantInvoice.findFirst({
         where: {
           tenantId,
-          folioNumber
+          folioNumber,
         },
         include: {
-          customer: true
-        }
+          customer: true,
+        },
       });
 
       if (invoiceRecord) {
         // Si encontramos el registro en nuestra base de datos
         const facturapiId = invoiceRecord.facturapiInvoiceId;
-        console.log(`Factura encontrada en BD local, ID FacturAPI: ${facturapiId}, Estado: ${invoiceRecord.status}`);
+        console.log(
+          `Factura encontrada en BD local, ID FacturAPI: ${facturapiId}, Estado: ${invoiceRecord.status}`
+        );
 
         // Construir respuesta con todos los campos necesarios
         const invoice = {
@@ -659,22 +670,27 @@ class InvoiceController {
           facturapiInvoiceId: facturapiId,
           series: invoiceRecord.series || 'A',
           folio_number: invoiceRecord.folioNumber,
-          customer: invoiceRecord.customer ? {
-            id: invoiceRecord.customer.id.toString(),
-            legal_name: invoiceRecord.customer.legalName,
-            tax_id: invoiceRecord.customer.rfc
-          } : {
-            id: 'unknown',
-            legal_name: 'Cliente Desconocido',
-            tax_id: 'AAA010101AAA'
-          },
+          customer: invoiceRecord.customer
+            ? {
+                id: invoiceRecord.customer.id.toString(),
+                legal_name: invoiceRecord.customer.legalName,
+                tax_id: invoiceRecord.customer.rfc,
+              }
+            : {
+                id: 'unknown',
+                legal_name: 'Cliente Desconocido',
+                tax_id: 'AAA010101AAA',
+              },
           status: invoiceRecord.status || 'valid',
           // Si está cancelada, añadir información de cancelación
           cancellation_status: invoiceRecord.status === 'canceled' ? 'accepted' : undefined,
-          cancellation_date: invoiceRecord.status === 'canceled' ? invoiceRecord.updatedAt?.toISOString() : undefined,
+          cancellation_date:
+            invoiceRecord.status === 'canceled'
+              ? invoiceRecord.updatedAt?.toISOString()
+              : undefined,
           subtotal: invoiceRecord.total ? (invoiceRecord.total / 1.16).toFixed(2) : 0,
           total: invoiceRecord.total || 0,
-          created_at: invoiceRecord.createdAt?.toISOString() || new Date().toISOString()
+          created_at: invoiceRecord.createdAt?.toISOString() || new Date().toISOString(),
         };
 
         return res.json(invoice);
@@ -683,14 +699,14 @@ class InvoiceController {
       // Si no lo encontramos en la BD, devolvemos un error 404
       return res.status(404).json({
         error: 'NotFoundError',
-        message: `No se encontró factura con folio ${folio}`
+        message: `No se encontró factura con folio ${folio}`,
       });
     } catch (error) {
       console.error('Error en getInvoiceByFolio:', error);
       next(error);
     }
   }
-    /**
+  /**
    * Busca facturas por rango de fechas y otros criterios
    * @param {Object} req - Request de Express
    * @param {Object} res - Response de Express
@@ -703,19 +719,12 @@ class InvoiceController {
       if (!tenantId) {
         return res.status(401).json({
           error: 'UnauthorizedError',
-          message: 'Se requiere un tenant válido para esta operación'
+          message: 'Se requiere un tenant válido para esta operación',
         });
       }
 
       // Extraer parámetros de búsqueda
-      const {
-        startDate,
-        endDate,
-        customerId,
-        status,
-        minAmount,
-        maxAmount
-      } = req.query;
+      const { startDate, endDate, customerId, status, minAmount, maxAmount } = req.query;
 
       // Crear objeto de criterios
       const criteria = {
@@ -725,7 +734,7 @@ class InvoiceController {
         customerId,
         status,
         minAmount: minAmount ? parseFloat(minAmount) : undefined,
-        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined
+        maxAmount: maxAmount ? parseFloat(maxAmount) : undefined,
       };
 
       // Llamar al servicio para buscar
@@ -733,7 +742,7 @@ class InvoiceController {
 
       res.json({
         data: invoices,
-        count: invoices.length
+        count: invoices.length,
       });
     } catch (error) {
       next(error);

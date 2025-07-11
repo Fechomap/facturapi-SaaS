@@ -14,7 +14,7 @@ export function safeCleanupPdfAnalysis(ctx, reason = 'flow_change') {
     userStateCleanup: false,
     sessionCleanup: false,
     reason: reason,
-    bytesSaved: 0
+    bytesSaved: 0,
   };
 
   // Calcular bytes que vamos a ahorrar
@@ -24,43 +24,58 @@ export function safeCleanupPdfAnalysis(ctx, reason = 'flow_change') {
 
   // 1. SIEMPRE limpiar userState (liberar memoria de sesión)
   if (ctx.userState?.pdfAnalysis) {
-    console.log(`🧹 Limpiando userState.pdfAnalysis (${results.bytesSaved} bytes, razón: ${reason})`);
+    console.log(
+      `🧹 Limpiando userState.pdfAnalysis (${results.bytesSaved} bytes, razón: ${reason})`
+    );
     delete ctx.userState.pdfAnalysis;
     results.userStateCleanup = true;
-    
-    cleanupLogger.debug({ 
-      userId: ctx.from?.id, 
-      reason, 
-      bytesSaved: results.bytesSaved 
-    }, 'pdfAnalysis limpiado de userState');
+
+    cleanupLogger.debug(
+      {
+        userId: ctx.from?.id,
+        reason,
+        bytesSaved: results.bytesSaved,
+      },
+      'pdfAnalysis limpiado de userState'
+    );
   }
 
   // 2. Limpiar session SELECTIVAMENTE
   if (ctx.session?.pdfAnalysis) {
     const age = Date.now() - ctx.session.pdfAnalysis.timestamp;
     const TTL = 30 * 60 * 1000; // 30 minutos
-    
+
     // Limpiar session si:
     // - Es muy viejo (>30 min)
     // - Viene nuevo PDF
     // - Cambio a menu principal (reset completo)
     if (age > TTL || reason === 'new_pdf' || reason === 'menu_principal') {
-      console.log(`🧹 Limpiando session.pdfAnalysis (${Math.round(age/60000)}min, razón: ${reason})`);
+      console.log(
+        `🧹 Limpiando session.pdfAnalysis (${Math.round(age / 60000)}min, razón: ${reason})`
+      );
       delete ctx.session.pdfAnalysis;
       results.sessionCleanup = true;
-      
-      cleanupLogger.debug({ 
-        userId: ctx.from?.id, 
-        reason, 
-        ageMinutes: Math.round(age/60000) 
-      }, 'pdfAnalysis limpiado de session');
+
+      cleanupLogger.debug(
+        {
+          userId: ctx.from?.id,
+          reason,
+          ageMinutes: Math.round(age / 60000),
+        },
+        'pdfAnalysis limpiado de session'
+      );
     } else {
-      console.log(`💾 Manteniendo session.pdfAnalysis como fallback (${Math.round(age/60000)}min)`);
-      
-      cleanupLogger.debug({ 
-        userId: ctx.from?.id, 
-        ageMinutes: Math.round(age/60000) 
-      }, 'pdfAnalysis mantenido en session como fallback');
+      console.log(
+        `💾 Manteniendo session.pdfAnalysis como fallback (${Math.round(age / 60000)}min)`
+      );
+
+      cleanupLogger.debug(
+        {
+          userId: ctx.from?.id,
+          ageMinutes: Math.round(age / 60000),
+        },
+        'pdfAnalysis mantenido en session como fallback'
+      );
     }
   }
 
@@ -76,7 +91,7 @@ export function cleanupExpiredTempData(ctx) {
   const results = {
     pdfCleanup: false,
     userStateSize: 0,
-    optimizedSize: 0
+    optimizedSize: 0,
   };
 
   // Medir tamaño antes
@@ -86,9 +101,9 @@ export function cleanupExpiredTempData(ctx) {
   if (ctx.userState?.pdfAnalysis) {
     const age = Date.now() - ctx.userState.pdfAnalysis.timestamp;
     const TTL = 30 * 60 * 1000; // 30 minutos
-    
+
     if (age > TTL) {
-      console.log(`🧹 TTL: Limpiando pdfAnalysis expirado (${Math.round(age/60000)} min)`);
+      console.log(`🧹 TTL: Limpiando pdfAnalysis expirado (${Math.round(age / 60000)} min)`);
       delete ctx.userState.pdfAnalysis;
       results.pdfCleanup = true;
     }
@@ -96,7 +111,7 @@ export function cleanupExpiredTempData(ctx) {
 
   // Limpiar otros datos temporales si están muy viejos
   const tempFields = ['axaSummary', 'facturaId', 'clienteNombre'];
-  tempFields.forEach(field => {
+  tempFields.forEach((field) => {
     if (ctx.userState?.[field]) {
       // Solo limpiar si hay evidencia de que es viejo (no timestamp directo)
       // En el futuro podríamos agregar timestamps a estos campos
@@ -117,13 +132,13 @@ export function cleanupExpiredTempData(ctx) {
  */
 export function cleanupFlowChange(ctx, newFlow) {
   console.log(`🔄 CAMBIO DE FLUJO: → ${newFlow}`);
-  
+
   const initialSize = JSON.stringify(ctx.userState || {}).length;
-  
+
   // Limpiar pdfAnalysis según el nuevo flujo
   const reason = newFlow === 'menu' ? 'menu_principal' : 'flow_change';
   const pdfCleanup = safeCleanupPdfAnalysis(ctx, reason);
-  
+
   // Limpieza cruzada existente (mantener el patrón actual)
   if (newFlow === 'axa') {
     // Limpiar estado CHUBB
@@ -140,24 +155,27 @@ export function cleanupFlowChange(ctx, newFlow) {
     delete ctx.userState.axaSummary;
     console.log('🧹 Estado AXA limpiado para flujo CHUBB');
   }
-  
+
   const finalSize = JSON.stringify(ctx.userState || {}).length;
   const improvement = Math.round((1 - finalSize / initialSize) * 100);
-  
+
   console.log(`📊 OPTIMIZACIÓN: ${initialSize}B → ${finalSize}B (${improvement}% reducción)`);
-  
-  cleanupLogger.info({ 
-    userId: ctx.from?.id, 
-    newFlow, 
-    initialSize, 
-    finalSize, 
-    improvement,
-    pdfBytesSaved: pdfCleanup.bytesSaved
-  }, 'Cambio de flujo con limpieza');
+
+  cleanupLogger.info(
+    {
+      userId: ctx.from?.id,
+      newFlow,
+      initialSize,
+      finalSize,
+      improvement,
+      pdfBytesSaved: pdfCleanup.bytesSaved,
+    },
+    'Cambio de flujo con limpieza'
+  );
 }
 
 export default {
   safeCleanupPdfAnalysis,
   cleanupExpiredTempData,
-  cleanupFlowChange
+  cleanupFlowChange,
 };

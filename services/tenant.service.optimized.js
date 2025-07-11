@@ -22,11 +22,11 @@ class OptimizedTenantService {
         const updated = await tx.tenantFolio.updateMany({
           where: {
             tenantId,
-            series
+            series,
           },
           data: {
-            currentNumber: { increment: 1 }
-          }
+            currentNumber: { increment: 1 },
+          },
         });
 
         // Si se actualizó, obtener el valor
@@ -35,9 +35,9 @@ class OptimizedTenantService {
             where: {
               tenantId_series: {
                 tenantId,
-                series
-              }
-            }
+                series,
+              },
+            },
           });
           return folio.currentNumber - 1; // Retornar el valor antes del incremento
         }
@@ -47,20 +47,23 @@ class OptimizedTenantService {
           data: {
             tenantId,
             series,
-            currentNumber: 801 // 800 + 1 para el próximo uso
-          }
+            currentNumber: 801, // 800 + 1 para el próximo uso
+          },
         });
-        
+
         return 800; // Valor inicial
       });
 
       return result;
     } catch (error) {
-      tenantServiceLogger.error({ 
-        tenantId, 
-        series, 
-        error: error.message 
-      }, 'Error al obtener próximo folio');
+      tenantServiceLogger.error(
+        {
+          tenantId,
+          series,
+          error: error.message,
+        },
+        'Error al obtener próximo folio'
+      );
       throw error;
     }
   }
@@ -84,11 +87,14 @@ class OptimizedTenantService {
 
       return result[0]?.folio || 800;
     } catch (error) {
-      tenantServiceLogger.error({ 
-        tenantId, 
-        series, 
-        error: error.message 
-      }, 'Error al obtener próximo folio (raw)');
+      tenantServiceLogger.error(
+        {
+          tenantId,
+          series,
+          error: error.message,
+        },
+        'Error al obtener próximo folio (raw)'
+      );
       throw error;
     }
   }
@@ -102,7 +108,7 @@ class OptimizedTenantService {
 
   static async getNextFolioCached(tenantId, series = 'A') {
     const cacheKey = `${tenantId}:${series}`;
-    
+
     // Verificar cache
     if (this.folioCache.has(cacheKey)) {
       const cached = this.folioCache.get(cacheKey);
@@ -113,15 +119,15 @@ class OptimizedTenantService {
 
     // Reservar un batch de folios
     const startFolio = await this.getNextFolioRaw(tenantId, series);
-    
+
     // Reservar los próximos N-1 folios
     await prisma.tenantFolio.update({
       where: {
-        tenantId_series: { tenantId, series }
+        tenantId_series: { tenantId, series },
       },
       data: {
-        currentNumber: { increment: this.folioBatchSize - 1 }
-      }
+        currentNumber: { increment: this.folioBatchSize - 1 },
+      },
     });
 
     // Guardar en cache
@@ -129,9 +135,9 @@ class OptimizedTenantService {
     for (let i = 1; i < this.folioBatchSize; i++) {
       available.push(startFolio + i);
     }
-    
+
     this.folioCache.set(cacheKey, { available });
-    
+
     return startFolio;
   }
 }

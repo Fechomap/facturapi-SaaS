@@ -12,11 +12,11 @@ export function registerOnboardingCommands(bot) {
     if (!ctx.hasTenant()) {
       return ctx.reply('Para ver tu progreso, primero debes registrar tu empresa.');
     }
-    
+
     try {
       const tenantId = ctx.getTenantId();
       const progress = await OnboardingProgressService.getProgress(tenantId);
-      
+
       const { message, keyboard, parse_mode } = onboardingProgressView(progress);
       return ctx.reply(message, { parse_mode, ...keyboard });
     } catch (error) {
@@ -26,19 +26,19 @@ export function registerOnboardingCommands(bot) {
       );
     }
   });
-  
+
   // Acción para ver progreso completo
   bot.action('view_onboarding_progress', async (ctx) => {
     await ctx.answerCbQuery();
-    
+
     if (!ctx.hasTenant()) {
       return ctx.reply('Para ver tu progreso, primero debes registrar tu empresa.');
     }
-    
+
     try {
       const tenantId = ctx.getTenantId();
       const progress = await OnboardingProgressService.getProgress(tenantId);
-      
+
       const { message, keyboard, parse_mode } = onboardingProgressView(progress);
       return ctx.reply(message, { parse_mode, ...keyboard });
     } catch (error) {
@@ -48,19 +48,19 @@ export function registerOnboardingCommands(bot) {
       );
     }
   });
-  
+
   // Acción para ver siguiente paso recomendado
   bot.action('next_step', async (ctx) => {
     await ctx.answerCbQuery();
-    
+
     if (!ctx.hasTenant()) {
       return ctx.reply('Para ver tu próximo paso, primero debes registrar tu empresa.');
     }
-    
+
     try {
       const tenantId = ctx.getTenantId();
       const progress = await OnboardingProgressService.getProgress(tenantId);
-      
+
       const { message, keyboard, parse_mode } = nextStepView(progress);
       return ctx.reply(message, { parse_mode, ...keyboard });
     } catch (error) {
@@ -70,7 +70,7 @@ export function registerOnboardingCommands(bot) {
       );
     }
   });
-  
+
   // Registrar estos comandos es útil para los usuarios
   console.log('✅ Comandos de progreso de onboarding registrados');
 }

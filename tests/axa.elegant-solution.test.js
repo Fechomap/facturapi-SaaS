@@ -2,7 +2,6 @@
 import { jest } from '@jest/globals';
 
 describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
-
   beforeEach(() => {
     global.tempAxaData = {};
   });
@@ -14,8 +13,8 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
       userState: {
         tenantId: 'test-tenant',
         axaClientId: 'axa-client-123',
-        esperando: null
-      }
+        esperando: null,
+      },
     };
 
     // PASO 1: Configurar cache global con datos precalculados
@@ -23,43 +22,44 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
       facturaConRetencion: {
         items: [{ product: { price: 1000 } }],
         total: 1116,
-        facturaData: { customer: 'axa-123', items: [] }
+        facturaData: { customer: 'axa-123', items: [] },
       },
       facturaSinRetencion: {
         items: [{ product: { price: 1000 } }],
         total: 1160,
-        facturaData: { customer: 'axa-123', items: [] }
+        facturaData: { customer: 'axa-123', items: [] },
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // PASO 2: Usuario presiona botón "Servicios Realizados"
     console.log('🔵 SIMULANDO: Click en botón "Con retención"');
-    
+
     // Guardar selección en CACHE GLOBAL (como CHUBB)
     global.tempAxaData[userId].seleccionUsuario = {
       tipoServicio: 'realizados',
       conRetencion: true,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    
+
     // También en userState para compatibilidad (middleware guardará)
     mockCtx.userState.axaTipoServicio = 'realizados';
     mockCtx.userState.axaConRetencion = true;
 
     // PASO 3: Usuario presiona "Confirmar" inmediatamente
     console.log('🟢 SIMULANDO: Click rápido en "Confirmar"');
-    
+
     const tempData = global.tempAxaData[userId];
-    
+
     // Simular fallback logic del handler
     let tipoServicio = mockCtx.userState.axaTipoServicio;
     let conRetencion = mockCtx.userState.axaConRetencion;
-    
+
     // Si falla userState, usar cache global
     if ((tipoServicio === undefined || conRetencion === undefined) && tempData.seleccionUsuario) {
       console.log('🚨 Fallback: Recuperando de cache global');
-      tipoServicio = tempData.seleccionUsuario.tipoServicio === 'realizados' ? 'realizados' : 'muertos';
+      tipoServicio =
+        tempData.seleccionUsuario.tipoServicio === 'realizados' ? 'realizados' : 'muertos';
       conRetencion = tempData.seleccionUsuario.conRetencion;
     }
 
@@ -80,7 +80,7 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
       userState: {
         tenantId: 'test-tenant',
         // PROBLEMA: userState perdido (sin axaTipoServicio, axaConRetencion)
-      }
+      },
     };
 
     // Cache global SÍ tiene la selección
@@ -90,25 +90,26 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
       seleccionUsuario: {
         tipoServicio: 'muertos',
         conRetencion: false,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     console.log('🚨 ESCENARIO: userState perdido, cache global tiene datos');
 
     const tempData = global.tempAxaData[userId];
-    
+
     // Simular lógica de fallback
     let tipoServicio = mockCtx.userState.axaTipoServicio; // undefined
     let conRetencion = mockCtx.userState.axaConRetencion; // undefined
-    
+
     // Fallback a cache global
     if ((tipoServicio === undefined || conRetencion === undefined) && tempData.seleccionUsuario) {
       console.log('🔄 FALLBACK: Recuperando de cache global...');
-      tipoServicio = tempData.seleccionUsuario.tipoServicio === 'realizados' ? 'realizados' : 'muertos';
+      tipoServicio =
+        tempData.seleccionUsuario.tipoServicio === 'realizados' ? 'realizados' : 'muertos';
       conRetencion = tempData.seleccionUsuario.conRetencion;
-      
+
       // Restaurar en userState
       mockCtx.userState.axaTipoServicio = tipoServicio;
       mockCtx.userState.axaConRetencion = conRetencion;
@@ -125,7 +126,7 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
 
   test('COMPARACIÓN: Solución elegante vs guardado forzado', async () => {
     const mockSessionService = {
-      saveUserState: jest.fn().mockResolvedValue({})
+      saveUserState: jest.fn().mockResolvedValue({}),
     };
 
     console.log('📊 COMPARANDO: Solución elegante vs guardado forzado');
@@ -133,27 +134,27 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
     // MÉTODO 1: Guardado forzado (problemático)
     console.log('❌ MÉTODO 1: Guardado forzado');
     const forzadoStart = Date.now();
-    
+
     await mockSessionService.saveUserState(123, { data: 'test' }); // Guardado forzado
     await mockSessionService.saveUserState(123, { data: 'test' }); // Middleware automático
-    
+
     const forzadoDuration = Date.now() - forzadoStart;
     const forzadoCalls = mockSessionService.saveUserState.mock.calls.length;
-    
+
     console.log(`❌ Guardado forzado: ${forzadoDuration}ms, ${forzadoCalls} escrituras DB`);
 
     // MÉTODO 2: Solución elegante (cache global)
     mockSessionService.saveUserState.mockClear();
     console.log('✅ MÉTODO 2: Cache global');
     const eleganteStart = Date.now();
-    
+
     // Solo cache global, sin escrituras DB inmediatas
     global.tempAxaData[123] = { seleccionUsuario: { tipo: 'test' } };
     // Middleware guardará después automáticamente
-    
+
     const eleganteDuration = Date.now() - eleganteStart;
     const eleganteCalls = mockSessionService.saveUserState.mock.calls.length;
-    
+
     console.log(`✅ Solución elegante: ${eleganteDuration}ms, ${eleganteCalls} escrituras DB`);
 
     // VALIDACIONES
@@ -166,12 +167,12 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
 
   test('ROBUSTEZ: Múltiples clicks rápidos no causan problemas', () => {
     const userId = 123456789;
-    
+
     // Configurar cache inicial
     global.tempAxaData[userId] = {
       facturaConRetencion: { total: 1116 },
       facturaSinRetencion: { total: 1160 },
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     console.log('⚡ SIMULANDO: Usuario hace clicks rápidos');
@@ -181,7 +182,7 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
     global.tempAxaData[userId].seleccionUsuario = {
       tipoServicio: 'realizados',
       conRetencion: true,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     const click1Duration = Date.now() - click1Start;
 
@@ -190,7 +191,7 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
     global.tempAxaData[userId].seleccionUsuario = {
       tipoServicio: 'muertos',
       conRetencion: false,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     const click2Duration = Date.now() - click2Start;
 
@@ -215,12 +216,12 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
 
   test('TIMING: Cache global vs session DB para selecciones', async () => {
     const mockSessionService = {
-      saveUserState: jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(resolve, 50)) // Simular 50ms de DB
+      saveUserState: jest.fn().mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 50)) // Simular 50ms de DB
       ),
-      getUserState: jest.fn().mockImplementation(() =>
-        new Promise(resolve => setTimeout(resolve, 30)) // Simular 30ms de DB
-      )
+      getUserState: jest.fn().mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 30)) // Simular 30ms de DB
+      ),
     };
 
     console.log('🏁 TIMING: Cache global vs Session DB');
@@ -228,19 +229,19 @@ describe('AXA - SOLUCIÓN ELEGANTE (sin guardado forzado)', () => {
     // OPCIÓN 1: Session DB (lento)
     console.log('🐌 OPCIÓN 1: Session DB');
     const dbStart = Date.now();
-    
+
     await mockSessionService.saveUserState(123, { axaTipoServicio: 'realizados' });
     const savedState = await mockSessionService.getUserState(123);
-    
+
     const dbDuration = Date.now() - dbStart;
 
     // OPCIÓN 2: Cache global (rápido)
     console.log('⚡ OPCIÓN 2: Cache global');
     const cacheStart = Date.now();
-    
+
     global.tempAxaData[123] = { seleccionUsuario: { tipoServicio: 'realizados' } };
     const cachedSelection = global.tempAxaData[123].seleccionUsuario;
-    
+
     const cacheDuration = Date.now() - cacheStart;
 
     console.log(`🐌 Session DB: ${dbDuration}ms`);

@@ -15,7 +15,7 @@ const colors = {
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
   reset: '\x1b[0m',
-  bright: '\x1b[1m'
+  bright: '\x1b[1m',
 };
 
 class PerformanceBenchmark {
@@ -27,7 +27,7 @@ class PerformanceBenchmark {
 
   async measureOperation(name, operation) {
     const measurements = [];
-    
+
     for (let i = 0; i < ITERATIONS; i++) {
       const start = performance.now();
       try {
@@ -38,26 +38,26 @@ class PerformanceBenchmark {
         console.error(`Error en ${name}:`, error.message);
         measurements.push(-1); // Marca error
       }
-      
+
       // Pequeña pausa entre mediciones
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    
+
     // Calcular estadísticas
-    const validMeasurements = measurements.filter(m => m >= 0);
+    const validMeasurements = measurements.filter((m) => m >= 0);
     const stats = {
       operation: name,
       iterations: ITERATIONS,
       successful: validMeasurements.length,
-      failed: measurements.filter(m => m < 0).length,
+      failed: measurements.filter((m) => m < 0).length,
       min: Math.min(...validMeasurements),
       max: Math.max(...validMeasurements),
       avg: validMeasurements.reduce((a, b) => a + b, 0) / validMeasurements.length,
       median: this.getMedian(validMeasurements),
       p95: this.getPercentile(validMeasurements, 95),
-      stdDev: this.getStdDev(validMeasurements)
+      stdDev: this.getStdDev(validMeasurements),
     };
-    
+
     this.results.push(stats);
     return stats;
   }
@@ -76,7 +76,7 @@ class PerformanceBenchmark {
 
   getStdDev(arr) {
     const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
-    const squareDiffs = arr.map(value => Math.pow(value - avg, 2));
+    const squareDiffs = arr.map((value) => Math.pow(value - avg, 2));
     const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / arr.length;
     return Math.sqrt(avgSquareDiff);
   }
@@ -89,7 +89,7 @@ class PerformanceBenchmark {
     // Obtener datos necesarios
     const user = await prisma.tenantUser.findUnique({
       where: { telegramId: BigInt(CHAT_ID) },
-      include: { tenant: true }
+      include: { tenant: true },
     });
 
     if (!user?.tenant) {
@@ -108,7 +108,7 @@ class PerformanceBenchmark {
 
     // 2. BENCHMARK: getUserState (cold y warm)
     console.log(`\n${colors.yellow}Midiendo: getUserState${colors.reset}`);
-    
+
     // Cold (limpiar cache primero)
     await prisma.$executeRaw`DELETE FROM user_sessions WHERE telegram_id = ${BigInt(CHAT_ID)}`;
     const sessionColdStats = await this.measureOperation('getUserState_cold', async () => {
@@ -135,8 +135,8 @@ class PerformanceBenchmark {
       await prisma.tenantCustomer.findFirst({
         where: {
           tenantId,
-          legalName: { contains: 'CHUBB', mode: 'insensitive' }
-        }
+          legalName: { contains: 'CHUBB', mode: 'insensitive' },
+        },
       });
     });
     this.printStats(customerStats);
@@ -150,7 +150,7 @@ class PerformanceBenchmark {
 
     // Guardar resultados
     this.saveResults();
-    
+
     // Mostrar resumen
     this.printSummary();
   }
@@ -166,12 +166,19 @@ class PerformanceBenchmark {
 
   saveResults() {
     const filename = `benchmark-results-${this.phase.toLowerCase()}-${Date.now()}.json`;
-    fs.writeFileSync(filename, JSON.stringify({
-      phase: this.phase,
-      timestamp: this.startTime,
-      environment: process.env.NODE_ENV || 'development',
-      results: this.results
-    }, null, 2));
+    fs.writeFileSync(
+      filename,
+      JSON.stringify(
+        {
+          phase: this.phase,
+          timestamp: this.startTime,
+          environment: process.env.NODE_ENV || 'development',
+          results: this.results,
+        },
+        null,
+        2
+      )
+    );
     console.log(`\n✅ Resultados guardados en: ${filename}`);
   }
 
@@ -179,30 +186,32 @@ class PerformanceBenchmark {
     console.log(`\n${colors.bright}=== RESUMEN ${this.phase} ===${colors.reset}`);
     console.log('\nOperación              | Promedio  | Min      | Max      | P95');
     console.log('-----------------------|-----------|----------|----------|----------');
-    
+
     let totalAvg = 0;
-    this.results.forEach(stat => {
+    this.results.forEach((stat) => {
       console.log(
         `${stat.operation.padEnd(22)} | ` +
-        `${stat.avg.toFixed(2).padStart(9)}ms | ` +
-        `${stat.min.toFixed(2).padStart(8)}ms | ` +
-        `${stat.max.toFixed(2).padStart(8)}ms | ` +
-        `${stat.p95.toFixed(2).padStart(8)}ms`
+          `${stat.avg.toFixed(2).padStart(9)}ms | ` +
+          `${stat.min.toFixed(2).padStart(8)}ms | ` +
+          `${stat.max.toFixed(2).padStart(8)}ms | ` +
+          `${stat.p95.toFixed(2).padStart(8)}ms`
       );
       totalAvg += stat.avg;
     });
-    
+
     console.log('-----------------------|-----------|----------|----------|----------');
-    console.log(`${colors.bright}TOTAL${colors.reset}                  | ${colors.bright}${totalAvg.toFixed(2).padStart(9)}ms${colors.reset}`);
+    console.log(
+      `${colors.bright}TOTAL${colors.reset}                  | ${colors.bright}${totalAvg.toFixed(2).padStart(9)}ms${colors.reset}`
+    );
   }
 }
 
 // Función para comparar resultados
 async function compareResults() {
   // Buscar archivos de resultados
-  const files = fs.readdirSync('.').filter(f => f.startsWith('benchmark-results-'));
-  const beforeFiles = files.filter(f => f.includes('before'));
-  const afterFiles = files.filter(f => f.includes('after'));
+  const files = fs.readdirSync('.').filter((f) => f.startsWith('benchmark-results-'));
+  const beforeFiles = files.filter((f) => f.includes('before'));
+  const afterFiles = files.filter((f) => f.includes('after'));
 
   if (beforeFiles.length === 0 || afterFiles.length === 0) {
     console.log('⚠️ No hay suficientes archivos para comparar');
@@ -227,27 +236,27 @@ async function compareResults() {
   const improvements = [];
 
   // Comparar cada operación
-  before.results.forEach(beforeStat => {
-    const afterStat = after.results.find(a => a.operation === beforeStat.operation);
+  before.results.forEach((beforeStat) => {
+    const afterStat = after.results.find((a) => a.operation === beforeStat.operation);
     if (afterStat) {
       const improvement = beforeStat.avg - afterStat.avg;
       const improvementPct = (improvement / beforeStat.avg) * 100;
-      
+
       improvements.push({
         operation: beforeStat.operation,
         before: beforeStat.avg,
         after: afterStat.avg,
         improvement,
-        improvementPct
+        improvementPct,
       });
 
       const color = improvementPct > 0 ? colors.green : colors.red;
       console.log(
         `${beforeStat.operation.padEnd(22)} | ` +
-        `${beforeStat.avg.toFixed(2).padStart(9)}ms | ` +
-        `${afterStat.avg.toFixed(2).padStart(8)}ms | ` +
-        `${color}${improvement > 0 ? '-' : '+'}${Math.abs(improvement).toFixed(2).padStart(7)}ms${colors.reset} | ` +
-        `${color}${improvementPct.toFixed(1).padStart(4)}%${colors.reset}`
+          `${beforeStat.avg.toFixed(2).padStart(9)}ms | ` +
+          `${afterStat.avg.toFixed(2).padStart(8)}ms | ` +
+          `${color}${improvement > 0 ? '-' : '+'}${Math.abs(improvement).toFixed(2).padStart(7)}ms${colors.reset} | ` +
+          `${color}${improvementPct.toFixed(1).padStart(4)}%${colors.reset}`
       );
     }
   });
@@ -262,26 +271,33 @@ async function compareResults() {
   const totalColor = totalImprovementPct > 0 ? colors.green : colors.red;
   console.log(
     `${colors.bright}TOTAL${colors.reset}                  | ` +
-    `${colors.bright}${totalBefore.toFixed(2).padStart(9)}ms${colors.reset} | ` +
-    `${colors.bright}${totalAfter.toFixed(2).padStart(8)}ms${colors.reset} | ` +
-    `${totalColor}${totalImprovement > 0 ? '-' : '+'}${Math.abs(totalImprovement).toFixed(2).padStart(7)}ms${colors.reset} | ` +
-    `${totalColor}${totalImprovementPct.toFixed(1).padStart(4)}%${colors.reset}`
+      `${colors.bright}${totalBefore.toFixed(2).padStart(9)}ms${colors.reset} | ` +
+      `${colors.bright}${totalAfter.toFixed(2).padStart(8)}ms${colors.reset} | ` +
+      `${totalColor}${totalImprovement > 0 ? '-' : '+'}${Math.abs(totalImprovement).toFixed(2).padStart(7)}ms${colors.reset} | ` +
+      `${totalColor}${totalImprovementPct.toFixed(1).padStart(4)}%${colors.reset}`
   );
 
   // Guardar comparación
   const comparisonFile = `benchmark-comparison-${Date.now()}.json`;
-  fs.writeFileSync(comparisonFile, JSON.stringify({
-    timestamp: new Date(),
-    before: beforeFile,
-    after: afterFile,
-    improvements,
-    totalImprovement: {
-      before: totalBefore,
-      after: totalAfter,
-      improvement: totalImprovement,
-      improvementPct: totalImprovementPct
-    }
-  }, null, 2));
+  fs.writeFileSync(
+    comparisonFile,
+    JSON.stringify(
+      {
+        timestamp: new Date(),
+        before: beforeFile,
+        after: afterFile,
+        improvements,
+        totalImprovement: {
+          before: totalBefore,
+          after: totalAfter,
+          improvement: totalImprovement,
+          improvementPct: totalImprovementPct,
+        },
+      },
+      null,
+      2
+    )
+  );
 
   console.log(`\n✅ Comparación guardada en: ${comparisonFile}`);
 }
@@ -289,7 +305,7 @@ async function compareResults() {
 // Main
 async function main() {
   const args = process.argv.slice(2);
-  
+
   if (args.includes('--compare')) {
     await compareResults();
   } else if (args.includes('--before')) {
@@ -312,7 +328,7 @@ ${colors.bright}PASOS:${colors.reset}
   4. Ejecuta con --compare para ver mejoras
     `);
   }
-  
+
   await prisma.$disconnect();
 }
 

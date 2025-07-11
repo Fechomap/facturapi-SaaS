@@ -3,13 +3,12 @@ import { jest } from '@jest/globals';
 import { debeDetectarExcel, esArchivoExcelValido } from '../core/utils/excel-detection.utils.js';
 
 describe('Excel Detection - Solución SIMPLE', () => {
-
   test('CASO 1: Estado esperando funciona (método original)', () => {
     const mockCtx = {
       userState: {
         esperando: 'archivo_excel_axa',
-        axaClientId: 'axa-123'
-      }
+        axaClientId: 'axa-123',
+      },
     };
 
     const detectado = debeDetectarExcel(mockCtx, 'axa');
@@ -22,8 +21,8 @@ describe('Excel Detection - Solución SIMPLE', () => {
       userState: {
         esperando: null, // PROBLEMA: estado perdido
         axaClientId: 'axa-123', // PERO: flujo activo
-        facturaGenerada: false
-      }
+        facturaGenerada: false,
+      },
     };
 
     const detectado = debeDetectarExcel(mockCtx, 'axa');
@@ -35,8 +34,8 @@ describe('Excel Detection - Solución SIMPLE', () => {
     const mockCtx = {
       userState: {
         esperando: null,
-        facturaGenerada: true // Procesamiento completado
-      }
+        facturaGenerada: true, // Procesamiento completado
+      },
     };
 
     const detectado = debeDetectarExcel(mockCtx, 'axa');
@@ -49,8 +48,8 @@ describe('Excel Detection - Solución SIMPLE', () => {
       userState: {
         esperando: null,
         chubbClientId: 'chubb-456',
-        facturaGenerada: false
-      }
+        facturaGenerada: false,
+      },
     };
 
     const detectado = debeDetectarExcel(mockCtxChubb, 'chubb');
@@ -63,7 +62,7 @@ describe('Excel Detection - Solución SIMPLE', () => {
       { file_name: 'datos.xlsx', esperado: true },
       { file_name: 'reporte.xls', esperado: true },
       { file_name: 'documento.pdf', esperado: false },
-      { file_name: null, esperado: false }
+      { file_name: null, esperado: false },
     ];
 
     archivos.forEach(({ file_name, esperado }) => {
@@ -77,20 +76,20 @@ describe('Excel Detection - Solución SIMPLE', () => {
 
   test('BUG SCENARIO: Reproducer el problema original', () => {
     console.log('🚨 SIMULANDO: Problema original del usuario');
-    
+
     // ANTES del fix: solo verificaba esperando
     function deteccionAntigua(ctx, tipoCliente) {
       return ctx.userState?.esperando === `archivo_excel_${tipoCliente}`;
     }
-    
+
     // DESPUÉS del fix: verifica esperando O flujo activo
     function deteccionNueva(ctx, tipoCliente) {
       const esperandoValue = `archivo_excel_${tipoCliente}`;
       const clientIdField = `${tipoCliente}ClientId`;
-      
+
       const estaEsperando = ctx.userState?.esperando === esperandoValue;
       const flujoActivo = ctx.userState?.[clientIdField] && !ctx.userState?.facturaGenerada;
-      
+
       return estaEsperando || flujoActivo;
     }
 
@@ -98,8 +97,8 @@ describe('Excel Detection - Solución SIMPLE', () => {
       userState: {
         esperando: null, // Estado perdido por timing
         axaClientId: 'axa-789',
-        facturaGenerada: false
-      }
+        facturaGenerada: false,
+      },
     };
 
     // ANTES: no detectaba (BUG)

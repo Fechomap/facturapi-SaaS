@@ -33,8 +33,12 @@ class MockTelegramContext {
     return result;
   }
 
-  hasTenant() { return true; }
-  getTenantId() { return 'test-tenant-123'; }
+  hasTenant() {
+    return true;
+  }
+  getTenantId() {
+    return 'test-tenant-123';
+  }
 }
 
 describe('PDF Analysis Handler', () => {
@@ -68,17 +72,17 @@ describe('PDF Analysis Handler', () => {
           clientName: 'TEST CLIENT SA DE CV',
           clientCode: 'CLI001',
           orderNumber: 'ORD-2025-001',
-          totalAmount: 1160.00,
-          confidence: 85
+          totalAmount: 1160.0,
+          confidence: 85,
         },
         validation: { isValid: true },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Simular lo que hace showSimpleAnalysisResults (después del fix)
       mockCtx.userState.pdfAnalysis = analysisData;
       mockCtx.session.pdfAnalysis = analysisData;
-      
+
       // Guardar sesión
       const saveResult = await mockCtx.saveSession();
       expect(saveResult.success).toBe(true);
@@ -97,10 +101,10 @@ describe('PDF Analysis Handler', () => {
         analysis: {
           clientName: 'RECOVERY TEST CLIENT',
           orderNumber: 'REC-001',
-          totalAmount: 500.00
+          totalAmount: 500.0,
         },
         validation: { isValid: true },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Worker 1: Guardar análisis
@@ -111,17 +115,17 @@ describe('PDF Analysis Handler', () => {
       // Worker 2: Simular nuevo contexto (userState vacío)
       const newCtx = new MockTelegramContext(mockCtx.from.id);
       newCtx.sessionId = mockCtx.sessionId;
-      
+
       // Cargar sesión
       await newCtx.loadSession();
 
       // Simular lo que hace el action handler (después del fix)
       let analysisDataRecovered = newCtx.userState?.pdfAnalysis;
-      
+
       if (!analysisDataRecovered || analysisDataRecovered.id !== analysisId) {
         // Buscar en session
         analysisDataRecovered = newCtx.session?.pdfAnalysis;
-        
+
         if (analysisDataRecovered && analysisDataRecovered.id === analysisId) {
           // Restaurar en userState
           newCtx.userState.pdfAnalysis = analysisDataRecovered;
@@ -138,11 +142,11 @@ describe('PDF Analysis Handler', () => {
     test('should handle expired analysis data gracefully', async () => {
       const analysisId = `simple_${Date.now()}_${mockCtx.from.id}`;
       const wrongAnalysisId = `simple_${Date.now() + 1000}_${mockCtx.from.id}`;
-      
+
       const analysisData = {
         id: analysisId,
         analysis: { clientName: 'TEST CLIENT' },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Guardar análisis
@@ -151,10 +155,10 @@ describe('PDF Analysis Handler', () => {
 
       // Simular búsqueda con ID incorrecto (como si hubiera expirado)
       let analysisDataFound = mockCtx.userState?.pdfAnalysis;
-      
+
       if (!analysisDataFound || analysisDataFound.id !== wrongAnalysisId) {
         analysisDataFound = mockCtx.session?.pdfAnalysis;
-        
+
         if (!analysisDataFound || analysisDataFound.id !== wrongAnalysisId) {
           analysisDataFound = null; // Simulando mensaje de error
         }
@@ -173,11 +177,11 @@ describe('PDF Analysis Handler', () => {
         analysis: {
           clientName: 'CONFIRM TEST CLIENT',
           orderNumber: 'CNF-001',
-          totalAmount: 750.00,
-          confidence: 90
+          totalAmount: 750.0,
+          confidence: 90,
         },
         validation: { isValid: true },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Preparar datos como después de análisis
@@ -187,12 +191,12 @@ describe('PDF Analysis Handler', () => {
 
       // Simular action handler
       const actionMatch = [null, analysisId]; // regex match simulation
-      
+
       let analysisDataForAction = mockCtx.userState?.pdfAnalysis;
-      
+
       if (!analysisDataForAction || analysisDataForAction.id !== analysisId) {
         analysisDataForAction = mockCtx.session?.pdfAnalysis;
-        
+
         if (analysisDataForAction && analysisDataForAction.id === analysisId) {
           mockCtx.userState.pdfAnalysis = analysisDataForAction;
         }
@@ -212,10 +216,10 @@ describe('PDF Analysis Handler', () => {
           clientName: 'EDIT TEST CLIENT',
           clientCode: 'EDT001',
           orderNumber: 'EDT-001',
-          totalAmount: 1200.00
+          totalAmount: 1200.0,
         },
         validation: { isValid: false }, // Requiere edición
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Worker 1: Análisis inicial
@@ -229,10 +233,10 @@ describe('PDF Analysis Handler', () => {
 
       // Simular edit action handler
       let analysisDataForEdit = editCtx.userState?.pdfAnalysis;
-      
+
       if (!analysisDataForEdit || analysisDataForEdit.id !== analysisId) {
         analysisDataForEdit = editCtx.session?.pdfAnalysis;
-        
+
         if (analysisDataForEdit && analysisDataForEdit.id === analysisId) {
           editCtx.userState.pdfAnalysis = analysisDataForEdit;
         }
@@ -249,7 +253,7 @@ describe('PDF Analysis Handler', () => {
       // Verificar que la edición puede proceder
       expect(editCtx.userState.clienteNombre).toBe('EDIT TEST CLIENT');
       expect(editCtx.userState.numeroPedido).toBe('EDT-001');
-      expect(editCtx.userState.monto).toBe(1200.00);
+      expect(editCtx.userState.monto).toBe(1200.0);
     });
   });
 
@@ -261,11 +265,11 @@ describe('PDF Analysis Handler', () => {
         analysis: {
           clientName: 'INVOICE GEN CLIENT SA',
           orderNumber: 'INV-2025-001',
-          totalAmount: 2500.00,
-          confidence: 95
+          totalAmount: 2500.0,
+          confidence: 95,
         },
         validation: { isValid: true },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Análisis inicial
@@ -277,14 +281,14 @@ describe('PDF Analysis Handler', () => {
       const facturaSimulada = {
         id: `fact_${Date.now()}`,
         folio_number: 123,
-        series: 'A'
+        series: 'A',
       };
 
       // Actualizar estado como hace generateSimpleInvoice (después del fix)
       mockCtx.userState.facturaId = facturaSimulada.id;
       mockCtx.userState.folioFactura = facturaSimulada.folio_number;
       mockCtx.userState.series = facturaSimulada.series;
-      
+
       // CRÍTICO: También en session
       mockCtx.session.facturaId = facturaSimulada.id;
       mockCtx.session.folioFactura = facturaSimulada.folio_number;
@@ -309,7 +313,7 @@ describe('PDF Analysis Handler', () => {
         facturaId: 'fact_test_123',
         folioFactura: 456,
         series: 'B',
-        facturaGenerada: true
+        facturaGenerada: true,
       };
 
       mockCtx.session = { ...facturaData };
@@ -340,11 +344,11 @@ describe('PDF Analysis Handler', () => {
       const analysisData = {
         id: analysisId,
         analysis: { clientName: 'PERSISTENCE TEST' },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Simular el flujo completo que causaba el bug
-      
+
       // 1. Análisis inicial (Worker 1)
       mockCtx.userState.pdfAnalysis = analysisData;
       mockCtx.session.pdfAnalysis = analysisData;
@@ -357,10 +361,10 @@ describe('PDF Analysis Handler', () => {
 
       // 3. Verificar que los datos están disponibles
       let recoveredAnalysis = actionCtx.userState?.pdfAnalysis;
-      
+
       if (!recoveredAnalysis || recoveredAnalysis.id !== analysisId) {
         recoveredAnalysis = actionCtx.session?.pdfAnalysis;
-        
+
         if (recoveredAnalysis && recoveredAnalysis.id === analysisId) {
           actionCtx.userState.pdfAnalysis = recoveredAnalysis;
         }
@@ -374,23 +378,23 @@ describe('PDF Analysis Handler', () => {
     test('should handle concurrent PDF analysis operations', async () => {
       const analysisId1 = `simple_${Date.now()}_${mockCtx.from.id}`;
       const analysisId2 = `simple_${Date.now() + 1}_${mockCtx.from.id}`;
-      
+
       const analysisData1 = {
         id: analysisId1,
         analysis: { clientName: 'CONCURRENT CLIENT 1' },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
-      
+
       const analysisData2 = {
         id: analysisId2,
         analysis: { clientName: 'CONCURRENT CLIENT 2' },
-        timestamp: Date.now() + 1
+        timestamp: Date.now() + 1,
       };
 
       // Simular análisis casi simultáneos
       mockCtx.session.pdfAnalysis = analysisData1;
       await mockCtx.saveSession();
-      
+
       // Rápidamente sobreescribir con nuevo análisis
       mockCtx.session.pdfAnalysis = analysisData2;
       await mockCtx.saveSession();
@@ -407,7 +411,7 @@ describe('PDF Analysis Handler', () => {
       const analysisData = {
         id: analysisId,
         analysis: { clientName: 'CLEANUP TEST CLIENT' },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Análisis inicial
@@ -418,7 +422,7 @@ describe('PDF Analysis Handler', () => {
       // Simular generación exitosa y limpieza
       delete mockCtx.userState.pdfAnalysis;
       delete mockCtx.session.pdfAnalysis;
-      
+
       mockCtx.session.facturaGenerada = true;
       await mockCtx.saveSession();
 

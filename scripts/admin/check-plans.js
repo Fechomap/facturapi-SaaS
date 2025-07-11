@@ -8,7 +8,7 @@ async function main() {
     const plans = await prisma.subscriptionPlan.findMany();
     console.log('Planes encontrados:', plans.length);
     console.log('Detalles de los planes:');
-    plans.forEach(plan => {
+    plans.forEach((plan) => {
       console.log(`- ID: ${plan.id}`);
       console.log(`  Nombre: ${plan.name}`);
       console.log(`  Stripe Price ID: ${plan.stripePriceId || 'No configurado'}`);

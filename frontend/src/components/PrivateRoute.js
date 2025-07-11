@@ -5,11 +5,11 @@ import { authService } from '../services/api.service';
 
 const PrivateRoute = ({ children }) => {
   const isAuthenticated = authService.isAuthenticated();
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 

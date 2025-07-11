@@ -22,9 +22,11 @@ class RedisSessionService {
     try {
       // Verificar si tenemos URL de Redis configurada
       const redisUrl = process.env.REDIS_URL || process.env.REDISCLOUD_URL;
-      
+
       if (!redisUrl) {
-        redisLogger.warn('Redis no configurado, usando almacenamiento en memoria (NO recomendado para clustering)');
+        redisLogger.warn(
+          'Redis no configurado, usando almacenamiento en memoria (NO recomendado para clustering)'
+        );
         return this.initializeMemoryFallback();
       }
 
@@ -38,15 +40,17 @@ class RedisSessionService {
         socket: {
           reconnectStrategy: (retries) => {
             const delay = Math.min(retries * 50, 2000);
-            redisLogger.warn(`🔄 Reintentando conexión Redis en ${delay}ms (intento ${retries + 1})`);
+            redisLogger.warn(
+              `🔄 Reintentando conexión Redis en ${delay}ms (intento ${retries + 1})`
+            );
             return delay;
           },
           connectTimeout: 10000,
-          commandTimeout: 5000
+          commandTimeout: 5000,
         },
         // Configuración para Railway/producción
         database: 0,
-        lazyConnect: true
+        lazyConnect: true,
       });
 
       // Eventos de conexión
@@ -74,13 +78,12 @@ class RedisSessionService {
 
       // Conectar
       await this.redis.connect();
-      
+
       return {
         success: true,
         message: 'Redis inicializado correctamente',
-        type: 'redis'
+        type: 'redis',
       };
-
     } catch (error) {
       redisLogger.error('Error al inicializar Redis:', error);
       return this.initializeMemoryFallback();
@@ -94,17 +97,20 @@ class RedisSessionService {
     redisLogger.warn('⚠️ Usando almacenamiento en memoria - NO es ideal para clustering');
     this.fallbackToMemory = true;
     this.isConnected = false;
-    
+
     // Limpiar memoria cada 30 minutos
-    setInterval(() => {
-      this.cleanupMemoryStore();
-    }, 30 * 60 * 1000);
+    setInterval(
+      () => {
+        this.cleanupMemoryStore();
+      },
+      30 * 60 * 1000
+    );
 
     return {
       success: true,
       message: 'Almacenamiento en memoria inicializado',
       type: 'memory',
-      warning: 'No es ideal para clustering - considera configurar Redis'
+      warning: 'No es ideal para clustering - considera configurar Redis',
     };
   }
 
@@ -116,22 +122,18 @@ class RedisSessionService {
       const data = {
         ...sessionData,
         timestamp: Date.now(),
-        ttl: ttlSeconds
+        ttl: ttlSeconds,
       };
 
       if (this.isConnected && this.redis) {
         // Usar Redis
-        await this.redis.setEx(
-          `session:${sessionId}`, 
-          ttlSeconds, 
-          JSON.stringify(data)
-        );
+        await this.redis.setEx(`session:${sessionId}`, ttlSeconds, JSON.stringify(data));
         redisLogger.debug(`Sesión guardada en Redis: ${sessionId}`);
       } else {
         // Usar memoria como fallback
         this.memoryStore.set(sessionId, {
           data,
-          expires: Date.now() + (ttlSeconds * 1000)
+          expires: Date.now() + ttlSeconds * 1000,
         });
         redisLogger.debug(`Sesión guardada en memoria: ${sessionId}`);
       }
@@ -225,14 +227,14 @@ class RedisSessionService {
       const stats = {
         type: this.isConnected ? 'redis' : 'memory',
         connected: this.isConnected,
-        fallbackMode: this.fallbackToMemory
+        fallbackMode: this.fallbackToMemory,
       };
 
       if (this.isConnected && this.redis) {
         // Estadísticas de Redis
         const info = await this.redis.info('memory');
         stats.redisMemory = info;
-        
+
         // Contar sesiones activas
         const keys = await this.redis.keys('session:*');
         stats.activeSessions = keys.length;
@@ -258,10 +260,10 @@ class RedisSessionService {
         await this.redis.quit();
         redisLogger.info('📴 Conexión Redis cerrada correctamente');
       }
-      
+
       // Limpiar memoria
       this.memoryStore.clear();
-      
+
       return { success: true };
     } catch (error) {
       redisLogger.error('Error al cerrar Redis:', error);

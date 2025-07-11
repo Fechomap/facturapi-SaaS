@@ -14,8 +14,8 @@ const userService = {
         lastName: 'Pérez',
         email: 'juan@ejemplo.com',
         role: 'admin',
-        isActive: true
-      }
+        isActive: true,
+      },
     };
   },
   createUser: async (userData) => {
@@ -25,14 +25,14 @@ const userService = {
   updateUser: async (id, userData) => {
     console.log(`Actualizando usuario ${id}:`, userData);
     return { data: { ...userData, id: parseInt(id) } };
-  }
+  },
 };
 
 const UserForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditing = Boolean(id);
-  
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -40,20 +40,20 @@ const UserForm = () => {
     role: 'user',
     isActive: true,
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
-  
+
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
-  
+
   useEffect(() => {
     const fetchUser = async () => {
       if (isEditing) {
         try {
           const response = await userService.getUserById(id);
           const userData = response.data;
-          
+
           // Eliminar el campo de contraseña para edición
           setFormData({
             firstName: userData.firstName,
@@ -62,7 +62,7 @@ const UserForm = () => {
             role: userData.role,
             isActive: userData.isActive,
             password: '',
-            confirmPassword: ''
+            confirmPassword: '',
           });
         } catch (error) {
           console.error('Error al cargar usuario:', error);
@@ -72,61 +72,63 @@ const UserForm = () => {
         }
       }
     };
-    
+
     fetchUser();
   }, [id, isEditing]);
-  
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
-  
+
   const validateForm = () => {
     // Validación básica
     if (!formData.firstName.trim()) return 'El nombre es obligatorio';
     if (!formData.lastName.trim()) return 'El apellido es obligatorio';
     if (!formData.email.trim()) return 'El correo electrónico es obligatorio';
     if (!formData.email.includes('@')) return 'El correo electrónico no es válido';
-    
+
     // Validar contraseña solo para nuevos usuarios o si se está cambiando
-    if (!isEditing && !formData.password) return 'La contraseña es obligatoria para nuevos usuarios';
-    if (formData.password && formData.password.length < 6) return 'La contraseña debe tener al menos 6 caracteres';
+    if (!isEditing && !formData.password)
+      return 'La contraseña es obligatoria para nuevos usuarios';
+    if (formData.password && formData.password.length < 6)
+      return 'La contraseña debe tener al menos 6 caracteres';
     if (formData.password !== formData.confirmPassword) return 'Las contraseñas no coinciden';
-    
+
     return null;
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
       return;
     }
-    
+
     setSubmitLoading(true);
-    
+
     try {
       // Eliminar confirmPassword antes de enviar los datos
       const userData = { ...formData };
       delete userData.confirmPassword;
-      
+
       // Si no se está cambiando la contraseña en edición, eliminarla
       if (isEditing && !userData.password) {
         delete userData.password;
       }
-      
+
       if (isEditing) {
         await userService.updateUser(id, userData);
       } else {
         await userService.createUser(userData);
       }
-      
+
       // Redirigir a la lista de usuarios
       navigate('/usuarios');
     } catch (error) {
@@ -136,19 +138,19 @@ const UserForm = () => {
       setSubmitLoading(false);
     }
   };
-  
+
   return (
     <div>
       <Navbar />
       <div className="user-form-container">
         <h1>{isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'}</h1>
-        
+
         {loading ? (
           <div className="loading">Cargando información del usuario...</div>
         ) : (
           <div className="form-card">
             {error && <div className="error-alert">{error}</div>}
-            
+
             <form onSubmit={handleSubmit}>
               <div className="form-group">
                 <label htmlFor="firstName">Nombre</label>
@@ -161,7 +163,7 @@ const UserForm = () => {
                   required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="lastName">Apellido</label>
                 <input
@@ -173,7 +175,7 @@ const UserForm = () => {
                   required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="email">Correo Electrónico</label>
                 <input
@@ -185,20 +187,15 @@ const UserForm = () => {
                   required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="role">Rol</label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                >
+                <select id="role" name="role" value={formData.role} onChange={handleChange}>
                   <option value="user">Usuario</option>
                   <option value="admin">Administrador</option>
                 </select>
               </div>
-              
+
               <div className="form-group checkbox-group">
                 <label>
                   <input
@@ -210,10 +207,12 @@ const UserForm = () => {
                   Usuario Activo
                 </label>
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="password">
-                  {isEditing ? 'Contraseña (dejar en blanco para mantener la actual)' : 'Contraseña'}
+                  {isEditing
+                    ? 'Contraseña (dejar en blanco para mantener la actual)'
+                    : 'Contraseña'}
                 </label>
                 <input
                   type="password"
@@ -224,7 +223,7 @@ const UserForm = () => {
                   required={!isEditing}
                 />
               </div>
-              
+
               <div className="form-group">
                 <label htmlFor="confirmPassword">Confirmar Contraseña</label>
                 <input
@@ -236,20 +235,12 @@ const UserForm = () => {
                   required={!isEditing || formData.password !== ''}
                 />
               </div>
-              
+
               <div className="form-actions">
-                <button 
-                  type="button" 
-                  className="cancel-btn"
-                  onClick={() => navigate('/usuarios')}
-                >
+                <button type="button" className="cancel-btn" onClick={() => navigate('/usuarios')}>
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
-                  className="save-btn"
-                  disabled={submitLoading}
-                >
+                <button type="submit" className="save-btn" disabled={submitLoading}>
                   {submitLoading ? 'Guardando...' : 'Guardar Usuario'}
                 </button>
               </div>

@@ -35,8 +35,12 @@ class MockTelegramContext {
     return result;
   }
 
-  hasTenant() { return true; }
-  getTenantId() { return this._tenantId; }
+  hasTenant() {
+    return true;
+  }
+  getTenantId() {
+    return this._tenantId;
+  }
 
   isProcessActive(processId) {
     return this._activeProcesses.has(processId);
@@ -58,7 +62,7 @@ class MockTelegramContext {
 
 // Mock del InvoiceService
 const mockInvoiceService = {
-  generateInvoice: () => Promise.resolve({})
+  generateInvoice: () => Promise.resolve({}),
 };
 
 // Jest mock functions
@@ -104,18 +108,16 @@ const createMockFunction = () => {
   };
 
   Object.defineProperty(mockFn, 'calls', {
-    get: () => calls
+    get: () => calls,
   });
 
   Object.defineProperty(mockFn, 'callCount', {
-    get: () => calls.length
+    get: () => calls.length,
   });
 
   mockFn.toHaveBeenCalledTimes = (times) => calls.length === times;
   mockFn.toHaveBeenCalledWith = (...expectedArgs) => {
-    return calls.some(callArgs => 
-      JSON.stringify(callArgs) === JSON.stringify(expectedArgs)
-    );
+    return calls.some((callArgs) => JSON.stringify(callArgs) === JSON.stringify(expectedArgs));
   };
 
   mockFn.reset = () => {
@@ -157,14 +159,14 @@ describe('Invoice Generation Handler', () => {
       const facturaData = {
         clienteNombre: 'TEST CLIENT SA',
         numeroPedido: 'ORD-001',
-        monto: 1000.00,
-        claveProducto: '78101803'
+        monto: 1000.0,
+        claveProducto: '78101803',
       };
 
       const expectedFactura = {
         id: 'fact_123',
         folio_number: 456,
-        series: 'A'
+        series: 'A',
       };
 
       // Configurar estado inicial
@@ -191,7 +193,7 @@ describe('Invoice Generation Handler', () => {
         } catch (attemptError) {
           lastError = attemptError;
           if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 10)); // Delay reducido para test
+            await new Promise((resolve) => setTimeout(resolve, 10)); // Delay reducido para test
           }
         }
       }
@@ -207,13 +209,13 @@ describe('Invoice Generation Handler', () => {
       const facturaData = {
         clienteNombre: 'RETRY TEST CLIENT',
         numeroPedido: 'RETRY-001',
-        monto: 2000.00
+        monto: 2000.0,
       };
 
       const expectedFactura = {
         id: 'fact_retry_123',
         folio_number: 789,
-        series: 'B'
+        series: 'B',
       };
 
       mockCtx.userState = { ...facturaData };
@@ -240,7 +242,7 @@ describe('Invoice Generation Handler', () => {
         } catch (attemptError) {
           lastError = attemptError;
           if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
           }
         }
       }
@@ -255,7 +257,7 @@ describe('Invoice Generation Handler', () => {
       const facturaData = {
         clienteNombre: 'FAIL TEST CLIENT',
         numeroPedido: 'FAIL-001',
-        monto: 500.00
+        monto: 500.0,
       };
 
       mockCtx.userState = { ...facturaData };
@@ -263,8 +265,7 @@ describe('Invoice Generation Handler', () => {
       const persistentError = new Error('Persistent service error');
 
       // Todos los intentos fallan
-      mockInvoiceService.generateInvoice
-        .mockRejectedValue(persistentError);
+      mockInvoiceService.generateInvoice.mockRejectedValue(persistentError);
 
       // Simular reintentos
       const maxRetries = 3;
@@ -283,7 +284,7 @@ describe('Invoice Generation Handler', () => {
         } catch (attemptError) {
           lastError = attemptError;
           if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, 10));
           }
         }
       }
@@ -301,7 +302,7 @@ describe('Invoice Generation Handler', () => {
       const expectedFactura = {
         id: 'fact_persist_123',
         folio_number: 999,
-        series: 'C'
+        series: 'C',
       };
 
       // Simular generación exitosa
@@ -334,7 +335,7 @@ describe('Invoice Generation Handler', () => {
         facturaId: 'fact_worker_test',
         folioFactura: 111,
         series: 'D',
-        facturaGenerada: true
+        facturaGenerada: true,
       };
 
       // Worker 1: Generar factura
@@ -389,14 +390,13 @@ describe('Invoice Generation Handler', () => {
 
       // Simular flujo completo
       mockCtx.markProcessActive(transactionId);
-      
+
       try {
         // Simular operación exitosa
-        await new Promise(resolve => setTimeout(resolve, 10));
-        
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
         // Estado debería seguir activo durante la operación
         expect(mockCtx.isProcessActive(transactionId)).toBe(true);
-        
       } finally {
         // Cleanup en finally (como hace el código real)
         mockCtx.markProcessInactive(transactionId);
@@ -410,10 +410,10 @@ describe('Invoice Generation Handler', () => {
   describe('Error Handling and Edge Cases', () => {
     test('should handle missing tenant ID gracefully', async () => {
       const invalidCtx = new MockTelegramContext(12345, null);
-      
+
       expect(invalidCtx.getTenantId()).toBeNull();
       expect(invalidCtx.hasTenant()).toBe(true); // Mock simplificado
-      
+
       // En código real, esto debería provocar un error controlado
       try {
         await mockInvoiceService.generateInvoice({}, invalidCtx.getTenantId());
@@ -424,18 +424,18 @@ describe('Invoice Generation Handler', () => {
 
     test('should preserve transaction ID throughout process', async () => {
       const transactionId = `tx_preserve_${Date.now()}_${mockCtx.from.id}`;
-      
+
       // Configurar como hace el handler real
       mockCtx.userState.transactionId = transactionId;
       mockCtx.userState.clienteNombre = 'PRESERVE TEST CLIENT';
       mockCtx.userState.numeroPedido = 'PRES-001';
-      mockCtx.userState.monto = 1500.00;
+      mockCtx.userState.monto = 1500.0;
 
       await mockCtx.saveSession();
 
       // Verificar que el transaction ID se mantiene
       expect(mockCtx.userState.transactionId).toBe(transactionId);
-      
+
       // Simular recuperación en otro contexto
       const newCtx = new MockTelegramContext(mockCtx.from.id);
       newCtx.sessionId = mockCtx.sessionId;
@@ -455,9 +455,10 @@ describe('Invoice Generation Handler', () => {
       // Simular verificación como hace el handler
       const incomingTransactionId = invalidTransactionId;
 
-      if (mockCtx.userState.facturaGenerada && 
-          mockCtx.userState.transactionId !== incomingTransactionId) {
-        
+      if (
+        mockCtx.userState.facturaGenerada &&
+        mockCtx.userState.transactionId !== incomingTransactionId
+      ) {
         // Debería rechazar la transacción inválida
         expect(mockCtx.userState.transactionId).not.toBe(incomingTransactionId);
         // En el código real, aquí se enviaría mensaje de error
@@ -470,21 +471,21 @@ describe('Invoice Generation Handler', () => {
       const analysisData = {
         clientName: 'PDF ANALYSIS CLIENT SA',
         orderNumber: 'PDF-001',
-        totalAmount: 3000.00,
-        clientCode: 'CLI999'
+        totalAmount: 3000.0,
+        clientCode: 'CLI999',
       };
 
       const expectedFactura = {
         id: 'fact_from_pdf_123',
         folio_number: 555,
-        series: 'A'
+        series: 'A',
       };
 
       // Simular datos de análisis previo
       mockCtx.userState.pdfAnalysis = {
         id: 'analysis_123',
         analysis: analysisData,
-        validation: { isValid: true }
+        validation: { isValid: true },
       };
 
       // Preparar datos para facturación como hace generateSimpleInvoice
@@ -493,7 +494,7 @@ describe('Invoice Generation Handler', () => {
         numeroPedido: analysisData.orderNumber,
         claveProducto: '78101803',
         monto: analysisData.totalAmount,
-        userId: mockCtx.from.id
+        userId: mockCtx.from.id,
       };
 
       mockInvoiceService.generateInvoice.mockResolvedValueOnce(expectedFactura);
@@ -518,35 +519,34 @@ describe('Invoice Generation Handler', () => {
       expect(factura).toEqual(expectedFactura);
       expect(mockCtx.session.facturaId).toBe(expectedFactura.id);
       expect(mockCtx.userState.pdfAnalysis).toBeUndefined();
-      expect(mockInvoiceService.generateInvoice.toHaveBeenCalledWith(
-        facturaData, 
-        mockCtx.getTenantId()
-      )).toBe(true);
+      expect(
+        mockInvoiceService.generateInvoice.toHaveBeenCalledWith(facturaData, mockCtx.getTenantId())
+      ).toBe(true);
     });
   });
 
   describe('Bug Prevention Tests', () => {
     test('should prevent "operación cancelada" false positives', async () => {
       const transactionId = `tx_no_cancel_${Date.now()}`;
-      
+
       // Simular el escenario que causaba cancelaciones incorrectas
       mockCtx.userState.transactionId = transactionId;
-      
+
       // Marcar proceso como activo
       mockCtx.markProcessActive(transactionId);
-      
+
       // Verificar que el proceso está marcado correctamente
       expect(mockCtx.isProcessActive(transactionId)).toBe(true);
-      
+
       // Simular operación exitosa
       const expectedFactura = { id: 'fact_no_cancel', folio_number: 777, series: 'A' };
       mockInvoiceService.generateInvoice.mockResolvedValueOnce(expectedFactura);
-      
+
       const factura = await mockInvoiceService.generateInvoice({}, mockCtx.getTenantId());
-      
+
       // Limpiar proceso
       mockCtx.markProcessInactive(transactionId);
-      
+
       // Verificar éxito sin cancelación
       expect(factura).toEqual(expectedFactura);
       expect(mockCtx.isProcessActive(transactionId)).toBe(false);
@@ -573,13 +573,13 @@ describe('Invoice Generation Handler', () => {
         } catch (attemptError) {
           if (attempt < maxRetries) {
             const delay = attempt * 2000; // Como en el código real
-            await new Promise(resolve => setTimeout(resolve, Math.min(delay, 50))); // Acelerado para test
+            await new Promise((resolve) => setTimeout(resolve, Math.min(delay, 50))); // Acelerado para test
           }
         }
       }
 
       const endTime = Date.now();
-      
+
       // Verificar éxito y que hubo delay
       expect(factura).toEqual(expectedFactura);
       expect(endTime - startTime).toBeGreaterThan(40); // Al menos el delay del primer reintento

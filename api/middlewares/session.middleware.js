@@ -15,14 +15,14 @@ export const sessionMiddleware = (options = {}) => {
     maxAge = 3600, // 1 hora por defecto
     secure = process.env.NODE_ENV === 'production',
     httpOnly = true,
-    sameSite = 'lax'
+    sameSite = 'lax',
   } = options;
 
   return async (req, res, next) => {
     try {
       // Generar o extraer session ID
       let sessionId = req.cookies?.[sessionName] || req.headers['x-session-id'];
-      
+
       if (!sessionId) {
         // Crear nueva sesión
         sessionId = crypto.randomUUID();
@@ -31,7 +31,7 @@ export const sessionMiddleware = (options = {}) => {
 
       // Obtener datos de sesión
       const sessionResult = await redisSessionService.getSession(sessionId);
-      
+
       if (sessionResult.success) {
         req.session = sessionResult.data;
         sessionLogger.debug(`Sesión cargada: ${sessionId}`);
@@ -40,7 +40,7 @@ export const sessionMiddleware = (options = {}) => {
         req.session = {
           id: sessionId,
           createdAt: new Date().toISOString(),
-          lastAccess: new Date().toISOString()
+          lastAccess: new Date().toISOString(),
         };
         sessionLogger.debug(`Nueva sesión inicializada: ${sessionId}`);
       }
@@ -65,10 +65,10 @@ export const sessionMiddleware = (options = {}) => {
       req.destroySession = async () => {
         try {
           await redisSessionService.deleteSession(sessionId);
-          
+
           // Limpiar cookie
           res.clearCookie(sessionName);
-          
+
           sessionLogger.debug(`Sesión destruida: ${sessionId}`);
           return { success: true };
         } catch (error) {
@@ -82,14 +82,14 @@ export const sessionMiddleware = (options = {}) => {
         maxAge: maxAge * 1000, // Convertir a milisegundos
         httpOnly,
         secure,
-        sameSite
+        sameSite,
       };
 
       res.cookie(sessionName, sessionId, cookieOptions);
 
       // Middleware para guardar automáticamente al final de la request
       const originalSend = res.send;
-      res.send = async function(data) {
+      res.send = async function (data) {
         try {
           // Guardar sesión antes de enviar respuesta (CRÍTICO: usar await)
           await req.saveSession();
@@ -98,25 +98,25 @@ export const sessionMiddleware = (options = {}) => {
           sessionLogger.error('Error al auto-guardar sesión:', error);
           // Continuar con el envío aunque falle el guardado
         }
-        
+
         return originalSend.call(this, data);
       };
 
       next();
     } catch (error) {
       sessionLogger.error('Error en middleware de sesión:', error);
-      
+
       // En caso de error, crear sesión básica en memoria
       req.session = {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
         lastAccess: new Date().toISOString(),
-        _fallback: true
+        _fallback: true,
       };
-      
+
       req.saveSession = async () => ({ success: false, error: 'Sesión en modo fallback' });
       req.destroySession = async () => ({ success: true });
-      
+
       next();
     }
   };
@@ -129,10 +129,10 @@ export const requireSession = (req, res, next) => {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({
       error: 'Sesión requerida',
-      message: 'Debe iniciar sesión para acceder a este recurso'
+      message: 'Debe iniciar sesión para acceder a este recurso',
     });
   }
-  
+
   next();
 };
 
@@ -142,24 +142,24 @@ export const requireSession = (req, res, next) => {
 export const sessionInfo = (req, res, next) => {
   // Agregar información de sesión a las respuestas
   const originalJson = res.json;
-  res.json = function(data) {
+  res.json = function (data) {
     const responseData = {
       ...data,
       _session: {
         id: req.sessionId,
         authenticated: Boolean(req.session?.userId),
-        lastAccess: req.session?.lastAccess
-      }
+        lastAccess: req.session?.lastAccess,
+      },
     };
-    
+
     return originalJson.call(this, responseData);
   };
-  
+
   next();
 };
 
 export default {
   sessionMiddleware,
   requireSession,
-  sessionInfo
+  sessionInfo,
 };

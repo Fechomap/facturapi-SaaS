@@ -13,7 +13,7 @@ const DEFAULT_RETRY_OPTIONS = {
   backoff: true, // Incrementar tiempo entre reintentos
   backoffFactor: 2, // Factor de multiplicación para backoff
   description: 'Operación con reintentos', // Descripción para logs
-  shouldRetry: null // Función personalizada para decidir si reintentar
+  shouldRetry: null, // Función personalizada para decidir si reintentar
 };
 
 /**
@@ -26,40 +26,37 @@ export async function withRetry(fn, options = {}) {
   // Combinar opciones con valores por defecto
   const config = { ...DEFAULT_RETRY_OPTIONS, ...options };
   const { maxRetries, retryDelay, backoff, backoffFactor, description, shouldRetry } = config;
-  
+
   let lastError = null;
   let attempts = 0;
-  
+
   // Función para decidir si se debe reintentar
-  const shouldRetryFn = shouldRetry || ((error) => {
-    // Por defecto, reintentamos todos los errores excepto los que indiquen
-    // un problema de autorización/autenticación o que el recurso no existe
-    const doNotRetry = [
-      'Authentication',
-      'Authorization',
-      'NotFound',
-      'Forbidden'
-    ];
-    
-    // Si el error tiene un nombre específico que indica no reintentar
-    if (error.name && doNotRetry.some(prefix => error.name.includes(prefix))) {
-      return false;
-    }
-    
-    // Si el error tiene un código HTTP que indica no reintentar
-    if (error.status) {
-      return ![401, 403, 404].includes(error.status);
-    }
-    
-    // Si el error es de respuesta HTTP
-    if (error.response && error.response.status) {
-      return ![401, 403, 404].includes(error.response.status);
-    }
-    
-    // Por defecto, reintentar
-    return true;
-  });
-  
+  const shouldRetryFn =
+    shouldRetry ||
+    ((error) => {
+      // Por defecto, reintentamos todos los errores excepto los que indiquen
+      // un problema de autorización/autenticación o que el recurso no existe
+      const doNotRetry = ['Authentication', 'Authorization', 'NotFound', 'Forbidden'];
+
+      // Si el error tiene un nombre específico que indica no reintentar
+      if (error.name && doNotRetry.some((prefix) => error.name.includes(prefix))) {
+        return false;
+      }
+
+      // Si el error tiene un código HTTP que indica no reintentar
+      if (error.status) {
+        return ![401, 403, 404].includes(error.status);
+      }
+
+      // Si el error es de respuesta HTTP
+      if (error.response && error.response.status) {
+        return ![401, 403, 404].includes(error.response.status);
+      }
+
+      // Por defecto, reintentar
+      return true;
+    });
+
   while (attempts <= maxRetries) {
     try {
       if (attempts > 0) {
@@ -68,13 +65,13 @@ export async function withRetry(fn, options = {}) {
           `Reintentando operación (${attempts}/${maxRetries})`
         );
       }
-      
+
       // Ejecutar la función
       return await fn();
     } catch (error) {
       lastError = error;
       attempts++;
-      
+
       // Si hemos alcanzado el máximo de reintentos, lanzar el último error
       if (attempts > maxRetries) {
         retryLogger.error(
@@ -83,7 +80,7 @@ export async function withRetry(fn, options = {}) {
         );
         throw error;
       }
-      
+
       // Verificar si debemos reintentar según la función personalizada
       if (!shouldRetryFn(error)) {
         retryLogger.info(
@@ -92,22 +89,20 @@ export async function withRetry(fn, options = {}) {
         );
         throw error;
       }
-      
+
       // Calcular el tiempo de espera para el siguiente reintento
-      const delay = backoff
-        ? retryDelay * Math.pow(backoffFactor, attempts - 1)
-        : retryDelay;
-      
+      const delay = backoff ? retryDelay * Math.pow(backoffFactor, attempts - 1) : retryDelay;
+
       retryLogger.debug(
         { delay, attempt: attempts, description },
         `Esperando ${delay}ms antes del siguiente reintento`
       );
-      
+
       // Esperar antes del siguiente reintento
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-  
+
   // Este código no debería ejecutarse, pero por si acaso
   throw lastError;
 }
@@ -118,24 +113,21 @@ export async function withRetry(fn, options = {}) {
  * @returns {Function} - Decorador de método
  */
 export function withRetryDecorator(options = {}) {
-  return function(target, propertyKey, descriptor) {
+  return function (target, propertyKey, descriptor) {
     const originalMethod = descriptor.value;
-    
-    descriptor.value = async function(...args) {
-      return withRetry(
-        () => originalMethod.apply(this, args),
-        {
-          ...options,
-          description: options.description || `Método ${propertyKey}`
-        }
-      );
+
+    descriptor.value = async function (...args) {
+      return withRetry(() => originalMethod.apply(this, args), {
+        ...options,
+        description: options.description || `Método ${propertyKey}`,
+      });
     };
-    
+
     return descriptor;
   };
 }
 
 export default {
   withRetry,
-  withRetryDecorator
+  withRetryDecorator,
 };

@@ -7,6 +7,7 @@ Sin Redis, las sesiones no se comparten entre workers del cluster, limitando la 
 ## 📋 **Pasos para Configurar Redis en Railway:**
 
 ### 1️⃣ **Añadir Redis Service**
+
 ```bash
 # En Railway Dashboard:
 1. Ve a tu proyecto FacturAPI SaaS
@@ -14,19 +15,24 @@ Sin Redis, las sesiones no se comparten entre workers del cluster, limitando la 
 3. Railway creará automáticamente la variable REDIS_URL
 ```
 
-### 2️⃣ **Variables Automáticas** 
+### 2️⃣ **Variables Automáticas**
+
 Railway configurará automáticamente:
+
 ```bash
 REDIS_URL="redis://default:password@redis-service.railway.internal:6379"
 ```
 
 ### 3️⃣ **Verificar Configuración**
+
 Una vez configurado Redis, ejecuta:
+
 ```bash
 node scripts/testing/test-redis.js
 ```
 
 Debería mostrar:
+
 ```
 ✅ Redis URL configurada: SÍ
 ✅ Tipo de almacenamiento: redis
@@ -38,6 +44,7 @@ Debería mostrar:
 Para desarrollo local, instala Redis:
 
 ### macOS:
+
 ```bash
 brew install redis
 brew services start redis
@@ -45,6 +52,7 @@ export REDIS_URL="redis://localhost:6379"
 ```
 
 ### Docker:
+
 ```bash
 docker run -d --name redis -p 6379:6379 redis:latest
 export REDIS_URL="redis://localhost:6379"
@@ -78,9 +86,9 @@ GET /api/cluster/metrics   # Métricas generales del cluster
 ## ⚡ **Impacto en Performance**
 
 | Configuración | Usuarios Concurrentes | Sesiones Compartidas |
-|---------------|------------------------|---------------------|
-| **Sin Redis** | ~50 por worker | ❌ NO |
-| **Con Redis** | 100-200+ total | ✅ SÍ |
+| ------------- | --------------------- | -------------------- |
+| **Sin Redis** | ~50 por worker        | ❌ NO                |
+| **Con Redis** | 100-200+ total        | ✅ SÍ                |
 
 ## 🚨 **Importante**
 
@@ -89,8 +97,9 @@ GET /api/cluster/metrics   # Métricas generales del cluster
 
 ---
 
-## 🎯 **Próximo Paso**: 
+## 🎯 **Próximo Paso**:
+
 1. Ve a Railway Dashboard
-2. Add Redis service  
+2. Add Redis service
 3. Deploy el código actual
 4. ¡Listo para 100+ usuarios! 🚀

@@ -7,7 +7,12 @@ import logger from './core/utils/logger.js';
 import routes from './api/routes/index.js';
 import { tenantMiddleware } from './api/middlewares/tenant.middleware.js';
 import errorMiddleware from './api/middlewares/error.middleware.js';
-import { generalRateLimit, invoiceRateLimit, queryRateLimit, authRateLimit } from './api/middlewares/rate-limit.middleware.js';
+import {
+  generalRateLimit,
+  invoiceRateLimit,
+  queryRateLimit,
+  authRateLimit,
+} from './api/middlewares/rate-limit.middleware.js';
 import { sessionMiddleware } from './api/middlewares/session.middleware.js';
 import redisSessionService from './services/redis-session.service.js';
 import { startJobs } from './jobs/index.js';
@@ -60,11 +65,13 @@ async function initializeApp() {
   const app = express();
 
   // Configurar CORS para permitir peticiones desde el frontend
-  app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID']
-  }));
+  app.use(
+    cors({
+      origin: ['http://localhost:3000', 'http://localhost:3001'],
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID'],
+    })
+  );
 
   // Configuración especial para webhooks
   app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
@@ -84,9 +91,9 @@ async function initializeApp() {
   });
 
   app.get('/telegram-webhook', (req, res) => {
-    res.json({ 
+    res.json({
       status: 'Webhook de Telegram activo',
-      bot_initialized: Boolean(telegramBot)
+      bot_initialized: Boolean(telegramBot),
     });
   });
 
@@ -98,16 +105,18 @@ async function initializeApp() {
   serverLogger.info('📦 Servicio de sesiones inicializado para clustering');
 
   // === SESIONES COMPARTIDAS PARA CLUSTERING ===
-  app.use(sessionMiddleware({
-    sessionName: 'facturapi_session',
-    maxAge: 3600, // 1 hora
-    secure: config.env === 'production'
-  }));
+  app.use(
+    sessionMiddleware({
+      sessionName: 'facturapi_session',
+      maxAge: 3600, // 1 hora
+      secure: config.env === 'production',
+    })
+  );
 
   // === RATE LIMITING PARA ESCALABILIDAD ===
   // Rate limiting general para toda la API
   app.use('/api', generalRateLimit);
-  
+
   // Rate limiting específico para endpoints críticos
   app.use('/api/invoices', invoiceRateLimit);
   app.use('/api/auth', authRateLimit);
@@ -130,7 +139,7 @@ async function initializeApp() {
       status: 'API de Facturación activa - FacturAPI SaaS',
       environment: config.env,
       version: '1.0.0',
-      telegram_bot: Boolean(telegramBot)
+      telegram_bot: Boolean(telegramBot),
     });
   });
 
@@ -172,63 +181,68 @@ async function startServer() {
     const PORT = process.env.PORT || config.port || 3000;
 
     // Iniciar el servidor con manejo de errores para puerto en uso
-    const server = app.listen(PORT, () => {
-      serverLogger.info(`Servidor corriendo en http://localhost:${PORT}`);
-      serverLogger.info(`Entorno: ${config.env}`);
-      serverLogger.info(`API de Facturación SaaS lista y funcionando`);
-      serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
-      serverLogger.info(`Frontend disponible en http://localhost:${PORT}`);
-      serverLogger.info(`Bot de Telegram: ${telegramBot ? '✅ Activo' : '❌ Inactivo'}`);
+    const server = app
+      .listen(PORT, () => {
+        serverLogger.info(`Servidor corriendo en http://localhost:${PORT}`);
+        serverLogger.info(`Entorno: ${config.env}`);
+        serverLogger.info(`API de Facturación SaaS lista y funcionando`);
+        serverLogger.info(`Rutas API disponibles en http://localhost:${PORT}/api`);
+        serverLogger.info(`Frontend disponible en http://localhost:${PORT}`);
+        serverLogger.info(`Bot de Telegram: ${telegramBot ? '✅ Activo' : '❌ Inactivo'}`);
 
-      // Inicializar servicio de notificaciones
-      const notificationInitialized = NotificationService.initialize();
-      if (notificationInitialized) {
-        serverLogger.info('Servicio de notificaciones inicializado correctamente');
-      } else {
-        serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
-      }
+        // Inicializar servicio de notificaciones
+        const notificationInitialized = NotificationService.initialize();
+        if (notificationInitialized) {
+          serverLogger.info('Servicio de notificaciones inicializado correctamente');
+        } else {
+          serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
+        }
 
-      // Iniciar sistema de jobs programados
-      startJobs();
-      serverLogger.info('Sistema de jobs programados iniciado');
-    }).on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        // Si el puerto está en uso, intentar con otro puerto
-        const newPort = PORT + 1;
-        serverLogger.warn(`Puerto ${PORT} en uso, intentando con puerto ${newPort}`);
-        server.close();
-        app.listen(newPort, () => {
-          serverLogger.info(`Servidor corriendo en http://localhost:${newPort}`);
-          serverLogger.info(`Entorno: ${config.env}`);
-          serverLogger.info(`API de Facturación SaaS lista y funcionando`);
-          serverLogger.info(`Rutas API disponibles en http://localhost:${newPort}/api`);
-          serverLogger.info(`Frontend disponible en http://localhost:${newPort}`);
+        // Iniciar sistema de jobs programados
+        startJobs();
+        serverLogger.info('Sistema de jobs programados iniciado');
+      })
+      .on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          // Si el puerto está en uso, intentar con otro puerto
+          const newPort = PORT + 1;
+          serverLogger.warn(`Puerto ${PORT} en uso, intentando con puerto ${newPort}`);
+          server.close();
+          app.listen(newPort, () => {
+            serverLogger.info(`Servidor corriendo en http://localhost:${newPort}`);
+            serverLogger.info(`Entorno: ${config.env}`);
+            serverLogger.info(`API de Facturación SaaS lista y funcionando`);
+            serverLogger.info(`Rutas API disponibles en http://localhost:${newPort}/api`);
+            serverLogger.info(`Frontend disponible en http://localhost:${newPort}`);
 
-          // Inicializar servicio de notificaciones
-          const notificationInitialized = NotificationService.initialize();
-          if (notificationInitialized) {
-            serverLogger.info('Servicio de notificaciones inicializado correctamente');
-          } else {
-            serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
-          }
+            // Inicializar servicio de notificaciones
+            const notificationInitialized = NotificationService.initialize();
+            if (notificationInitialized) {
+              serverLogger.info('Servicio de notificaciones inicializado correctamente');
+            } else {
+              serverLogger.warn('El servicio de notificaciones no pudo ser inicializado');
+            }
 
-          // Iniciar sistema de jobs programados
-          startJobs();
-          serverLogger.info('Sistema de jobs programados iniciado');
-        });
-      } else {
-        // Log more details about the error
-        console.error('Raw Server Startup Error:', err);
-        serverLogger.error({
-          message: err.message,
-          stack: err.stack,
-          code: err.code,
-          errno: err.errno,
-          syscall: err.syscall
-        }, 'Error detallado al iniciar el servidor');
-        process.exit(1);
-      }
-    });
+            // Iniciar sistema de jobs programados
+            startJobs();
+            serverLogger.info('Sistema de jobs programados iniciado');
+          });
+        } else {
+          // Log more details about the error
+          console.error('Raw Server Startup Error:', err);
+          serverLogger.error(
+            {
+              message: err.message,
+              stack: err.stack,
+              code: err.code,
+              errno: err.errno,
+              syscall: err.syscall,
+            },
+            'Error detallado al iniciar el servidor'
+          );
+          process.exit(1);
+        }
+      });
 
     // Habilitar el cierre correcto
     process.once('SIGINT', () => {
@@ -250,17 +264,19 @@ async function startServer() {
         process.exit(0);
       });
     });
-
   } catch (error) {
     // Log errors during the initial setup phase (before app.listen)
     console.error('Raw Server Initialization Error:', error);
-    serverLogger.error({
+    serverLogger.error(
+      {
         message: error.message,
         stack: error.stack,
         code: error.code,
         errno: error.errno,
-        syscall: error.syscale
-    }, 'Error detallado durante la inicialización del servidor');
+        syscall: error.syscale,
+      },
+      'Error detallado durante la inicialización del servidor'
+    );
     process.exit(1);
   }
 }

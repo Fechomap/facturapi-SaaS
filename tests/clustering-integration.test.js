@@ -14,11 +14,11 @@ class MockWorkerContext {
   }
 
   async reply(message, options) {
-    this.messages.push({ 
+    this.messages.push({
       workerId: this.workerId,
-      message, 
-      options, 
-      timestamp: Date.now() 
+      message,
+      options,
+      timestamp: Date.now(),
     });
     return { message_id: Math.floor(Math.random() * 1000) };
   }
@@ -40,8 +40,12 @@ class MockWorkerContext {
     return result;
   }
 
-  hasTenant() { return true; }
-  getTenantId() { return 'test-tenant-clustering'; }
+  hasTenant() {
+    return true;
+  }
+  getTenantId() {
+    return 'test-tenant-clustering';
+  }
 
   isProcessActive(processId) {
     return this._activeProcesses.has(processId);
@@ -63,7 +67,7 @@ class MockFacturapiService {
   static async generateInvoice(data, tenantId, simulateDelay = 100) {
     // Simular latencia de red variable
     const delay = simulateDelay + Math.random() * 200;
-    await new Promise(resolve => setTimeout(resolve, delay));
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     // Simular fallas ocasionales (10% de probabilidad)
     if (Math.random() < 0.1) {
@@ -73,7 +77,7 @@ class MockFacturapiService {
     return {
       id: `fact_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       folio_number: Math.floor(Math.random() * 9999) + 1,
-      series: ['A', 'B', 'C'][Math.floor(Math.random() * 3)]
+      series: ['A', 'B', 'C'][Math.floor(Math.random() * 3)],
     };
   }
 }
@@ -111,11 +115,11 @@ describe('Clustering Integration Tests', () => {
         analysis: {
           clientName: 'CLUSTERING TEST CLIENT SA',
           orderNumber: 'CLUST-001',
-          totalAmount: 5000.00,
-          confidence: 92
+          totalAmount: 5000.0,
+          confidence: 92,
         },
         validation: { isValid: true },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Simular análisis PDF en Worker 1
@@ -149,7 +153,7 @@ describe('Clustering Integration Tests', () => {
 
       try {
         const factura = await MockFacturapiService.generateInvoice(
-          recoveredAnalysis.analysis, 
+          recoveredAnalysis.analysis,
           worker3.getTenantId()
         );
 
@@ -166,7 +170,6 @@ describe('Clustering Integration Tests', () => {
         // Verificar estado final
         expect(worker3.session.facturaId).toBe(factura.id);
         expect(worker3.session.pdfAnalysis).toBeUndefined();
-
       } catch (error) {
         // Simular reintentos como en el código real
         console.log(`Worker 3 falló, será reintentado: ${error.message}`);
@@ -185,7 +188,7 @@ describe('Clustering Integration Tests', () => {
       const baseData = {
         userId: userId,
         concurrentOperations: [],
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
       };
 
       // Worker inicial establece la sesión
@@ -205,18 +208,21 @@ describe('Clustering Integration Tests', () => {
       const concurrentOperations = workers.map(async (worker, index) => {
         // Cada worker carga la sesión
         await worker.loadSession();
-        
+
         // Simular latencia variable
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
+
         // Actualizar datos
         const currentOps = worker.session.concurrentOperations || [];
-        worker.session.concurrentOperations = [...currentOps, `op_${worker.workerId}_${Date.now()}`];
+        worker.session.concurrentOperations = [
+          ...currentOps,
+          `op_${worker.workerId}_${Date.now()}`,
+        ];
         worker.session.lastUpdate = Date.now();
-        
+
         // Guardar cambios
         await worker.saveSession();
-        
+
         return worker.workerId;
       });
 
@@ -249,8 +255,8 @@ describe('Clustering Integration Tests', () => {
       const facturaData = {
         clienteNombre: 'RETRY CLIENT SA',
         numeroPedido: 'RETRY-001',
-        monto: 1500.00,
-        claveProducto: '78101803'
+        monto: 1500.0,
+        claveProducto: '78101803',
       };
 
       worker1.session = { ...facturaData, retryAttempts: 0 };
@@ -289,8 +295,8 @@ describe('Clustering Integration Tests', () => {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           factura = await MockFacturapiService.generateInvoice(
-            facturaData, 
-            worker2.getTenantId(), 
+            facturaData,
+            worker2.getTenantId(),
             20 // Menor latencia para aumentar probabilidad de éxito
           );
           retrySuccess = true;
@@ -298,7 +304,7 @@ describe('Clustering Integration Tests', () => {
         } catch (error) {
           worker2.session.retryAttempts = worker2.session.retryAttempts + 1;
           await worker2.saveSession();
-          await new Promise(resolve => setTimeout(resolve, 50)); // Delay entre reintentos
+          await new Promise((resolve) => setTimeout(resolve, 50)); // Delay entre reintentos
         }
       }
 
@@ -331,7 +337,7 @@ describe('Clustering Integration Tests', () => {
       const facturaData = {
         id: 'fact_download_test',
         folio_number: 12345,
-        series: 'D'
+        series: 'D',
       };
 
       generationWorker.session = {
@@ -339,7 +345,7 @@ describe('Clustering Integration Tests', () => {
         folioFactura: facturaData.folio_number,
         series: facturaData.series,
         facturaGenerada: true,
-        clienteNombre: 'DOWNLOAD TEST CLIENT'
+        clienteNombre: 'DOWNLOAD TEST CLIENT',
       };
 
       await generationWorker.saveSession();
@@ -398,7 +404,7 @@ describe('Clustering Integration Tests', () => {
       const sessionData = {
         userId: userId,
         temporaryData: 'This should expire',
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Guardar con TTL muy corto (1 segundo)
@@ -409,7 +415,7 @@ describe('Clustering Integration Tests', () => {
       expect(result.success).toBe(true);
 
       // Worker 2: Intenta acceder después de expiración
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       const worker2 = new MockWorkerContext('SHORT2', userId);
       worker2.sessionId = shortSessionId;
@@ -422,7 +428,7 @@ describe('Clustering Integration Tests', () => {
         worker2.session = {
           userId: userId,
           newSession: true,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
         await worker2.saveSession();
       }
@@ -457,36 +463,38 @@ describe('Clustering Integration Tests', () => {
                 worker.session = {
                   userId: userId,
                   operations: [],
-                  createdBy: worker.workerId
+                  createdBy: worker.workerId,
                 };
               }
 
               // Operación 2: Actualizar datos
               const currentOps = worker.session.operations || [];
-              worker.session.operations = [...currentOps, {
-                workerId: worker.workerId,
-                timestamp: Date.now(),
-                operation: `load_test_op_${workerIndex}`
-              }];
+              worker.session.operations = [
+                ...currentOps,
+                {
+                  workerId: worker.workerId,
+                  timestamp: Date.now(),
+                  operation: `load_test_op_${workerIndex}`,
+                },
+              ];
 
               // Operación 3: Guardar
               await worker.saveSession();
 
               // Operación 4: Simular procesamiento
-              await new Promise(resolve => setTimeout(resolve, Math.random() * 100));
+              await new Promise((resolve) => setTimeout(resolve, Math.random() * 100));
 
               return {
                 userId: userId,
                 workerId: worker.workerId,
-                success: true
+                success: true,
               };
-
             } catch (error) {
               return {
                 userId: userId,
                 workerId: worker.workerId,
                 success: false,
-                error: error.message
+                error: error.message,
               };
             }
           };
@@ -499,8 +507,8 @@ describe('Clustering Integration Tests', () => {
       const results = await Promise.all(operations);
 
       // Verificar resultados
-      const successful = results.filter(r => r.success);
-      const failed = results.filter(r => !r.success);
+      const successful = results.filter((r) => r.success);
+      const failed = results.filter((r) => !r.success);
 
       expect(successful.length).toBeGreaterThan(failed.length);
       expect(successful.length).toBeGreaterThanOrEqual(numUsers * workersPerUser * 0.8); // Al menos 80% de éxito
@@ -527,7 +535,7 @@ describe('Clustering Integration Tests', () => {
       initialWorker.session = {
         userId: userId,
         operationLog: [],
-        checksum: 0
+        checksum: 0,
       };
       await initialWorker.saveSession();
 
@@ -544,7 +552,7 @@ describe('Clustering Integration Tests', () => {
         const newOperation = {
           index: i,
           workerId: worker.workerId,
-          timestamp: Date.now()
+          timestamp: Date.now(),
         };
 
         worker.session.operationLog = [...currentLog, newOperation];
@@ -554,7 +562,7 @@ describe('Clustering Integration Tests', () => {
         await worker.saveSession();
 
         // Pequeño delay para simular procesamiento
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
 
       // Verificar consistencia final
@@ -566,7 +574,9 @@ describe('Clustering Integration Tests', () => {
       expect(finalWorker.session.checksum).toBe(numOperations);
 
       // Verificar que todas las operaciones están registradas
-      const operationIndices = finalWorker.session.operationLog.map(op => op.index).sort((a, b) => a - b);
+      const operationIndices = finalWorker.session.operationLog
+        .map((op) => op.index)
+        .sort((a, b) => a - b);
       const expectedIndices = Array.from({ length: numOperations }, (_, i) => i);
 
       expect(operationIndices).toEqual(expectedIndices);

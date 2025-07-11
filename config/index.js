@@ -6,7 +6,12 @@ import path from 'path';
 import logger from '../core/utils/logger.js';
 import { facturapiConfig, stripeConfig, validateServicesConfig } from './services.js';
 import { authConfig, validateAuthConfig } from './auth.js';
-import { getDatabaseConfig, validateDatabaseConfig, connectDatabase, disconnectDatabase } from './database.js';
+import {
+  getDatabaseConfig,
+  validateDatabaseConfig,
+  connectDatabase,
+  disconnectDatabase,
+} from './database.js';
 import prisma from '../lib/prisma.js';
 
 // Logger específico para configuración
@@ -31,23 +36,23 @@ dotenv.config();
 // Función para validar variables de entorno críticas
 const validateEnv = () => {
   const requiredVars = [];
-  
+
   // Si estamos ejecutando el bot, necesitamos el token de Telegram
   const executedFile = process.argv[1];
   if (executedFile && executedFile.includes('bot.js')) {
     requiredVars.push('TELEGRAM_BOT_TOKEN');
   }
-  
+
   // Para cualquier entorno, necesitamos la URL de la base de datos
   requiredVars.push('DATABASE_URL');
-  
+
   // NOTA: Variables CLIENTE_* removidas - ya no se requieren en sistema multitenant
-  
+
   // Para operaciones administrativas de FacturAPI
   requiredVars.push('FACTURAPI_USER_KEY');
-  
-  const missing = requiredVars.filter(varName => !process.env[varName]);
-  
+
+  const missing = requiredVars.filter((varName) => !process.env[varName]);
+
   if (missing.length > 0) {
     configLogger.error(`Variables de entorno requeridas no encontradas: ${missing.join(', ')}`);
     if (IS_RAILWAY) {
@@ -75,7 +80,9 @@ if (IS_RAILWAY) {
   } else if (process.env.API_BASE_URL) {
     apiBaseUrlConfig = process.env.API_BASE_URL;
   } else {
-    configLogger.warn('No se encontró RAILWAY_PUBLIC_DOMAIN ni API_BASE_URL, usando valor genérico');
+    configLogger.warn(
+      'No se encontró RAILWAY_PUBLIC_DOMAIN ni API_BASE_URL, usando valor genérico'
+    );
     apiBaseUrlConfig = 'https://app.railway.app';
   }
   configLogger.info(`Entorno Railway detectado, usando URL base: ${apiBaseUrlConfig}`);
@@ -98,57 +105,57 @@ const config = {
   // Entorno de la aplicación y plataforma
   env: NODE_ENV,
   isRailway: IS_RAILWAY,
-  
+
   // Puerto para el servidor
   port: process.env.PORT || 3000,
-  
+
   // Configuración de FacturAPI
   facturapi: facturapiConfig,
-  
+
   // Configuración del Bot de Telegram
   telegram: {
     token: process.env.TELEGRAM_BOT_TOKEN,
     authorizedUsers: authConfig.telegram.authorizedUsers,
     // FIX: Añadir adminChatIds que estaba faltando
-    adminChatIds: process.env.ADMIN_CHAT_IDS 
-      ? process.env.ADMIN_CHAT_IDS.split(',').map(id => id.trim())
-      : []
+    adminChatIds: process.env.ADMIN_CHAT_IDS
+      ? process.env.ADMIN_CHAT_IDS.split(',').map((id) => id.trim())
+      : [],
   },
-  
+
   // URL base para las solicitudes del bot a la API
   apiBaseUrl: apiBaseUrlConfig,
-  
+
   // NOTA: IDs de clientes removidos - sistema multitenant
-  
+
   // Base de datos
   database: {
     url: process.env.DATABASE_URL,
     prisma,
-    connect: connectDatabase
+    connect: connectDatabase,
   },
-  
+
   // Configuración de Stripe
   stripe: stripeConfig,
-  
+
   // Configuración de autenticación
   auth: authConfig,
-  
+
   // Configuración de almacenamiento
   storage: {
     basePath: IS_RAILWAY
       ? '/tmp/storage' // En Railway usamos /tmp
       : path.resolve(__dirname, '../storage'),
-    maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10)
+    maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10),
   },
-  
+
   // Helper para construir URLs de API
-  buildApiUrl: function(path) {
+  buildApiUrl: function (path) {
     const pathWithLeadingSlash = path.startsWith('/') ? path : `/${path}`;
     return `${this.apiBaseUrl}${pathWithLeadingSlash}`;
   },
-  
+
   // Función para obtener una representación segura de la configuración
-  getSafeConfig: function() {
+  getSafeConfig: function () {
     return {
       env: this.env,
       isRailway: this.isRailway,
@@ -156,44 +163,46 @@ const config = {
       apiBaseUrl: this.apiBaseUrl,
       facturapi: {
         apiVersion: this.facturapi.apiVersion,
-        userKey: this.facturapi.userKey ? `${this.facturapi.userKey.substring(0, 4)}...` : 'no configurada'
+        userKey: this.facturapi.userKey
+          ? `${this.facturapi.userKey.substring(0, 4)}...`
+          : 'no configurada',
       },
       telegram: {
         token: this.telegram.token ? `${this.telegram.token.substring(0, 8)}...` : 'no configurado',
-        authorizedUsers: this.telegram.authorizedUsers.length 
-          ? `${this.telegram.authorizedUsers.length} usuarios autorizados` 
+        authorizedUsers: this.telegram.authorizedUsers.length
+          ? `${this.telegram.authorizedUsers.length} usuarios autorizados`
           : 'Todos los usuarios',
-        adminChatIds: this.telegram.adminChatIds.length 
+        adminChatIds: this.telegram.adminChatIds.length
           ? `${this.telegram.adminChatIds.length} admins configurados`
-          : 'Sin admins configurados'
+          : 'Sin admins configurados',
       },
       // NOTA: Configuración de clientes removida - sistema multitenant
       database: {
-        url: this.database.url ? 'configurada' : 'no configurada'
+        url: this.database.url ? 'configurada' : 'no configurada',
       },
       storage: {
         basePath: this.storage.basePath,
-        maxFileSizeMB: this.storage.maxFileSizeMB
-      }
+        maxFileSizeMB: this.storage.maxFileSizeMB,
+      },
     };
-  }
+  },
 };
 
 // Función para inicializar y validar toda la configuración
 const initConfig = async () => {
   // Validar variables de entorno
   validateEnv();
-  
+
   // Validar configuración de servicios
   validateServicesConfig();
-  
+
   // Validar configuración de autenticación
   validateAuthConfig();
-  
+
   // Mostrar configuración segura
   configLogger.info('Configuración cargada correctamente');
   configLogger.debug(config.getSafeConfig(), 'Configuración segura');
-  
+
   return config;
 };
 

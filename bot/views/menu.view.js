@@ -11,7 +11,7 @@ export function mainMenu() {
     [Markup.button.callback('🔍 Consultar Factura', 'menu_consultar')],
     [Markup.button.callback('📊 Reportes', 'menu_reportes')],
     [Markup.button.callback('💳 Mi Suscripción', 'menu_suscripcion')],
-    [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')]
+    [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')],
   ]);
 }
 
@@ -23,7 +23,7 @@ export function reportsMenu() {
     [Markup.button.callback('📈 Reporte de Facturación', 'reporte_facturas_action')],
     [Markup.button.callback('💰 Reporte de Suscripción', 'reporte_suscripcion_action')],
     [Markup.button.callback('🔄 Estado de Progreso', 'view_onboarding_progress')],
-    [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+    [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
   ]);
 }
 
@@ -33,7 +33,7 @@ export function reportsMenu() {
 export function startMenu() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('📝 Crear organización', 'create_organization')],
-    [Markup.button.callback('ℹ️ Más información', 'show_pricing')]
+    [Markup.button.callback('ℹ️ Más información', 'show_pricing')],
   ]);
 }
 
@@ -43,15 +43,15 @@ export function startMenu() {
  * @param {boolean} includeChubb - Si se debe incluir la opción CHUBB
  */
 export function clientSelectionMenu(clients, includeChubb = true) {
-  const buttons = clients.map(client => 
-    [Markup.button.callback(client.name, `cliente_${client.id}`)]
-  );
-  
+  const buttons = clients.map((client) => [
+    Markup.button.callback(client.name, `cliente_${client.id}`),
+  ]);
+
   if (includeChubb) {
     buttons.push([Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')]);
     buttons.push([Markup.button.callback('AXA (Archivo Excel)', 'menu_axa')]);
   }
-  
+
   return Markup.inlineKeyboard(buttons);
 }
 
@@ -59,12 +59,12 @@ export function clientSelectionMenu(clients, includeChubb = true) {
 export function confirmationMenu(transactionId) {
   return Markup.inlineKeyboard([
     [Markup.button.callback('✅ Confirmar', `confirmar_${transactionId}`)],
-    [Markup.button.callback('❌ Cancelar', `cancelar_${transactionId}`)]
+    [Markup.button.callback('❌ Cancelar', `cancelar_${transactionId}`)],
   ]);
 }
 
 export function backToMainMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')]
+    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')],
   ]);
 }

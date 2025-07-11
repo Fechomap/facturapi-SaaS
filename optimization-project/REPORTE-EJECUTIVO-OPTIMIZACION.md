@@ -1,15 +1,18 @@
 # 📊 REPORTE EJECUTIVO: OPTIMIZACIÓN BOT FACTURAPI
+
 **Fecha**: 10 Julio 2025  
 **Estado**: CRÍTICO - Requiere acción inmediata
 
 ## 🚨 RESUMEN EJECUTIVO
 
 ### Situación Actual
+
 - **CURL directo**: 4 segundos ✅
 - **Bot actual**: 8-10 segundos ❌ (con picos variables)
 - **Overhead**: 4-6 segundos adicionales (100-150% más lento)
 
 ### Hallazgos Principales
+
 1. **getNextFolio**: 3.4 segundos promedio (86% del overhead)
 2. **Bloat extremo en PostgreSQL**: hasta 1,166% en tablas críticas
 3. **Sequential Scans**: PostgreSQL no usa índices existentes
@@ -21,6 +24,7 @@
 ## 📋 ORDEN DE EJECUCIÓN (CRÍTICO)
 
 ### FASE 1: BASE DE DATOS (Hacer AHORA - 30 minutos)
+
 ```bash
 # 1. Conectar a PostgreSQL
 psql -U tu_usuario -d tu_base_de_datos
@@ -32,6 +36,7 @@ psql -U tu_usuario -d tu_base_de_datos
 **Impacto esperado**: Reducir getNextFolio de 3,437ms → 50ms
 
 ### FASE 2: DEPLOY CÓDIGO OPTIMIZADO (Después del VACUUM - 15 minutos)
+
 ```bash
 # 1. Los cambios ya están hechos en:
 - services/tenant.service.js (getNextFolio optimizado)
@@ -47,6 +52,7 @@ git push origin main  # Railway auto-deploy
 ### FASE 3: IMPLEMENTAR CACHE (30 minutos)
 
 #### Cache para FacturAPI Client:
+
 ```javascript
 // services/facturapi.service.js - Agregar al inicio de la clase
 class FacturapiService {
@@ -75,6 +81,7 @@ class FacturapiService {
 ### FASE 4: ELIMINAR REDUNDANCIAS (20 minutos)
 
 #### En invoice.service.js línea 98-124:
+
 ```javascript
 // ELIMINAR esta verificación redundante:
 // let requiresWithholding = false;
@@ -84,8 +91,9 @@ class FacturapiService {
 // }
 
 // REEMPLAZAR por:
-const requiresWithholding = ['INFOASIST', 'ARSA', 'S.O.S', 'SOS']
-  .some(name => data.clienteNombre?.includes(name));
+const requiresWithholding = ['INFOASIST', 'ARSA', 'S.O.S', 'SOS'].some((name) =>
+  data.clienteNombre?.includes(name)
+);
 ```
 
 ---
@@ -93,6 +101,7 @@ const requiresWithholding = ['INFOASIST', 'ARSA', 'S.O.S', 'SOS']
 ## 📊 MÉTRICAS Y MONITOREO
 
 ### Antes de optimizaciones:
+
 ```
 Operación            | Tiempo
 ---------------------|--------
@@ -105,6 +114,7 @@ TOTAL Bot            | ~7,766ms
 ```
 
 ### Después de optimizaciones:
+
 ```
 Operación            | Esperado | Mejora
 ---------------------|----------|--------
@@ -121,11 +131,12 @@ TOTAL Bot            | ~4,200ms | 46%
 ## 🔍 VERIFICACIÓN POST-IMPLEMENTACIÓN
 
 ### 1. Verificar mejoras en DB:
+
 ```sql
 -- Verificar que no hay Sequential Scans
-EXPLAIN (ANALYZE, BUFFERS) 
-UPDATE tenant_folios 
-SET current_number = current_number + 1 
+EXPLAIN (ANALYZE, BUFFERS)
+UPDATE tenant_folios
+SET current_number = current_number + 1
 WHERE tenant_id = 'tu-tenant-id'::uuid AND series = 'A';
 
 -- Verificar bloat reducido
@@ -136,11 +147,13 @@ WHERE schemaname = 'public';
 ```
 
 ### 2. Ejecutar diagnóstico:
+
 ```bash
 node scripts/diagnose-bottlenecks.js
 ```
 
 ### 3. Monitorear en producción:
+
 - Logs de Railway: `railway logs --follow`
 - Métricas de New Relic/DataDog si tienes
 - Feedback de usuarios
@@ -150,10 +163,12 @@ node scripts/diagnose-bottlenecks.js
 ## ⚠️ RIESGOS Y MITIGACIONES
 
 1. **VACUUM FULL bloquea tablas**
+
    - Ejecutar en horario de bajo tráfico
    - O usar VACUUM simple primero
 
 2. **Cambios en getNextFolio**
+
    - Tiene fallback al método anterior
    - Monitorear logs por errores
 
@@ -166,14 +181,17 @@ node scripts/diagnose-bottlenecks.js
 ## 📈 PRÓXIMOS PASOS (OPCIONAL)
 
 1. **Connection Pooling con pgBouncer**
+
    - Reducir latencia de conexión
    - Mejor manejo de concurrencia
 
 2. **Redis para sesiones**
+
    - Ya está parcialmente implementado
    - Completar migración
 
 3. **Batch processing para Excel**
+
    - Procesar múltiples facturas en paralelo
    - Usar transacciones para atomicidad
 

@@ -50,10 +50,7 @@ if (isDevelopment || process.stdout.isTTY) {
 }
 
 // Crea la instancia del logger
-const logger = pino(
-  baseConfig,
-  transport ? pino.transport(transport) : undefined
-);
+const logger = pino(baseConfig, transport ? pino.transport(transport) : undefined);
 
 // Exporta el logger directamente
 export default logger;

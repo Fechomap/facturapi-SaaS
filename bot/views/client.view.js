@@ -7,19 +7,19 @@ import { Markup } from 'telegraf';
  */
 export function clientStatusView(customerStatus) {
   let statusMessage = '📋 *Estado actual de clientes*\n\n';
-  
-  customerStatus.clients.forEach(client => {
+
+  customerStatus.clients.forEach((client) => {
     const emoji = client.isConfigured ? '✅' : '⏳';
     statusMessage += `${emoji} ${client.legalName}\n`;
   });
-  
+
   statusMessage += `\n*Total:* ${customerStatus.configuredCount} de ${customerStatus.totalCount} clientes configurados`;
-  
+
   const keyboard = Markup.inlineKeyboard([
     [Markup.button.callback('✅ Configurar clientes pendientes', 'start_client_setup')],
-    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')]
+    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')],
   ]);
-  
+
   return { message: statusMessage, keyboard, parse_mode: 'Markdown' };
 }
 
@@ -30,19 +30,21 @@ export function clientStatusView(customerStatus) {
  */
 export function clientSetupResultView(successCount, newlyConfigured) {
   let message;
-  
+
   if (newlyConfigured > 0) {
-    message = `✅ Configuración completada con éxito.\n\n` +
+    message =
+      `✅ Configuración completada con éxito.\n\n` +
       `Se han configurado ${newlyConfigured} nuevos clientes.\n` +
       `Total de clientes disponibles: ${successCount}`;
   } else {
-    message = `ℹ️ No se han configurado nuevos clientes.\n\n` +
+    message =
+      `ℹ️ No se han configurado nuevos clientes.\n\n` +
       `Ya tienes ${successCount} clientes configurados.`;
   }
-  
+
   const keyboard = Markup.inlineKeyboard([
-    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')]
+    [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')],
   ]);
-  
+
   return { message, keyboard };
 }

@@ -19,6 +19,6 @@ export function registerAllCommands(bot) {
   registerAdminCommands(bot);
   registerOnboardingCommands(bot);
   registerReportCommands(bot); // Nuevo registro
-  
+
   console.log('✅ Comandos registrados correctamente');
 }

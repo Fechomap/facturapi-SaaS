@@ -43,8 +43,8 @@ export const cancelInvoice = async (id, motive) => {
 
 export const downloadInvoicePdf = async (id) => {
   try {
-    const response = await apiClient.get(`/facturas/${id}/pdf`, { 
-      responseType: 'blob' 
+    const response = await apiClient.get(`/facturas/${id}/pdf`, {
+      responseType: 'blob',
     });
     // Crear URL para descarga
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -63,8 +63,8 @@ export const downloadInvoicePdf = async (id) => {
 
 export const downloadInvoiceXml = async (id) => {
   try {
-    const response = await apiClient.get(`/facturas/${id}/xml`, { 
-      responseType: 'blob' 
+    const response = await apiClient.get(`/facturas/${id}/xml`, {
+      responseType: 'blob',
     });
     // Crear URL para descarga
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -90,7 +90,7 @@ export const searchInvoices = async (criteria) => {
         params.append(key, value);
       }
     });
-    
+
     const response = await apiClient.get(`/facturas/search?${params.toString()}`);
     return response.data;
   } catch (error) {
@@ -106,7 +106,7 @@ const invoiceService = {
   cancelInvoice,
   downloadInvoicePdf,
   downloadInvoiceXml,
-  searchInvoices
+  searchInvoices,
 };
 
 export default invoiceService;

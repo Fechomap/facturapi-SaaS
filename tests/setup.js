@@ -16,7 +16,7 @@ beforeAll(() => {
       originalError(...args);
     }
   };
-  
+
   console.warn = (...args) => {
     // Solo mostrar warnings importantes
     if (!args[0]?.toString().includes('ExperimentalWarning')) {
@@ -44,29 +44,29 @@ global.testUtils = {
       return { message_id: Math.floor(Math.random() * 1000) };
     },
     hasTenant: () => true,
-    getTenantId: () => 'test-tenant-123'
+    getTenantId: () => 'test-tenant-123',
   }),
 
-  sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 
   generateTestAnalysisData: (overrides = {}) => ({
     id: `test_analysis_${Date.now()}`,
     analysis: {
       clientName: 'TEST CLIENT SA DE CV',
       orderNumber: 'TEST-001',
-      totalAmount: 1000.00,
+      totalAmount: 1000.0,
       confidence: 85,
-      ...overrides.analysis
+      ...overrides.analysis,
     },
     validation: { isValid: true },
     timestamp: Date.now(),
-    ...overrides
+    ...overrides,
   }),
 
   generateTestFacturaData: (overrides = {}) => ({
     id: `fact_test_${Date.now()}`,
     folio_number: Math.floor(Math.random() * 9999) + 1,
     series: 'A',
-    ...overrides
-  })
+    ...overrides,
+  }),
 };

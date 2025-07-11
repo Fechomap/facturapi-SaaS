@@ -26,8 +26,8 @@ describe('Redis Session Service', () => {
         pdfAnalysis: {
           id: 'analysis_123',
           analysis: { clientName: 'Test Client SA' },
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       };
 
       // Guardar sesión
@@ -80,33 +80,35 @@ describe('Redis Session Service', () => {
             clientName: 'COMPLEJO EMPRESARIAL SA DE CV',
             clientCode: 'CLI001',
             orderNumber: 'ORD-2025-001',
-            totalAmount: 1160.00,
+            totalAmount: 1160.0,
             confidence: 85,
             items: [
               { description: 'Producto 1', amount: 500 },
-              { description: 'Producto 2', amount: 660 }
-            ]
+              { description: 'Producto 2', amount: 660 },
+            ],
           },
           validation: { isValid: true },
-          timestamp: Date.now()
+          timestamp: Date.now(),
         },
         facturaState: {
           step: 'confirmation',
-          transactionId: 'tx_123456'
-        }
+          transactionId: 'tx_123456',
+        },
       };
 
       // Worker 1: Guardar datos
       await redisSessionService.setSession(sessionId, complexData);
 
       // Simular latencia entre workers
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Worker 2: Recuperar datos
       const retrievedResult = await redisSessionService.getSession(sessionId);
-      
+
       expect(retrievedResult.success).toBe(true);
-      expect(retrievedResult.data.pdfAnalysis.analysis.clientName).toBe('COMPLEJO EMPRESARIAL SA DE CV');
+      expect(retrievedResult.data.pdfAnalysis.analysis.clientName).toBe(
+        'COMPLEJO EMPRESARIAL SA DE CV'
+      );
       expect(retrievedResult.data.pdfAnalysis.analysis.items).toHaveLength(2);
       expect(retrievedResult.data.facturaState.transactionId).toBe('tx_123456');
 
@@ -126,7 +128,7 @@ describe('Redis Session Service', () => {
         const result = await redisSessionService.getSession(sessionId);
         expect(result.success).toBe(true);
         expect(result.data.userId).toBe('concurrent_user');
-        
+
         // Cada worker actualiza con su índice
         const updatedData = { ...result.data, workerId: index };
         await redisSessionService.setSession(sessionId, updatedData);
@@ -158,7 +160,7 @@ describe('Redis Session Service', () => {
       expect(result.success).toBe(true);
 
       // Esperar expiración
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Verificar que expiró
       result = await redisSessionService.getSession(sessionId);
@@ -169,13 +171,13 @@ describe('Redis Session Service', () => {
   describe('Error Handling', () => {
     test('should handle invalid session data gracefully', async () => {
       const sessionId = 'invalid_data_session';
-      
+
       // Intentar guardar datos circulares (no serializables)
       const circularData = { userId: 'test' };
       circularData.self = circularData;
 
       const result = await redisSessionService.setSession(sessionId, circularData);
-      
+
       // Debería manejar el error sin crashear
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
@@ -191,11 +193,11 @@ describe('Redis Session Service', () => {
   describe('Statistics and Health Check', () => {
     test('should provide accurate statistics', async () => {
       const stats = await redisSessionService.getStats();
-      
+
       expect(stats).toHaveProperty('type');
       expect(stats).toHaveProperty('connected');
       expect(stats.type === 'redis' || stats.type === 'memory').toBe(true);
-      
+
       if (stats.type === 'redis') {
         expect(stats).toHaveProperty('activeSessions');
         expect(typeof stats.activeSessions).toBe('number');
@@ -204,10 +206,10 @@ describe('Redis Session Service', () => {
 
     test('should indicate proper connection status', async () => {
       const stats = await redisSessionService.getStats();
-      
+
       // En ambiente de test, debería estar conectado o usar memoria
       expect(stats.type === 'redis' || stats.type === 'memory').toBe(true);
-      
+
       if (stats.type === 'redis') {
         expect(stats.connected).toBe(true);
       }
@@ -217,7 +219,7 @@ describe('Redis Session Service', () => {
   describe('Bug Prevention Tests', () => {
     test('should prevent data loss between workers (Bug Fix Verification)', async () => {
       const sessionId = 'bug_prevention_session';
-      
+
       // Simular el bug original: datos de PDF analysis perdidos entre workers
       const pdfAnalysisData = {
         userId: 'user_bug_test',
@@ -226,10 +228,10 @@ describe('Redis Session Service', () => {
           analysis: {
             clientName: 'BUG TEST CLIENT SA',
             orderNumber: 'BUG-001',
-            totalAmount: 999.99
+            totalAmount: 999.99,
           },
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       };
 
       // Worker 1: Guarda análisis de PDF
@@ -246,7 +248,7 @@ describe('Redis Session Service', () => {
         facturaId: 'factura_123',
         folioFactura: '456',
         series: 'A',
-        facturaGenerada: true
+        facturaGenerada: true,
       };
 
       await redisSessionService.setSession(sessionId, updatedData);

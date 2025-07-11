@@ -7,7 +7,12 @@ import { requireTenant } from '../middlewares/tenant.middleware.js';
 const router = express.Router();
 
 // Rutas para facturas con requireTenant aplicado
-router.post('/', requireTenant, validateRequest(createInvoiceSchema), invoiceController.createInvoice);
+router.post(
+  '/',
+  requireTenant,
+  validateRequest(createInvoiceSchema),
+  invoiceController.createInvoice
+);
 router.post('/simple', requireTenant, invoiceController.createSimpleInvoice);
 router.get('/', requireTenant, invoiceController.listInvoices);
 router.get('/:id', requireTenant, invoiceController.getInvoice);

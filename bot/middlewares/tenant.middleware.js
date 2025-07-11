@@ -12,7 +12,7 @@ async function tenantContextMiddleware(ctx, next) {
   try {
     // Inicializar userState si no existe
     ctx.userState = ctx.userState || {};
-    
+
     console.log('Estado actual antes de verificar tenant:', ctx.userState);
 
     // Solo verificar el tenant si no hay uno establecido o si userStatus es 'no_tenant'
@@ -20,19 +20,19 @@ async function tenantContextMiddleware(ctx, next) {
       // Buscar el usuario y su tenant asociado
       const user = await TenantService.findUserByTelegramId(telegramId);
       console.log('Información de usuario encontrada:', user);
-      
+
       if (user && user.tenant) {
         // Guardar el ID del tenant en el estado del usuario para futuras referencias
         ctx.userState.tenantId = user.tenant.id;
         ctx.userState.tenantName = user.tenant.businessName;
-        
+
         // También verificar si el usuario está autorizado
         if (!user.isAuthorized) {
           ctx.userState.userStatus = 'pending_authorization';
         } else {
           ctx.userState.userStatus = 'authorized';
         }
-        
+
         console.log('Estado actualizado con información de tenant:', ctx.userState);
       } else {
         // El usuario no está asociado a ningún tenant
@@ -45,7 +45,7 @@ async function tenantContextMiddleware(ctx, next) {
     ctx.getTenantId = () => ctx.userState?.tenantId;
     ctx.isUserAuthorized = () => ctx.userState?.userStatus === 'authorized';
     ctx.hasTenant = () => !!ctx.userState?.tenantId;
-    
+
     return next();
   } catch (error) {
     console.error('Error en tenant middleware:', error);

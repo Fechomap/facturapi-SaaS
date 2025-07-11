@@ -6,12 +6,12 @@ import { authService } from '../services/api.service';
 const Navbar = () => {
   const navigate = useNavigate();
   const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-  
+
   const handleLogout = () => {
     authService.logout();
     navigate('/login');
   };
-  
+
   return (
     <nav className="navbar">
       <div className="navbar-brand">
@@ -25,7 +25,9 @@ const Navbar = () => {
       </div>
       <div className="navbar-end">
         <span className="user-info">{userInfo.firstName || 'Usuario'}</span>
-        <button className="logout-btn" onClick={handleLogout}>Cerrar Sesión</button>
+        <button className="logout-btn" onClick={handleLogout}>
+          Cerrar Sesión
+        </button>
       </div>
     </nav>
   );

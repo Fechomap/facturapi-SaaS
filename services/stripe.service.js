@@ -10,7 +10,9 @@ const stripeLogger = logger.child({ module: 'stripe-service' });
 // Usar directamente la variable de entorno si la configuración no está disponible
 const stripeSecretKey = config.stripe?.secretKey || process.env.STRIPE_SECRET_KEY;
 if (!stripeSecretKey) {
-  throw new Error('STRIPE_SECRET_KEY no está configurada. La integración con Stripe no funcionará.');
+  throw new Error(
+    'STRIPE_SECRET_KEY no está configurada. La integración con Stripe no funcionará.'
+  );
 }
 
 const stripe = new Stripe(stripeSecretKey, {
@@ -18,11 +20,14 @@ const stripe = new Stripe(stripeSecretKey, {
 });
 
 // Registrar información sobre la inicialización (sin mostrar la clave completa)
-stripeLogger.info({
-  secretKeyConfigured: Boolean(stripeSecretKey),
-  secretKeyPrefix: stripeSecretKey ? stripeSecretKey.substring(0, 7) : null,
-  apiVersion: config.stripe?.apiVersion || '2023-10-16'
-}, 'Cliente de Stripe inicializado');
+stripeLogger.info(
+  {
+    secretKeyConfigured: Boolean(stripeSecretKey),
+    secretKeyPrefix: stripeSecretKey ? stripeSecretKey.substring(0, 7) : null,
+    apiVersion: config.stripe?.apiVersion || '2023-10-16',
+  },
+  'Cliente de Stripe inicializado'
+);
 
 /**
  * Servicio para interactuar con la API de Stripe
@@ -43,7 +48,10 @@ class StripeService {
       stripeLogger.info({ customerId: customer.id }, 'Cliente creado en Stripe');
       return customer;
     } catch (error) {
-      stripeLogger.error({ error: error.message, customerData }, 'Error al crear cliente en Stripe');
+      stripeLogger.error(
+        { error: error.message, customerData },
+        'Error al crear cliente en Stripe'
+      );
       throw error;
     }
   }
@@ -59,9 +67,9 @@ class StripeService {
   async createPaymentLink(paymentLinkData) {
     try {
       const { priceId, quantity = 1, metadata = {} } = paymentLinkData;
-      
+
       stripeLogger.info({ priceId, quantity }, 'Creando enlace de pago en Stripe');
-      
+
       const paymentLink = await stripe.paymentLinks.create({
         line_items: [
           {
@@ -71,11 +79,17 @@ class StripeService {
         ],
         metadata: metadata,
       });
-      
-      stripeLogger.info({ paymentLinkId: paymentLink.id, url: paymentLink.url }, 'Enlace de pago creado en Stripe');
+
+      stripeLogger.info(
+        { paymentLinkId: paymentLink.id, url: paymentLink.url },
+        'Enlace de pago creado en Stripe'
+      );
       return paymentLink;
     } catch (error) {
-      stripeLogger.error({ error: error.message, paymentLinkData }, 'Error al crear enlace de pago en Stripe');
+      stripeLogger.error(
+        { error: error.message, paymentLinkData },
+        'Error al crear enlace de pago en Stripe'
+      );
       throw error;
     }
   }
@@ -91,7 +105,10 @@ class StripeService {
       const customer = await stripe.customers.retrieve(customerId);
       return customer;
     } catch (error) {
-      stripeLogger.error({ error: error.message, customerId }, 'Error al obtener cliente de Stripe');
+      stripeLogger.error(
+        { error: error.message, customerId },
+        'Error al obtener cliente de Stripe'
+      );
       throw error;
     }
   }

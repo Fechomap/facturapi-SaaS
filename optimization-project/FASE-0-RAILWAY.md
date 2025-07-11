@@ -1,17 +1,20 @@
 # 🚀 FASE 0: PREPARACIÓN CON RAILWAY
 
 ## 1️⃣ Login a Railway
+
 ```bash
 railway login
 ```
 
 ## 2️⃣ Verificar proyectos
+
 ```bash
 railway status
 railway list
 ```
 
 ## 3️⃣ Conectar a PostgreSQL
+
 ```bash
 # Opción 1: Usar Railway CLI
 railway connect
@@ -21,6 +24,7 @@ railway connect
 ```
 
 ## 4️⃣ Crear backup
+
 ```bash
 # Usando Railway
 railway db dump > backup-$(date +%Y%m%d-%H%M%S).sql

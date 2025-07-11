@@ -16,10 +16,10 @@ function errorMiddleware(bot) {
     }
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback('Volver al Menú', 'menu_principal')]
+      [Markup.button.callback('Volver al Menú', 'menu_principal')],
     ]);
 
-    ctx.reply(errorMsg, keyboard).catch(e => {
+    ctx.reply(errorMsg, keyboard).catch((e) => {
       console.error('Error al enviar mensaje de error:', e);
     });
   });

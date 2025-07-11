@@ -6,21 +6,20 @@ const testLogger = logger.child({ module: 'jobs-validation' });
 
 async function validateJobs() {
   testLogger.info('Iniciando validación de jobs');
-  
+
   try {
     // Iniciar el sistema de jobs
     startJobs();
     testLogger.info('Sistema de jobs iniciado correctamente');
-    
+
     // Verificar que los jobs estén registrados
     await import('../jobs/index.js');
-    
+
     // Esperar 2 segundos para asegurar que los jobs se registren
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     console.log('✅ Validación de jobs completada');
     console.log('El sistema de jobs se ha inicializado correctamente');
-    
   } catch (error) {
     testLogger.error({ error }, 'Error al validar jobs');
     console.error('❌ Error en la validación de jobs:', error.message);
@@ -33,7 +32,7 @@ validateJobs()
     // No terminamos el proceso para que los jobs puedan ejecutarse
     console.log('Presiona Ctrl+C para terminar');
   })
-  .catch(error => {
+  .catch((error) => {
     console.error('Error en el script de validación:', error);
     process.exit(1);
   });

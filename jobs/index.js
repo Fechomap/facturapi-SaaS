@@ -12,48 +12,56 @@ const jobsLogger = logger.child({ module: 'jobs' });
  */
 export function registerJobs() {
   jobsLogger.info('Iniciando registro de jobs programados');
-  
+
   try {
     // Registrar jobs de suscripciones
     Object.entries(subscriptionJobs).forEach(([jobName, jobConfig]) => {
       if (jobConfig.schedule && jobConfig.task) {
-        cron.schedule(jobConfig.schedule, async () => {
-          jobsLogger.info(`Ejecutando job: ${jobName}`);
-          try {
-            await jobConfig.task();
-            jobsLogger.info(`Job ${jobName} completado exitosamente`);
-          } catch (error) {
-            jobsLogger.error({ error }, `Error en job ${jobName}`);
+        cron.schedule(
+          jobConfig.schedule,
+          async () => {
+            jobsLogger.info(`Ejecutando job: ${jobName}`);
+            try {
+              await jobConfig.task();
+              jobsLogger.info(`Job ${jobName} completado exitosamente`);
+            } catch (error) {
+              jobsLogger.error({ error }, `Error en job ${jobName}`);
+            }
+          },
+          {
+            scheduled: true,
+            timezone: 'America/Mexico_City',
           }
-        }, {
-          scheduled: true,
-          timezone: "America/Mexico_City"
-        });
-        
+        );
+
         jobsLogger.info(`Job registrado: ${jobName} (${jobConfig.schedule})`);
       }
     });
-    
+
     // Registrar jobs de facturas
     Object.entries(invoiceJobs).forEach(([jobName, jobConfig]) => {
       if (jobConfig.schedule && jobConfig.task) {
-        cron.schedule(jobConfig.schedule, async () => {
-          jobsLogger.info(`Ejecutando job: ${jobName}`);
-          try {
-            await jobConfig.task();
-            jobsLogger.info(`Job ${jobName} completado exitosamente`);
-          } catch (error) {
-            jobsLogger.error({ error }, `Error en job ${jobName}`);
+        cron.schedule(
+          jobConfig.schedule,
+          async () => {
+            jobsLogger.info(`Ejecutando job: ${jobName}`);
+            try {
+              await jobConfig.task();
+              jobsLogger.info(`Job ${jobName} completado exitosamente`);
+            } catch (error) {
+              jobsLogger.error({ error }, `Error en job ${jobName}`);
+            }
+          },
+          {
+            scheduled: true,
+            timezone: 'America/Mexico_City',
           }
-        }, {
-          scheduled: true,
-          timezone: "America/Mexico_City"
-        });
-        
+        );
+
         jobsLogger.info(`Job registrado: ${jobName} (${jobConfig.schedule})`);
       }
     });
-    
+
     jobsLogger.info('Todos los jobs han sido registrados correctamente');
   } catch (error) {
     jobsLogger.error({ error }, 'Error al registrar jobs');
@@ -70,5 +78,5 @@ export function startJobs() {
 
 export default {
   registerJobs,
-  startJobs
+  startJobs,
 };

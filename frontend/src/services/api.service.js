@@ -19,10 +19,11 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     // Tenant ID - requerido para todas las peticiones API
-    const tenantId = localStorage.getItem('tenant_id') || 
-                     JSON.parse(localStorage.getItem('user_info'))?.tenant?.id;
+    const tenantId =
+      localStorage.getItem('tenant_id') ||
+      JSON.parse(localStorage.getItem('user_info'))?.tenant?.id;
     if (!tenantId) {
       console.error('Tenant ID no encontrado - no se puede proceder sin un tenant válido');
       // Redirigir al login si no hay tenant ID
@@ -35,10 +36,10 @@ apiClient.interceptors.request.use(
     } else {
       config.headers['X-Tenant-ID'] = tenantId;
     }
-    
+
     // Asegurar que Accept es application/json para todas las peticiones
     config.headers['Accept'] = 'application/json';
-    
+
     return config;
   },
   (error) => {
@@ -51,9 +52,9 @@ export const authService = {
   login: async (email, tenantId) => {
     try {
       console.log('Iniciando sesión');
-      const response = await apiClient.post('auth/login', { 
-        email, 
-        tenantId 
+      const response = await apiClient.post('auth/login', {
+        email,
+        tenantId,
       });
       if (response.data.token) {
         localStorage.setItem('auth_token', response.data.token);
@@ -67,16 +68,16 @@ export const authService = {
       throw error;
     }
   },
-  
+
   logout: () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_info');
     localStorage.removeItem('tenant_id');
   },
-  
+
   isAuthenticated: () => {
     return !!localStorage.getItem('auth_token');
-  }
+  },
 };
 
 // Servicios de facturas
@@ -85,22 +86,22 @@ export const invoiceService = {
     console.log('Obteniendo facturas:', `facturas?page=${page}&limit=${limit}`);
     return apiClient.get(`facturas?page=${page}&limit=${limit}`);
   },
-  
+
   getInvoiceById: async (id) => {
     return apiClient.get(`facturas/${id}`);
   },
-  
+
   getInvoiceByFolio: async (folio) => {
     return apiClient.get(`facturas/by-folio/${folio}`);
   },
-  
+
   createInvoice: async (invoiceData) => {
     return apiClient.post('facturas', invoiceData);
   },
-  
+
   cancelInvoice: async (id, motive) => {
     return apiClient.delete(`facturas/${id}`, { data: { motive } });
-  }
+  },
 };
 
 // Servicios de clientes
@@ -109,22 +110,22 @@ export const clientService = {
     console.log('Obteniendo clientes');
     return apiClient.get('clientes');
   },
-  
+
   getClientById: async (id) => {
     return apiClient.get(`clientes/${id}`);
   },
-  
+
   createClient: async (clientData) => {
     return apiClient.post('clientes', clientData);
   },
-  
+
   updateClient: async (id, clientData) => {
     return apiClient.put(`clientes/${id}`, clientData);
   },
-  
+
   deleteClient: async (id) => {
     return apiClient.delete(`clientes/${id}`);
-  }
+  },
 };
 
 export default apiClient;

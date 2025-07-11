@@ -5,6 +5,7 @@
 ### 📊 Implementaciones Completadas
 
 #### **FASE 1: Optimizaciones Base (10-50 usuarios)**
+
 - ✅ **Búsqueda de clientes optimizada**: 99.7% mejora (30s → 0.1s)
 - ✅ **Connection pooling de BD**: 10-20 conexiones concurrentes
 - ✅ **Rate limiting inteligente**: Protección contra abuso
@@ -12,6 +13,7 @@
 - ✅ **Timeouts adaptativos**: Manejo inteligente de latencia
 
 #### **FASE 2: Clustering (50-200+ usuarios)**
+
 - ✅ **Node.js clustering nativo**: 2-8 workers según CPUs
 - ✅ **Redis para sesiones compartidas**: Fallback a memoria
 - ✅ **Load balancing automático**: Distribución entre workers
@@ -20,13 +22,13 @@
 
 ### 🚀 Capacidad del Sistema
 
-| Métrica | Antes | Ahora | Mejora |
-|---------|--------|--------|---------|
-| **Usuarios concurrentes** | 1-5 | 50-200+ | **40x-200x** |
-| **Búsqueda de clientes** | 30s | 0.1s | **300x más rápido** |
-| **Conexiones BD** | 1-2 | 10-20 | **10x más conexiones** |
-| **Workers activos** | 1 | 2-8 | **Escalabilidad horizontal** |
-| **Throughput API** | ~10 req/s | 100+ req/s | **10x más throughput** |
+| Métrica                   | Antes     | Ahora      | Mejora                       |
+| ------------------------- | --------- | ---------- | ---------------------------- |
+| **Usuarios concurrentes** | 1-5       | 50-200+    | **40x-200x**                 |
+| **Búsqueda de clientes**  | 30s       | 0.1s       | **300x más rápido**          |
+| **Conexiones BD**         | 1-2       | 10-20      | **10x más conexiones**       |
+| **Workers activos**       | 1         | 2-8        | **Escalabilidad horizontal** |
+| **Throughput API**        | ~10 req/s | 100+ req/s | **10x más throughput**       |
 
 ### 🏗️ Arquitectura de Clustering
 
@@ -82,7 +84,7 @@ railway:build: "npx prisma generate"
 ### 🔍 Endpoints de Monitoreo
 
 - `GET /api/cluster/info` - Información del worker actual
-- `GET /api/cluster/health` - Health check para load balancing  
+- `GET /api/cluster/health` - Health check para load balancing
 - `GET /api/cluster/metrics` - Métricas detalladas del sistema
 - `GET /api/cluster/sessions` - Estado de sesiones Redis
 

@@ -12,7 +12,7 @@ const ERROR_TYPES = {
   FacturapiError: { status: 400, logLevel: 'error' },
   StripeError: { status: 400, logLevel: 'error' },
   DatabaseError: { status: 500, logLevel: 'error' },
-  InternalServerError: { status: 500, logLevel: 'error' }
+  InternalServerError: { status: 500, logLevel: 'error' },
 };
 
 // Función para normalizar un error en un formato estándar
@@ -25,7 +25,7 @@ function normalizeError(err) {
       status: ERROR_TYPES[err.name].status,
       details: err.details || null,
       logLevel: ERROR_TYPES[err.name].logLevel,
-      originalError: err
+      originalError: err,
     };
   }
 
@@ -37,7 +37,7 @@ function normalizeError(err) {
       status: err.response.status || 400,
       details: err.response.data,
       logLevel: 'error',
-      originalError: err
+      originalError: err,
     };
   }
 
@@ -50,10 +50,10 @@ function normalizeError(err) {
       details: {
         code: err.code,
         clientVersion: err.clientVersion,
-        meta: err.meta
+        meta: err.meta,
       },
       logLevel: 'error',
-      originalError: err
+      originalError: err,
     };
   }
 
@@ -64,7 +64,7 @@ function normalizeError(err) {
     status: err.statusCode || 500,
     details: null,
     logLevel: 'error',
-    originalError: err
+    originalError: err,
   };
 }
 
@@ -84,10 +84,10 @@ async function errorMiddleware(err, req, res, next) {
     const logger = loggerModule.default;
     errorLogger = logger.child({ module: 'error-middleware' });
   } catch (importError) {
-    console.error("FATAL: Failed to import logger in error middleware:", importError);
+    console.error('FATAL: Failed to import logger in error middleware:', importError);
     errorLogger = {
-        error: (obj, msg) => console.error(`[ERROR_MW_ERROR] ${msg}`, JSON.stringify(obj)),
-        warn: (obj, msg) => console.warn(`[ERROR_MW_WARN] ${msg}`, JSON.stringify(obj)),
+      error: (obj, msg) => console.error(`[ERROR_MW_ERROR] ${msg}`, JSON.stringify(obj)),
+      warn: (obj, msg) => console.warn(`[ERROR_MW_WARN] ${msg}`, JSON.stringify(obj)),
     };
   }
 
@@ -95,7 +95,10 @@ async function errorMiddleware(err, req, res, next) {
   const normalizedError = normalizeError(err);
 
   // Log según nivel de gravedad
-  const logMethod = normalizedError.logLevel === 'error' ? errorLogger.error.bind(errorLogger) : errorLogger.warn.bind(errorLogger);
+  const logMethod =
+    normalizedError.logLevel === 'error'
+      ? errorLogger.error.bind(errorLogger)
+      : errorLogger.warn.bind(errorLogger);
 
   // Crear objeto de log con contexto enriquecido
   const logContext = {
@@ -107,7 +110,7 @@ async function errorMiddleware(err, req, res, next) {
     tenantId: req.tenant?.id,
     userId: req.user?.id,
     ip: req.ip,
-    userAgent: req.headers['user-agent']
+    userAgent: req.headers['user-agent'],
   };
 
   // Log completo del error con stack trace para errores críticos
@@ -118,13 +121,15 @@ async function errorMiddleware(err, req, res, next) {
     // Para errores críticos, notificar a administradores
     try {
       const isProduction = process.env.NODE_ENV === 'production';
-      const isRailway = process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
-      
+      const isRailway =
+        process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
+
       // Notificar si estamos en producción (Railway) o si está explícitamente activado
       if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || (isProduction && isRailway)) {
         const platformName = isRailway ? 'Railway' : 'Producción';
-        
-        const adminMessage = `🚨 *Error Crítico en API (${platformName})*\n\n` +
+
+        const adminMessage =
+          `🚨 *Error Crítico en API (${platformName})*\n\n` +
           `*Tipo:* ${normalizedError.type}\n` +
           `*Endpoint:* ${req.method} ${req.path}\n` +
           `*Tenant:* ${req.tenant?.id || 'N/A'}\n` +
@@ -132,18 +137,12 @@ async function errorMiddleware(err, req, res, next) {
           `*Hora:* ${new Date().toISOString()}\n\n` +
           `Ver logs para más detalles.`;
 
-        NotificationService.notifySystemAdmins(adminMessage).catch(notifyError => {
-          errorLogger.warn(
-            { error: notifyError },
-            'Error al enviar notificación de error crítico'
-          );
+        NotificationService.notifySystemAdmins(adminMessage).catch((notifyError) => {
+          errorLogger.warn({ error: notifyError }, 'Error al enviar notificación de error crítico');
         });
       }
     } catch (notifyError) {
-      errorLogger.warn(
-        { error: notifyError },
-        'Error al procesar notificación de error crítico'
-      );
+      errorLogger.warn({ error: notifyError }, 'Error al procesar notificación de error crítico');
     }
   }
 
@@ -154,16 +153,17 @@ async function errorMiddleware(err, req, res, next) {
     error: normalizedError.type,
     message: normalizedError.message,
     path: req.path,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
   };
 
   // Incluir detalles según el entorno
   const isDebug = process.env.DEBUG_ERRORS === 'true';
-  if (normalizedError.details && (
-    process.env.NODE_ENV === 'development' ||
-    isDebug ||
-    ['ValidationError', 'FacturapiError'].includes(normalizedError.type)
-  )) {
+  if (
+    normalizedError.details &&
+    (process.env.NODE_ENV === 'development' ||
+      isDebug ||
+      ['ValidationError', 'FacturapiError'].includes(normalizedError.type))
+  ) {
     clientResponse.details = normalizedError.details;
   }
 

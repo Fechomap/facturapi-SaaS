@@ -13,28 +13,32 @@ import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerAxaHandler } from './handlers/axa.handler.js';
 import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
-import { registerProductionSetupHandler } from './handlers/production-setup.handler.js'; 
+import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
 
 export function createBot(logger) {
   // Verificar que el token está configurado
   if (!config.telegram.token) {
     logger.error('Token de Telegram no configurado');
-    throw new Error('Token de Telegram no configurado. Configura TELEGRAM_BOT_TOKEN en tu archivo .env');
+    throw new Error(
+      'Token de Telegram no configurado. Configura TELEGRAM_BOT_TOKEN en tu archivo .env'
+    );
   }
-  
+
   // Inicializar bot con token de Telegram
   const bot = new Telegraf(config.telegram.token);
-  
+
   // Middleware para gestionar la sesión de usuario
   bot.use(sessionMiddleware);
-  
+
   // Middleware para añadir información del tenant al contexto
   bot.use(tenantContextMiddleware);
-  
+
   // Lista de IDs de admin (tomar de las variables de entorno)
-  const ADMIN_IDS = config.telegram.adminChatIds || 
-    process.env.ADMIN_CHAT_IDS?.split(',').map(id => BigInt(id.trim())) || [];
+  const ADMIN_IDS =
+    config.telegram.adminChatIds ||
+    process.env.ADMIN_CHAT_IDS?.split(',').map((id) => BigInt(id.trim())) ||
+    [];
 
   // Middleware para comandos de administrador
   bot.use((ctx, next) => {
@@ -47,40 +51,40 @@ export function createBot(logger) {
     }
     return next();
   });
-  
+
   // Middleware para autorización (después del filtro de comandos admin)
   bot.use(authMiddleware);
-  
+
   // Middleware para manejo global de errores
   bot.catch((err, ctx) => {
     logger.error(
-      { 
-        error: err, 
-        userId: ctx.from?.id, 
+      {
+        error: err,
+        userId: ctx.from?.id,
         username: ctx.from?.username,
-        command: ctx.message?.text 
-      }, 
+        command: ctx.message?.text,
+      },
       'Error no controlado en el bot'
     );
-    
+
     ctx.reply('❌ Ha ocurrido un error inesperado. Por favor, intenta de nuevo más tarde.');
   });
-  
+
   // Registrar los handlers de prueba primero (para diagnóstico)
   registerTestHandlers(bot);
-  
+
   // Registrar todos los comandos (incluyendo los de admin a través de registerAllCommands)
   registerAllCommands(bot);
 
   // Registrar handlers en orden: IMPORTANTE - el handler de PDF debe ir PRIMERO
-  registerPDFInvoiceHandler(bot);    // 1. PDF (PRIMERO)
-  registerClientHandler(bot);        // 2. Clientes
-  registerInvoiceHandler(bot);       // 3. Facturas
-  registerChubbHandler(bot);         // 4. Excel CHUBB
-  registerAxaHandler(bot);           // 5. Excel AXA
-  registerOnboardingHandler(bot);    // 6. Onboarding
+  registerPDFInvoiceHandler(bot); // 1. PDF (PRIMERO)
+  registerClientHandler(bot); // 2. Clientes
+  registerInvoiceHandler(bot); // 3. Facturas
+  registerChubbHandler(bot); // 4. Excel CHUBB
+  registerAxaHandler(bot); // 5. Excel AXA
+  registerOnboardingHandler(bot); // 6. Onboarding
   registerProductionSetupHandler(bot); // 7. Producción (ÚLTIMO)
-  
+
   logger.info('Bot configurado correctamente');
   return bot;
 }

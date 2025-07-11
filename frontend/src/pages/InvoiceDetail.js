@@ -1,7 +1,12 @@
 // frontend/src/pages/InvoiceDetail.js
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getInvoiceById, downloadInvoicePdf, downloadInvoiceXml, cancelInvoice } from '../services/invoiceService';
+import {
+  getInvoiceById,
+  downloadInvoicePdf,
+  downloadInvoiceXml,
+  cancelInvoice,
+} from '../services/invoiceService';
 import Navbar from '../components/Navbar';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -44,10 +49,7 @@ const InvoiceDetail = () => {
           <div className="invoice-detail-container">
             <p className="no-data">La factura no se encuentra disponible</p>
             <div className="btn-container">
-              <button 
-                onClick={handleBack}
-                className="view-btn"
-              >
+              <button onClick={handleBack} className="view-btn">
                 Volver a Facturas
               </button>
             </div>
@@ -73,49 +75,45 @@ const InvoiceDetail = () => {
       <div className="invoice-list-container">
         <div className="header-actions">
           <h1>Detalles de Factura</h1>
-          <button 
-            onClick={handleBack} 
-            className="cancel-btn"
-          >
+          <button onClick={handleBack} className="cancel-btn">
             Volver a Facturas
           </button>
         </div>
 
         <div className="invoice-detail-card">
           <div className="invoice-header">
-            <h2>
-              Factura #{invoice.invoiceNumber || invoice.folio_number || id}
-            </h2>
+            <h2>Factura #{invoice.invoiceNumber || invoice.folio_number || id}</h2>
             <span className={`status-${invoice.status}`}>
-              {invoice.status === 'valid' ? 'Vigente' : 
-               invoice.status === 'canceled' ? 'Cancelada' : invoice.status}
+              {invoice.status === 'valid'
+                ? 'Vigente'
+                : invoice.status === 'canceled'
+                  ? 'Cancelada'
+                  : invoice.status}
             </span>
             <div className="invoice-actions">
-              <button 
-                onClick={() => downloadInvoicePdf(id)}
-                className="btn btn-primary"
-              >
+              <button onClick={() => downloadInvoicePdf(id)} className="btn btn-primary">
                 Descargar PDF
               </button>
-              <button 
-                onClick={() => downloadInvoiceXml(id)}
-                className="btn btn-secondary"
-              >
+              <button onClick={() => downloadInvoiceXml(id)} className="btn btn-secondary">
                 Descargar XML
               </button>
               {invoice.status === 'valid' && (
-                <button 
+                <button
                   onClick={() => {
-                    if (window.confirm('¿Estás seguro de cancelar esta factura? Esta acción no se puede deshacer.')) {
+                    if (
+                      window.confirm(
+                        '¿Estás seguro de cancelar esta factura? Esta acción no se puede deshacer.'
+                      )
+                    ) {
                       const motive = prompt('Ingrese el motivo de cancelación (01, 02, 03 o 04):');
                       if (motive && ['01', '02', '03', '04'].includes(motive)) {
                         cancelInvoice(id, motive)
                           .then(() => {
                             alert('Factura cancelada correctamente');
                             // Refrescar datos
-                            getInvoiceById(id).then(data => setInvoice(data));
+                            getInvoiceById(id).then((data) => setInvoice(data));
                           })
-                          .catch(error => {
+                          .catch((error) => {
                             alert(`Error al cancelar la factura: ${error.message}`);
                           });
                       } else if (motive) {
@@ -130,30 +128,45 @@ const InvoiceDetail = () => {
               )}
             </div>
           </div>
-          
+
           <div className="invoice-content">
             <div className="invoice-section">
               <div className="invoice-info">
                 <h3>Información General</h3>
                 <div className="info-group">
-                  <p><strong>Fecha de emisión:</strong> {formattedDate}</p>
-                  <p><strong>Fecha de vencimiento:</strong> {formattedDueDate}</p>
-                  <p><strong>Referencia:</strong> {invoice.reference || 'N/A'}</p>
+                  <p>
+                    <strong>Fecha de emisión:</strong> {formattedDate}
+                  </p>
+                  <p>
+                    <strong>Fecha de vencimiento:</strong> {formattedDueDate}
+                  </p>
+                  <p>
+                    <strong>Referencia:</strong> {invoice.reference || 'N/A'}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="invoice-info">
                 <h3>Cliente</h3>
                 <div className="info-group">
-                  <p><strong>Nombre:</strong> {invoice.clientName || invoice.customer?.legal_name || 'N/A'}</p>
-                  <p><strong>Email:</strong> {invoice.clientEmail || invoice.customer?.email || 'N/A'}</p>
-                  <p><strong>Teléfono:</strong> {invoice.clientPhone || invoice.customer?.phone || 'N/A'}</p>
+                  <p>
+                    <strong>Nombre:</strong>{' '}
+                    {invoice.clientName || invoice.customer?.legal_name || 'N/A'}
+                  </p>
+                  <p>
+                    <strong>Email:</strong>{' '}
+                    {invoice.clientEmail || invoice.customer?.email || 'N/A'}
+                  </p>
+                  <p>
+                    <strong>Teléfono:</strong>{' '}
+                    {invoice.clientPhone || invoice.customer?.phone || 'N/A'}
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="separator"></div>
-            
+
             <h3>Productos / Servicios</h3>
             <div className="table-container">
               <table className="invoice-table">
@@ -171,7 +184,9 @@ const InvoiceDetail = () => {
                       <td>{item.description}</td>
                       <td className="text-right">{item.quantity}</td>
                       <td className="text-right">${parseFloat(item.unitPrice || 0).toFixed(2)}</td>
-                      <td className="text-right">${parseFloat((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</td>
+                      <td className="text-right">
+                        ${parseFloat((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

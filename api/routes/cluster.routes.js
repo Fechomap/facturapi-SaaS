@@ -30,20 +30,20 @@ router.get('/info', (req, res) => {
       freeMemory: os.freemem(),
       loadAverage: os.loadavg(),
       environment: process.env.NODE_ENV,
-      isRailway: process.env.IS_RAILWAY === 'true'
+      isRailway: process.env.IS_RAILWAY === 'true',
     };
 
     res.json({
       success: true,
       worker: workerInfo,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     clusterLogger.error('Error al obtener información del cluster:', error);
     res.status(500).json({
       success: false,
       error: 'Error al obtener información del cluster',
-      message: error.message
+      message: error.message,
     });
   }
 });
@@ -54,22 +54,22 @@ router.get('/info', (req, res) => {
 router.get('/sessions', async (req, res) => {
   try {
     const sessionStats = await redisSessionService.getStats();
-    
+
     res.json({
       success: true,
       sessions: sessionStats,
       worker: {
         id: cluster.worker?.id || 'master',
-        pid: process.pid
+        pid: process.pid,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     clusterLogger.error('Error al obtener estadísticas de sesiones:', error);
     res.status(500).json({
       success: false,
       error: 'Error al obtener estadísticas de sesiones',
-      message: error.message
+      message: error.message,
     });
   }
 });
@@ -81,21 +81,21 @@ router.get('/health', async (req, res) => {
   try {
     // Incrementar contador de requests
     clusterHealthService.incrementRequestCount();
-    
+
     // Realizar health check completo
     const healthCheck = await clusterHealthService.checkHealth();
-    
+
     const statusCode = healthCheck.healthy ? 200 : 503;
     res.status(statusCode).json(healthCheck);
   } catch (error) {
     clusterLogger.error('Error en health check:', error);
     clusterHealthService.incrementErrorCount();
-    
+
     res.status(503).json({
       healthy: false,
       error: 'Error en health check',
       message: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -107,7 +107,7 @@ router.get('/health/simple', (req, res) => {
   const memUsage = process.memoryUsage();
   const memoryPressure = memUsage.heapUsed / memUsage.heapTotal;
   const isHealthy = memoryPressure < 0.9;
-  
+
   if (isHealthy) {
     res.status(200).json({ status: 'healthy' });
   } else {
@@ -122,22 +122,22 @@ router.get('/recommendations', async (req, res) => {
   try {
     // Asegurar que tenemos health check reciente
     await clusterHealthService.checkHealth();
-    
+
     const recommendations = clusterHealthService.getRecommendations();
     const clusterStats = clusterHealthService.getClusterStats();
-    
+
     res.json({
       success: true,
       cluster: clusterStats,
       recommendations,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     clusterLogger.error('Error al obtener recomendaciones:', error);
     res.status(500).json({
       success: false,
       error: 'Error al obtener recomendaciones',
-      message: error.message
+      message: error.message,
     });
   }
 });
@@ -148,18 +148,20 @@ router.get('/recommendations', async (req, res) => {
 router.post('/stress-test', (req, res) => {
   if (process.env.NODE_ENV === 'production') {
     return res.status(403).json({
-      error: 'Stress test no disponible en producción'
+      error: 'Stress test no disponible en producción',
     });
   }
 
   try {
     const { duration = 5000, intensity = 'medium' } = req.body;
-    
-    clusterLogger.info(`Iniciando stress test: ${intensity} por ${duration}ms en worker ${process.pid}`);
-    
+
+    clusterLogger.info(
+      `Iniciando stress test: ${intensity} por ${duration}ms en worker ${process.pid}`
+    );
+
     const startTime = Date.now();
     const endTime = startTime + duration;
-    
+
     // Simular carga según intensidad
     const stressLoop = () => {
       const now = Date.now();
@@ -178,13 +180,13 @@ router.post('/stress-test', (req, res) => {
             Math.random() * Math.random();
           }
         }
-        
+
         setImmediate(stressLoop);
       }
     };
-    
+
     stressLoop();
-    
+
     res.json({
       success: true,
       message: `Stress test iniciado en worker ${process.pid}`,
@@ -192,15 +194,15 @@ router.post('/stress-test', (req, res) => {
       intensity,
       worker: {
         id: cluster.worker?.id || 'master',
-        pid: process.pid
-      }
+        pid: process.pid,
+      },
     });
   } catch (error) {
     clusterLogger.error('Error en stress test:', error);
     res.status(500).json({
       success: false,
       error: 'Error en stress test',
-      message: error.message
+      message: error.message,
     });
   }
 });
@@ -216,7 +218,7 @@ router.get('/metrics', (req, res) => {
         pid: process.pid,
         ppid: process.ppid,
         uptime: process.uptime(),
-        title: process.title
+        title: process.title,
       },
       system: {
         platform: os.platform(),
@@ -226,34 +228,34 @@ router.get('/metrics', (req, res) => {
         freeMemory: os.freemem(),
         loadAverage: os.loadavg(),
         hostname: os.hostname(),
-        networkInterfaces: Object.keys(os.networkInterfaces()).length
+        networkInterfaces: Object.keys(os.networkInterfaces()).length,
       },
       process: {
         memory: process.memoryUsage(),
         cpu: process.cpuUsage(),
         versions: process.versions,
         execPath: process.execPath,
-        argv: process.argv.slice(0, 3) // Solo mostrar los primeros argumentos
+        argv: process.argv.slice(0, 3), // Solo mostrar los primeros argumentos
       },
       environment: {
         nodeEnv: process.env.NODE_ENV,
         isRailway: process.env.IS_RAILWAY === 'true',
-        port: process.env.PORT
+        port: process.env.PORT,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     res.json({
       success: true,
       metrics,
-      generatedBy: `worker-${process.pid}`
+      generatedBy: `worker-${process.pid}`,
     });
   } catch (error) {
     clusterLogger.error('Error al obtener métricas:', error);
     res.status(500).json({
       success: false,
       error: 'Error al obtener métricas',
-      message: error.message
+      message: error.message,
     });
   }
 });

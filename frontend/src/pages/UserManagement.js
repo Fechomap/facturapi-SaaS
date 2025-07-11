@@ -9,10 +9,31 @@ const userService = {
     // Simulación de respuesta de API
     return {
       data: [
-        { id: 1, firstName: 'Juan', lastName: 'Pérez', email: 'juan@ejemplo.com', role: 'admin', isActive: true },
-        { id: 2, firstName: 'Ana', lastName: 'García', email: 'ana@ejemplo.com', role: 'user', isActive: true },
-        { id: 3, firstName: 'Carlos', lastName: 'López', email: 'carlos@ejemplo.com', role: 'user', isActive: false }
-      ]
+        {
+          id: 1,
+          firstName: 'Juan',
+          lastName: 'Pérez',
+          email: 'juan@ejemplo.com',
+          role: 'admin',
+          isActive: true,
+        },
+        {
+          id: 2,
+          firstName: 'Ana',
+          lastName: 'García',
+          email: 'ana@ejemplo.com',
+          role: 'user',
+          isActive: true,
+        },
+        {
+          id: 3,
+          firstName: 'Carlos',
+          lastName: 'López',
+          email: 'carlos@ejemplo.com',
+          role: 'user',
+          isActive: false,
+        },
+      ],
     };
   },
   deleteUser: async (id) => {
@@ -22,14 +43,14 @@ const userService = {
   updateUserStatus: async (id, isActive) => {
     console.log(`Cambiando estado de usuario ${id} a ${isActive ? 'activo' : 'inactivo'}`);
     return { success: true };
-  }
+  },
 };
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -42,34 +63,34 @@ const UserManagement = () => {
         setLoading(false);
       }
     };
-    
+
     fetchUsers();
   }, []);
-  
+
   const handleDeleteUser = async (id) => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
       try {
         await userService.deleteUser(id);
-        setUsers(users.filter(user => user.id !== id));
+        setUsers(users.filter((user) => user.id !== id));
       } catch (error) {
         console.error('Error al eliminar usuario:', error);
         setError('No se pudo eliminar el usuario. Por favor, intenta nuevamente.');
       }
     }
   };
-  
+
   const handleToggleStatus = async (id, currentStatus) => {
     try {
       await userService.updateUserStatus(id, !currentStatus);
-      setUsers(users.map(user => 
-        user.id === id ? { ...user, isActive: !user.isActive } : user
-      ));
+      setUsers(
+        users.map((user) => (user.id === id ? { ...user, isActive: !user.isActive } : user))
+      );
     } catch (error) {
       console.error('Error al cambiar estado de usuario:', error);
       setError('No se pudo actualizar el estado del usuario. Por favor, intenta nuevamente.');
     }
   };
-  
+
   return (
     <div>
       <Navbar />
@@ -80,9 +101,9 @@ const UserManagement = () => {
             <Link to="/usuarios/nuevo">Añadir Usuario</Link>
           </button>
         </div>
-        
+
         {error && <div className="error-alert">{error}</div>}
-        
+
         {loading ? (
           <div className="loading">Cargando usuarios...</div>
         ) : (
@@ -97,9 +118,11 @@ const UserManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.map((user) => (
                 <tr key={user.id} className={!user.isActive ? 'inactive-row' : ''}>
-                  <td>{user.firstName} {user.lastName}</td>
+                  <td>
+                    {user.firstName} {user.lastName}
+                  </td>
                   <td>{user.email}</td>
                   <td>
                     <span className={`role-badge ${user.role}`}>
@@ -112,17 +135,16 @@ const UserManagement = () => {
                     </span>
                   </td>
                   <td className="actions-cell">
-                    <Link to={`/usuarios/${user.id}`} className="edit-btn">Editar</Link>
+                    <Link to={`/usuarios/${user.id}`} className="edit-btn">
+                      Editar
+                    </Link>
                     <button
                       className={`status-toggle-btn ${user.isActive ? 'deactivate' : 'activate'}`}
                       onClick={() => handleToggleStatus(user.id, user.isActive)}
                     >
                       {user.isActive ? 'Desactivar' : 'Activar'}
                     </button>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
+                    <button className="delete-btn" onClick={() => handleDeleteUser(user.id)}>
                       Eliminar
                     </button>
                   </td>

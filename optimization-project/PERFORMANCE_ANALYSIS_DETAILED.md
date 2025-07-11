@@ -1,6 +1,7 @@
 # Análisis Detallado de Performance - Bot de Facturación Multitenant
 
 ## 🔴 PROBLEMA IDENTIFICADO
+
 - **Bot**: 8-10 segundos para procesar una factura pequeña
 - **CURL directo**: 2-4 segundos para la misma operación
 - **Diferencia**: 4-6 segundos de overhead en el bot
@@ -8,6 +9,7 @@
 ## 📊 MÉTRICAS OBTENIDAS DEL DIAGNÓSTICO
 
 ### Tiempos de Operación (ms)
+
 ```
 1. Inicialización Total: 966.53ms
    - Conexión DB: 731.05ms (75.6%)
@@ -29,6 +31,7 @@
 ## 🔍 FLUJO DETALLADO DE PROCESAMIENTO
 
 ### ETAPA 1: RECEPCIÓN DE ARCHIVO (PDF/Excel)
+
 ```
 1.1 Bot recibe documento
 1.2 Validación tipo archivo
@@ -38,12 +41,13 @@
 ```
 
 ### ETAPA 2: DESCARGA Y ANÁLISIS
+
 ```
 2.1 downloadTelegramFile()
     - ctx.telegram.getFileLink(fileId) ← API Call Telegram
     - axios download stream ← Network I/O
     - fs.createWriteStream() ← Disk I/O
-    
+
 2.2 PDFAnalysisService.analyzePDF()
     - fs.readFileSync() ← Disk I/O
     - pdf-parse import dinámico ← Module Loading
@@ -53,12 +57,13 @@
 ```
 
 ### ETAPA 3: CONFIRMACIÓN Y PREPARACIÓN
+
 ```
 3.1 showSimpleAnalysisResults()
     - Generación ID análisis
     - Guardar en ctx.userState.pdfAnalysis
     - ctx.saveSession() ← Redis Write
-    
+
 3.2 Usuario confirma datos
     - bot.action callback
     - ctx.answerCbQuery()
@@ -66,16 +71,17 @@
 ```
 
 ### ETAPA 4: GENERACIÓN DE FACTURA
+
 ```
 4.1 generateSimpleInvoice()
     - Obtener tenantId
-    
+
 4.2 Búsqueda de Cliente
     - prisma.tenantCustomer.findFirst() ← DB Query
     - Si no encuentra:
       - facturapIService.getFacturapiClient() ← DB Query
       - facturapi.customers.list() ← API Call (30s timeout!)
-      
+
 4.3 InvoiceService.generateInvoice()
     - TenantService.getNextFolio()
       - prisma.tenantFolio.findUnique() ← DB Query
@@ -92,41 +98,49 @@
 ## 🚨 CUELLOS DE BOTELLA IDENTIFICADOS
 
 ### 1. **CONEXIÓN INICIAL A DB (731ms)**
+
 - Se conecta a DB en cada operación
 - No hay pool de conexiones persistente
 - Prisma crea nueva conexión cada vez
 
 ### 2. **BÚSQUEDAS REDUNDANTES**
+
 - `findTenant()` se ejecuta múltiples veces
 - Verificación de suscripción en cada operación
 - No hay caché de datos del tenant
 
 ### 3. **OPERACIONES SÍNCRONAS BLOQUEANTES**
+
 ```javascript
 // En PDFAnalysisService
 const dataBuffer = fs.readFileSync(filePath); // Bloquea event loop
 ```
 
 ### 4. **LLAMADA A FACTURAPI PARA BUSCAR CLIENTES**
+
 - Si cliente no está en DB local, busca en FacturAPI
 - Esta operación puede tardar 30+ segundos
 - No hay timeout configurado
 
 ### 5. **MÚLTIPLES ESCRITURAS A REDIS**
+
 - saveSession() después de cada cambio
 - No hay batching de operaciones
 
 ### 6. **ACTUALIZACIONES DE MENSAJE EXCESIVAS**
+
 - updateProgressMessage() se llama múltiples veces
 - Cada actualización es una llamada a Telegram API
 
 ### 7. **TRANSACCIONES NO OPTIMIZADAS**
+
 - Folio, factura y suscripción se actualizan por separado
 - No hay uso de transacciones Prisma
 
 ## 🛠️ SOLUCIONES PROPUESTAS
 
 ### 1. **Pool de Conexiones Persistente**
+
 ```javascript
 // En lib/prisma.js
 const prisma = new PrismaClient({
@@ -147,29 +161,30 @@ setInterval(async () => {
 ```
 
 ### 2. **Caché en Memoria para Tenant**
+
 ```javascript
 class TenantCache {
   constructor() {
     this.cache = new Map();
     this.ttl = 5 * 60 * 1000; // 5 minutos
   }
-  
+
   async get(tenantId) {
     const cached = this.cache.get(tenantId);
     if (cached && Date.now() - cached.timestamp < this.ttl) {
       return cached.data;
     }
-    
+
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      include: { 
+      include: {
         subscriptions: {
           where: { status: { in: ['active', 'trial'] } },
-          include: { plan: true }
-        }
-      }
+          include: { plan: true },
+        },
+      },
     });
-    
+
     this.cache.set(tenantId, { data: tenant, timestamp: Date.now() });
     return tenant;
   }
@@ -177,6 +192,7 @@ class TenantCache {
 ```
 
 ### 3. **Operaciones Asíncronas No Bloqueantes**
+
 ```javascript
 // Reemplazar fs.readFileSync con:
 import { promises as fs } from 'fs';
@@ -184,13 +200,12 @@ const dataBuffer = await fs.readFile(filePath);
 ```
 
 ### 4. **Timeout y Caché para Búsqueda de Clientes**
+
 ```javascript
 // Agregar timeout a búsqueda en FacturAPI
 const clientes = await Promise.race([
   facturapi.customers.list({ q: clientName }),
-  new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Timeout')), 5000)
-  )
+  new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000)),
 ]);
 
 // Caché de clientes frecuentes
@@ -198,6 +213,7 @@ const clientCache = new NodeCache({ stdTTL: 600 }); // 10 min
 ```
 
 ### 5. **Batching de Operaciones Redis**
+
 ```javascript
 class SessionBatcher {
   constructor() {
@@ -205,14 +221,14 @@ class SessionBatcher {
     this.flushInterval = 100; // ms
     this.scheduleFlush();
   }
-  
+
   async save(key, data) {
     this.pending.set(key, data);
   }
-  
+
   async flush() {
     if (this.pending.size === 0) return;
-    
+
     const pipeline = redis.pipeline();
     for (const [key, data] of this.pending) {
       pipeline.setex(key, 3600, JSON.stringify(data));
@@ -224,39 +240,39 @@ class SessionBatcher {
 ```
 
 ### 6. **Throttling de Actualizaciones de Progreso**
+
 ```javascript
 const progressThrottle = throttle(async (ctx, messageId, text) => {
-  await ctx.telegram.editMessageText(
-    ctx.chat.id,
-    messageId,
-    null,
-    text,
-    { parse_mode: 'Markdown' }
-  );
+  await ctx.telegram.editMessageText(ctx.chat.id, messageId, null, text, {
+    parse_mode: 'Markdown',
+  });
 }, 500); // Máximo una actualización cada 500ms
 ```
 
 ### 7. **Transacciones Optimizadas**
+
 ```javascript
 // Usar transacción para operaciones relacionadas
 const result = await prisma.$transaction(async (tx) => {
   // Obtener y actualizar folio
   const folio = await tx.tenantFolio.update({
     where: { tenantId_series: { tenantId, series: 'A' } },
-    data: { currentNumber: { increment: 1 } }
+    data: { currentNumber: { increment: 1 } },
   });
-  
+
   // Crear factura
   const invoice = await tx.tenantInvoice.create({
-    data: { /* ... */ }
+    data: {
+      /* ... */
+    },
   });
-  
+
   // Actualizar suscripción
   await tx.tenantSubscription.update({
     where: { id: subscriptionId },
-    data: { invoicesUsed: { increment: 1 } }
+    data: { invoicesUsed: { increment: 1 } },
   });
-  
+
   return { folio, invoice };
 });
 ```
@@ -264,6 +280,7 @@ const result = await prisma.$transaction(async (tx) => {
 ## 📈 HERRAMIENTAS DE PROFILING RECOMENDADAS
 
 ### 1. **Para Node.js**
+
 ```bash
 # Clinic.js - Suite completa de profiling
 npm install -g clinic
@@ -281,6 +298,7 @@ node --prof-process isolate-*.log > processed.txt
 ```
 
 ### 2. **Para PostgreSQL**
+
 ```sql
 -- Activar pg_stat_statements
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
@@ -292,12 +310,13 @@ WHERE mean_exec_time > 100
 ORDER BY mean_exec_time DESC;
 
 -- Analizar plan de ejecución
-EXPLAIN (ANALYZE, BUFFERS) 
-SELECT * FROM tenant_customers 
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM tenant_customers
 WHERE tenant_id = '...' AND legal_name ILIKE '%SOS%';
 ```
 
 ### 3. **Para Monitoreo Distribuido**
+
 ```javascript
 // OpenTelemetry
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
@@ -317,6 +336,7 @@ registerInstrumentations({
 ```
 
 ### 4. **Logging Estructurado**
+
 ```javascript
 // Configurar Pino para performance
 import pino from 'pino';
@@ -339,10 +359,13 @@ const logger = pino({
 app.use((req, res, next) => {
   req.startTime = Date.now();
   res.on('finish', () => {
-    logger.info({
-      duration: Date.now() - req.startTime,
-      statusCode: res.statusCode,
-    }, 'Request completed');
+    logger.info(
+      {
+        duration: Date.now() - req.startTime,
+        statusCode: res.statusCode,
+      },
+      'Request completed'
+    );
   });
   next();
 });
@@ -351,6 +374,7 @@ app.use((req, res, next) => {
 ## 🎯 MÉTRICAS OBJETIVO
 
 Después de implementar las optimizaciones:
+
 - Conexión DB: < 50ms (con pool caliente)
 - Búsqueda cliente local: < 20ms (con índices)
 - Generación factura total: < 3s

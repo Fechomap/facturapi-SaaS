@@ -11,19 +11,20 @@ let isProcessing = false;
  */
 async function processBatch() {
   if (pendingUpdates.size === 0 || isProcessing) return;
-  
+
   isProcessing = true;
-  
+
   const updates = Array.from(pendingUpdates.entries());
   pendingUpdates.clear();
-  
+
   console.log(`[SESSION_BATCH] Procesando ${updates.length} actualizaciones en batch`);
-  
+
   try {
     await Promise.all(
-      updates.map(([userId, state]) => 
-        SessionService.saveUserState(userId, state)
-          .catch(error => console.error(`[SESSION_BATCH] Error guardando estado para ${userId}:`, error))
+      updates.map(([userId, state]) =>
+        SessionService.saveUserState(userId, state).catch((error) =>
+          console.error(`[SESSION_BATCH] Error guardando estado para ${userId}:`, error)
+        )
       )
     );
   } finally {
@@ -43,16 +44,16 @@ export function sessionBatchMiddleware(ctx, next) {
   ctx.saveSession = async () => {
     const userId = ctx.from?.id;
     if (!userId || !ctx.userState) return;
-    
+
     // Agregar a la cola de actualizaciones
     pendingUpdates.set(userId, { ...ctx.userState });
-    
+
     // Disparar el procesamiento en el siguiente tick del event loop
     if (!isProcessing) {
       process.nextTick(processBatch);
     }
   };
-  
+
   return next();
 }
 

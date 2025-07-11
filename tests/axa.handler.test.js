@@ -4,13 +4,13 @@ import { jest } from '@jest/globals';
 // Mocks para dependencias
 const mockPrisma = {
   tenantCustomer: {
-    findFirst: jest.fn()
-  }
+    findFirst: jest.fn(),
+  },
 };
 
 const mockTelegram = {
   getFileLink: jest.fn(),
-  editMessageText: jest.fn()
+  editMessageText: jest.fn(),
 };
 
 // Mock global
@@ -19,7 +19,7 @@ global.tempAxaData = {};
 // Crear función de mapeo directamente para testing
 function mapColumnNamesAxa(firstRow) {
   if (!firstRow) return null;
-  
+
   const posiblesColumnas = {
     estatus: ['ESTATUS', 'Estatus', 'Status', 'Estado'],
     factura: ['FACTURA', 'Factura', 'No. FACTURA', 'Numero Factura'],
@@ -29,42 +29,41 @@ function mapColumnNamesAxa(firstRow) {
     importe: ['IMPORTE', 'Importe', 'Monto', 'Valor', 'Total'],
     iva: ['I.V.A.', 'IVA', 'Iva', 'Impuesto'],
     neto: ['NETO', 'Neto', 'Net', 'Total Neto'],
-    fecha: ['FECHA', 'Fecha', 'Date', 'Día']
+    fecha: ['FECHA', 'Fecha', 'Date', 'Día'],
   };
-  
+
   const columnMapping = {};
-  
-  Object.keys(posiblesColumnas).forEach(tipoColumna => {
-    const nombreEncontrado = posiblesColumnas[tipoColumna].find(posibleNombre => 
+
+  Object.keys(posiblesColumnas).forEach((tipoColumna) => {
+    const nombreEncontrado = posiblesColumnas[tipoColumna].find((posibleNombre) =>
       Object.keys(firstRow).includes(posibleNombre)
     );
-    
+
     if (nombreEncontrado) {
       columnMapping[tipoColumna] = nombreEncontrado;
     } else {
       const keys = Object.keys(firstRow);
-      const matchParcial = keys.find(key => 
-        posiblesColumnas[tipoColumna].some(posibleNombre => 
+      const matchParcial = keys.find((key) =>
+        posiblesColumnas[tipoColumna].some((posibleNombre) =>
           key.toLowerCase().includes(posibleNombre.toLowerCase())
         )
       );
-      
+
       if (matchParcial) {
         columnMapping[tipoColumna] = matchParcial;
       }
     }
   });
-  
+
   const requiredKeys = ['factura', 'orden', 'folio', 'autorizacion', 'importe'];
-  if (requiredKeys.every(key => columnMapping[key])) {
+  if (requiredKeys.every((key) => columnMapping[key])) {
     return columnMapping;
   }
-  
+
   return null;
 }
 
 describe('AXA Handler - Optimizaciones implementadas', () => {
-  
   describe('🚀 FASE 1: Precarga Cliente AXA', () => {
     beforeEach(() => {
       jest.clearAllMocks();
@@ -75,21 +74,21 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const expectedClient = {
         facturapiCustomerId: '68671168de097f4e7bd4734c',
         legalName: 'AXA ASSISTANCE MEXICO',
-        rfc: 'AAM850528H51'
+        rfc: 'AAM850528H51',
       };
-      
+
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(expectedClient);
-      
+
       const tenantId = 'test-tenant-123';
-      
+
       // Act
       const startTime = Date.now();
       const result = await mockPrisma.tenantCustomer.findFirst({
         where: {
           tenantId: tenantId,
           rfc: 'AAM850528H51',
-          isActive: true
-        }
+          isActive: true,
+        },
       });
       const duration = Date.now() - startTime;
 
@@ -100,8 +99,8 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         where: {
           tenantId: tenantId,
           rfc: 'AAM850528H51',
-          isActive: true
-        }
+          isActive: true,
+        },
       });
     });
 
@@ -109,9 +108,9 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       // Arrange
       const fallbackClient = {
         facturapiCustomerId: '68671168de097f4e7bd4734c',
-        legalName: 'AXA ASSISTANCE MEXICO'
+        legalName: 'AXA ASSISTANCE MEXICO',
       };
-      
+
       // Primera llamada (por RFC) retorna null
       // Segunda llamada (por nombre) retorna cliente
       mockPrisma.tenantCustomer.findFirst
@@ -119,14 +118,14 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         .mockResolvedValueOnce(fallbackClient);
 
       const tenantId = 'test-tenant-123';
-      
+
       // Act - Primera búsqueda por RFC
       const resultByRfc = await mockPrisma.tenantCustomer.findFirst({
         where: {
           tenantId: tenantId,
           rfc: 'AAM850528H51',
-          isActive: true
-        }
+          isActive: true,
+        },
       });
 
       // Fallback por nombre
@@ -134,8 +133,8 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         where: {
           tenantId: tenantId,
           legalName: 'AXA ASSISTANCE MEXICO',
-          isActive: true
-        }
+          isActive: true,
+        },
       });
 
       // Assert
@@ -149,11 +148,11 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
     test('debe mapear columnas correctamente', () => {
       // Arrange
       const mockExcelRow = {
-        'FACTURA': 'F001',
+        FACTURA: 'F001',
         'No. ORDEN': 'O001',
         'No. FOLIO': 'FOL001',
-        'AUTORIZACION': 'AUTH001',
-        'IMPORTE': 1000.00
+        AUTORIZACION: 'AUTH001',
+        IMPORTE: 1000.0,
       };
 
       // Act
@@ -165,15 +164,27 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         orden: 'No. ORDEN',
         folio: 'No. FOLIO',
         autorizacion: 'AUTORIZACION',
-        importe: 'IMPORTE'
+        importe: 'IMPORTE',
       });
     });
 
     test('debe precalcular ambas opciones (con/sin retención)', () => {
       // Arrange
       const testData = [
-        { 'FACTURA': 'F001', 'No. ORDEN': 'O001', 'No. FOLIO': 'FOL001', 'AUTORIZACION': 'AUTH001', 'IMPORTE': 1000.00 },
-        { 'FACTURA': 'F002', 'No. ORDEN': 'O002', 'No. FOLIO': 'FOL002', 'AUTORIZACION': 'AUTH002', 'IMPORTE': 1500.00 }
+        {
+          FACTURA: 'F001',
+          'No. ORDEN': 'O001',
+          'No. FOLIO': 'FOL001',
+          AUTORIZACION: 'AUTH001',
+          IMPORTE: 1000.0,
+        },
+        {
+          FACTURA: 'F002',
+          'No. ORDEN': 'O002',
+          'No. FOLIO': 'FOL002',
+          AUTORIZACION: 'AUTH002',
+          IMPORTE: 1500.0,
+        },
       ];
 
       const columnMappings = {
@@ -181,7 +192,7 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         orden: 'No. ORDEN',
         folio: 'No. FOLIO',
         autorizacion: 'AUTORIZACION',
-        importe: 'IMPORTE'
+        importe: 'IMPORTE',
       };
 
       const userId = 12345;
@@ -189,7 +200,7 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
 
       // Act - Simular precálculo
       const startTime = Date.now();
-      
+
       const subtotal = testData.reduce((total, item) => {
         return total + parseFloat(item[columnMappings.importe]);
       }, 0);
@@ -206,38 +217,38 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         retencion4: retencion4,
         facturaConRetencion: {
           total: totalConRetencion,
-          items: testData.map(item => ({
+          items: testData.map((item) => ({
             quantity: 1,
             product: {
               description: `ARRASTRE DE GRUA FACTURA ${item[columnMappings.factura]} No. ORDEN ${item[columnMappings.orden]} No. FOLIO ${item[columnMappings.folio]} AUTORIZACION ${item[columnMappings.autorizacion]}`,
               product_key: '78101803',
-              unit_key: "E48",
-              unit_name: "SERVICIO",
+              unit_key: 'E48',
+              unit_name: 'SERVICIO',
               price: parseFloat(item[columnMappings.importe]),
               tax_included: false,
               taxes: [
-                { type: "IVA", rate: 0.16, factor: "Tasa" },
-                { type: "IVA", rate: 0.04, factor: "Tasa", withholding: true }
-              ]
-            }
-          }))
+                { type: 'IVA', rate: 0.16, factor: 'Tasa' },
+                { type: 'IVA', rate: 0.04, factor: 'Tasa', withholding: true },
+              ],
+            },
+          })),
         },
         facturaSinRetencion: {
           total: totalSinRetencion,
-          items: testData.map(item => ({
+          items: testData.map((item) => ({
             quantity: 1,
             product: {
               description: `ARRASTRE DE GRUA FACTURA ${item[columnMappings.factura]} No. ORDEN ${item[columnMappings.orden]} No. FOLIO ${item[columnMappings.folio]} AUTORIZACION ${item[columnMappings.autorizacion]}`,
               product_key: '78101803',
-              unit_key: "E48",
-              unit_name: "SERVICIO",
+              unit_key: 'E48',
+              unit_name: 'SERVICIO',
               price: parseFloat(item[columnMappings.importe]),
               tax_included: false,
-              taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }]
-            }
-          }))
+              taxes: [{ type: 'IVA', rate: 0.16, factor: 'Tasa' }],
+            },
+          })),
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const duration = Date.now() - startTime;
@@ -283,18 +294,20 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const mockTempData = {
         facturaConRetencion: {
           total: 67405.14,
-          items: Array(34).fill().map((_, i) => ({
-            quantity: 1,
-            product: {
-              description: `TEST ITEM ${i}`,
-              price: 100,
-              taxes: [
-                { type: "IVA", rate: 0.16, factor: "Tasa" },
-                { type: "IVA", rate: 0.04, factor: "Tasa", withholding: true }
-              ]
-            }
-          }))
-        }
+          items: Array(34)
+            .fill()
+            .map((_, i) => ({
+              quantity: 1,
+              product: {
+                description: `TEST ITEM ${i}`,
+                price: 100,
+                taxes: [
+                  { type: 'IVA', rate: 0.16, factor: 'Tasa' },
+                  { type: 'IVA', rate: 0.04, factor: 'Tasa', withholding: true },
+                ],
+              },
+            })),
+        },
       };
 
       global.tempAxaData[userId] = mockTempData;
@@ -318,15 +331,17 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const mockTempData = {
         facturaSinRetencion: {
           total: 69812.47,
-          items: Array(34).fill().map((_, i) => ({
-            quantity: 1,
-            product: {
-              description: `TEST ITEM ${i}`,
-              price: 100,
-              taxes: [{ type: "IVA", rate: 0.16, factor: "Tasa" }]
-            }
-          }))
-        }
+          items: Array(34)
+            .fill()
+            .map((_, i) => ({
+              quantity: 1,
+              product: {
+                description: `TEST ITEM ${i}`,
+                price: 100,
+                taxes: [{ type: 'IVA', rate: 0.16, factor: 'Tasa' }],
+              },
+            })),
+        },
       };
 
       global.tempAxaData[userId] = mockTempData;
@@ -355,14 +370,14 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         facturaConRetencion: {
           total: 67405.14,
           items: expect.any(Array),
-          facturaData: expect.any(Object)
+          facturaData: expect.any(Object),
         },
         facturaSinRetencion: {
           total: 69812.47,
           items: expect.any(Array),
-          facturaData: expect.any(Object)
+          facturaData: expect.any(Object),
         },
-        timestamp: expect.any(Number)
+        timestamp: expect.any(Number),
       };
 
       // Act
@@ -374,14 +389,14 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
         facturaConRetencion: {
           total: 67405.14,
           items: [],
-          facturaData: { customer: '68671168de097f4e7bd4734c' }
+          facturaData: { customer: '68671168de097f4e7bd4734c' },
         },
         facturaSinRetencion: {
           total: 69812.47,
           items: [],
-          facturaData: { customer: '68671168de097f4e7bd4734c' }
+          facturaData: { customer: '68671168de097f4e7bd4734c' },
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Assert
@@ -395,11 +410,11 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const performanceTargets = {
         clienteLoad: 100, // ms
         precalculo: 1, // ms (objetivo 0ms)
-        bottonResponse: 5 // ms
+        bottonResponse: 5, // ms
       };
 
       // Act & Assert - Simular tiempos de las fases optimizadas
-      
+
       // FASE 1: Carga de cliente
       const clienteStart = Date.now();
       // Simulación de búsqueda por RFC
@@ -429,15 +444,15 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const userId2 = 67890;
 
       // Act - Simular datos de usuarios en diferentes workers
-      global.tempAxaData[userId1] = { 
-        clientId: 'client1', 
+      global.tempAxaData[userId1] = {
+        clientId: 'client1',
         timestamp: Date.now(),
-        facturaConRetencion: { total: 1000 }
+        facturaConRetencion: { total: 1000 },
       };
-      global.tempAxaData[userId2] = { 
-        clientId: 'client2', 
+      global.tempAxaData[userId2] = {
+        clientId: 'client2',
         timestamp: Date.now(),
-        facturaConRetencion: { total: 2000 }
+        facturaConRetencion: { total: 2000 },
       };
 
       // Assert
@@ -454,15 +469,15 @@ describe('AXA Handler - Optimizaciones implementadas', () => {
       const oldTimestamp = Date.now() - 700000; // 11+ minutos atrás
       const recentTimestamp = Date.now() - 300000; // 5 minutos atrás
 
-      global.tempAxaData[userId] = { 
-        clientId: 'test', 
+      global.tempAxaData[userId] = {
+        clientId: 'test',
         timestamp: oldTimestamp,
-        facturaConRetencion: { total: 1000 }
+        facturaConRetencion: { total: 1000 },
       };
-      global.tempAxaData[67890] = { 
-        clientId: 'test2', 
+      global.tempAxaData[67890] = {
+        clientId: 'test2',
         timestamp: recentTimestamp,
-        facturaConRetencion: { total: 2000 }
+        facturaConRetencion: { total: 2000 },
       };
 
       // Act - Simular limpieza (lógica del handler real)

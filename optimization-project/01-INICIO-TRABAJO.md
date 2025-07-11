@@ -7,6 +7,7 @@
 ## ✅ FASE 0: PREPARACIÓN
 
 ### 1. Verificar accesos
+
 ```bash
 # Verificar Railway CLI
 railway --version
@@ -19,6 +20,7 @@ railway variables
 ```
 
 ### 2. Crear backup de seguridad
+
 ```bash
 # Ejecutar script backup Railway
 ./backups/backup_dbs.sh
@@ -28,6 +30,7 @@ ls -la backups/*/railway.dump
 ```
 
 ### 3. Verificar estado actual del bot
+
 - [x] Bot funcionando en Telegram
 - [x] Puedes enviar un PDF de prueba
 - [x] Anotar tiempo actual: **8-10 segundos** (medido)

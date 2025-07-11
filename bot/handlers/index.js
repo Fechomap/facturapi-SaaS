@@ -11,21 +11,21 @@ import { registerOnboardingHandler } from './onboarding.handler.js';
  */
 export function registerAllHandlers(bot) {
   console.log('🔄 Iniciando registro de handlers...');
-  
+
   registerClientHandler(bot);
   console.log('✅ Client handler registrado');
-  
+
   registerInvoiceHandler(bot);
   console.log('✅ Invoice handler registrado');
-  
+
   registerChubbHandler(bot);
   console.log('✅ Chubb handler registrado');
-  
+
   registerAxaHandler(bot);
   console.log('✅ AXA handler registrado');
-  
+
   registerOnboardingHandler(bot);
   console.log('✅ Onboarding handler registrado');
-  
+
   console.log('✅ Handlers registrados correctamente');
 }

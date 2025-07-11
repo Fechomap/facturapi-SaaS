@@ -15,43 +15,61 @@ function App() {
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
-        
-        <Route path="/dashboard" element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        } />
-        
-        <Route path="/facturas" element={
-          <PrivateRoute>
-            <InvoiceList />
-          </PrivateRoute>
-        } />
-        
-        <Route path="/facturas/:id" element={
-          <PrivateRoute>
-            <InvoiceDetail />
-          </PrivateRoute>
-        } />
-        
-        <Route path="/usuarios" element={
-          <PrivateRoute>
-            <UserManagement />
-          </PrivateRoute>
-        } />
-        
-        <Route path="/usuarios/nuevo" element={
-          <PrivateRoute>
-            <UserForm />
-          </PrivateRoute>
-        } />
-        
-        <Route path="/usuarios/:id" element={
-          <PrivateRoute>
-            <UserForm />
-          </PrivateRoute>
-        } />
-        
+
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <Dashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/facturas"
+          element={
+            <PrivateRoute>
+              <InvoiceList />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/facturas/:id"
+          element={
+            <PrivateRoute>
+              <InvoiceDetail />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/usuarios"
+          element={
+            <PrivateRoute>
+              <UserManagement />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/usuarios/nuevo"
+          element={
+            <PrivateRoute>
+              <UserForm />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/usuarios/:id"
+          element={
+            <PrivateRoute>
+              <UserForm />
+            </PrivateRoute>
+          }
+        />
+
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>

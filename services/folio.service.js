@@ -8,7 +8,7 @@ import prisma from '../lib/prisma.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const FOLIO_FILE = path.join(__dirname, '..', 'data', 'folio-counter.json');
-const DEFAULT_COUNTERS = { 'A': 800 };
+const DEFAULT_COUNTERS = { A: 800 };
 
 /**
  * Inicializa el contador de folios en el sistema de archivos (compatibilidad)
@@ -18,7 +18,7 @@ function initFolioCounter() {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  
+
   if (!fs.existsSync(FOLIO_FILE)) {
     try {
       fs.writeFileSync(FOLIO_FILE, JSON.stringify(DEFAULT_COUNTERS, null, 2));
@@ -42,25 +42,25 @@ async function peekNextFolioDb(tenantId, series = 'A') {
       where: {
         tenantId_series: {
           tenantId,
-          series
-        }
-      }
+          series,
+        },
+      },
     });
-    
+
     // Si existe, devolver el número actual
     if (folio) {
       return folio.currentNumber;
     }
-    
+
     // Si no existe, crear uno nuevo con el valor predeterminado
     const newFolio = await prisma.tenantFolio.create({
       data: {
         tenantId,
         series,
-        currentNumber: DEFAULT_COUNTERS[series] || 800
-      }
+        currentNumber: DEFAULT_COUNTERS[series] || 800,
+      },
     });
-    
+
     return newFolio.currentNumber;
   } catch (error) {
     console.error(`Error al obtener próximo folio para tenant ${tenantId}:`, error);
@@ -79,20 +79,20 @@ async function reserveNextFolioDb(tenantId, series = 'A') {
   try {
     // Obtener el folio actual
     const currentFolio = await peekNextFolioDb(tenantId, series);
-    
+
     // Actualizar el contador en la base de datos
     await prisma.tenantFolio.updateMany({
       where: {
         tenantId,
-        series
+        series,
       },
       data: {
         currentNumber: {
-          increment: 1
-        }
-      }
+          increment: 1,
+        },
+      },
     });
-    
+
     return currentFolio;
   } catch (error) {
     console.error(`Error al reservar folio para tenant ${tenantId}:`, error);
@@ -117,7 +117,7 @@ function peekNextFolio(serie = 'A') {
 
 function reserveNextFolio(serie = 'A') {
   let counters;
-  
+
   try {
     if (fs.existsSync(FOLIO_FILE)) {
       const data = fs.readFileSync(FOLIO_FILE, 'utf8');
@@ -129,32 +129,26 @@ function reserveNextFolio(serie = 'A') {
     console.error('Error al leer el archivo de folios:', error);
     counters = { ...DEFAULT_COUNTERS };
   }
-  
+
   if (!counters[serie]) {
     counters[serie] = DEFAULT_COUNTERS[serie] || 1;
   }
-  
+
   const nextFolio = counters[serie];
   counters[serie] += 1;
-  
+
   const dir = path.dirname(FOLIO_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  
+
   try {
     fs.writeFileSync(FOLIO_FILE, JSON.stringify(counters, null, 2));
   } catch (error) {
     console.error('Error al guardar el contador de folios:', error);
   }
-  
+
   return nextFolio;
 }
 
-export {
-  initFolioCounter,
-  peekNextFolio,
-  reserveNextFolio,
-  peekNextFolioDb,
-  reserveNextFolioDb
-};
+export { initFolioCounter, peekNextFolio, reserveNextFolio, peekNextFolioDb, reserveNextFolioDb };

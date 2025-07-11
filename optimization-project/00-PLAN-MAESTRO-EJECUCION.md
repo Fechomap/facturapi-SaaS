@@ -11,15 +11,17 @@
 ### ⏱️ FASE 0: PREPARACIÓN (10 minutos)
 
 1. **Verificar accesos**:
+
    - [x] Acceso a PostgreSQL Railway
    - [x] Railway CLI configurado
    - [x] Git configurado correctamente
 
 2. **Crear backup de seguridad**:
+
    ```bash
    # Backup de la base de datos Railway
    ./backups/backup_dbs.sh
-   
+
    # Verificar backup creado
    ls -la backups/*/railway.dump
    ```
@@ -35,20 +37,21 @@
    cd /Users/jhonvc/NODE\ HEROKU/facturapi-SaaS
    node scripts/benchmark-before-after.js --before
    ```
-   
 2. **Guardar evidencia**:
+
    - [ ] Screenshot del resultado
    - [ ] Copiar archivo `benchmark-results-before-*.json` a `optimization-project/evidence/`
 
 3. **Verificar estado de PostgreSQL**:
+
    ```bash
    # Conectar a Railway PostgreSQL
    PGPASSWORD=eLQHlZEgKsaLftJFoUXcxipIdoyKhvJy psql -h hopper.proxy.rlwy.net -p 17544 -U postgres -d railway
    ```
-   
+
    ```sql
    -- Verificar bloat actual
-   SELECT 
+   SELECT
      relname,
      n_dead_tup,
      n_live_tup,
@@ -66,38 +69,41 @@
 **⚠️ ADVERTENCIA**: VACUUM FULL bloquea las tablas. Ejecutar en horario de bajo tráfico.
 
 1. **Conectar a PostgreSQL Railway**:
+
    ```bash
    PGPASSWORD=eLQHlZEgKsaLftJFoUXcxipIdoyKhvJy psql -h hopper.proxy.rlwy.net -p 17544 -U postgres -d railway
    ```
 
 2. **Ejecutar optimizaciones críticas**:
+
    ```sql
    -- 1. VACUUM FULL en tablas con bloat crítico
    \timing on
-   
+
    VACUUM FULL tenant_folios;
    VACUUM FULL user_sessions;
    VACUUM FULL tenant_customers;
    VACUUM FULL tenant_invoices;
-   
+
    -- 2. Actualizar estadísticas
    ANALYZE;
-   
+
    -- 3. Verificar que ahora usa índices
-   EXPLAIN (ANALYZE, BUFFERS) 
-   UPDATE tenant_folios 
-   SET current_number = current_number + 1 
-   WHERE tenant_id = (SELECT id FROM tenants LIMIT 1) 
+   EXPLAIN (ANALYZE, BUFFERS)
+   UPDATE tenant_folios
+   SET current_number = current_number + 1
+   WHERE tenant_id = (SELECT id FROM tenants LIMIT 1)
    AND series = 'A';
    ```
 
 3. **Crear índices adicionales**:
+
    ```sql
    -- Solo si no existen
-   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tenant_customer_search 
+   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tenant_customer_search
    ON tenant_customers(tenant_id, legal_name text_pattern_ops);
-   
-   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tenant_invoice_list 
+
+   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tenant_invoice_list
    ON tenant_invoices(tenant_id, created_at DESC);
    ```
 
@@ -106,6 +112,7 @@
 ### ⏱️ FASE 3: DEPLOY DE CÓDIGO OPTIMIZADO (20 minutos)
 
 1. **Verificar cambios**:
+
    ```bash
    cd /Users/jhonvc/NODE\ HEROKU/facturapi-SaaS
    git status
@@ -113,27 +120,30 @@
    ```
 
 2. **Commit y push**:
+
    ```bash
    git add services/tenant.service.js services/tenant.service.optimized.js
    git commit -m "perf: Optimizar getNextFolio con query atómica
-   
+
    - Reduce tiempo de 3.4s a ~50ms
    - Usa INSERT ON CONFLICT para operación atómica
    - Incluye fallback al método anterior por seguridad
-   
+
    Fixes #performance-issue"
-   
+
    git push origin main
    # Railway auto-deploys from main branch
    ```
 
 3. **Monitorear deploy Railway**:
+
    ```bash
    # Railway dashboard o logs
    railway logs --follow
    ```
-   
+
    Esperar mensajes:
+
    - "Build succeeded"
    - "Stopping all processes"
    - "State changed from starting to up"
@@ -145,11 +155,13 @@
 1. **Esperar estabilización** (5 minutos)
 
 2. **Ejecutar benchmark DESPUÉS**:
+
    ```bash
    node scripts/benchmark-before-after.js --after
    ```
 
 3. **Comparar resultados**:
+
    ```bash
    node scripts/benchmark-before-after.js --compare
    ```
@@ -165,19 +177,20 @@
 ### ⏱️ FASE 5: DOCUMENTACIÓN Y CIERRE (15 minutos)
 
 1. **Generar reporte final**:
+
    ```bash
    cd optimization-project
    cp ../benchmark-comparison-*.json evidence/
    ```
 
 2. **Actualizar métricas finales**:
-   
-   | Métrica | Antes | Después | Mejora |
-   |---------|-------|---------|--------|
-   | getNextFolio | 1,987ms | 190ms | 90.4% |
-   | getUserState | 65ms | 68ms | Estable |
-   | getFacturapiClient | 70ms | 7ms | 90.0% |
-   | incrementInvoiceCount | 1,425ms | 1,153ms | 19.1% |
+
+   | Métrica               | Antes     | Después  | Mejora  |
+   | --------------------- | --------- | -------- | ------- |
+   | getNextFolio          | 1,987ms   | 190ms    | 90.4%   |
+   | getUserState          | 65ms      | 68ms     | Estable |
+   | getFacturapiClient    | 70ms      | 7ms      | 90.0%   |
+   | incrementInvoiceCount | 1,425ms   | 1,153ms  | 19.1%   |
    | **Bot Total Usuario** | **8-10s** | **1.6s** | **83%** |
 
 3. **Comunicar resultados**:
@@ -192,6 +205,7 @@
 ### Si algo sale mal:
 
 1. **Rollback de código**:
+
    ```bash
    git revert HEAD
    git push origin main
@@ -199,6 +213,7 @@
    ```
 
 2. **Si la DB queda lenta**:
+
    ```sql
    -- Los VACUUM no se pueden revertir
    -- Pero se puede hacer REINDEX si hay problemas
@@ -206,9 +221,9 @@
    ```
 
 3. **Contactos de emergencia**:
-   - DBA: ____________
-   - DevOps: __________
-   - Lead Dev: ________
+   - DBA: ****\_\_\_\_****
+   - DevOps: ****\_\_****
+   - Lead Dev: **\_\_\_\_**
 
 ---
 

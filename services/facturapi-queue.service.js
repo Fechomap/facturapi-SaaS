@@ -13,19 +13,19 @@ class FacturapiQueueService {
   constructor() {
     // Cola de solicitudes pendientes
     this.queue = [];
-    
+
     // Solicitudes en procesamiento
     this.processing = new Set();
-    
+
     // Configuración de la cola
     this.config = {
-      maxConcurrent: 5,        // Máximo 5 solicitudes concurrentes a FacturAPI
-      maxQueueSize: 100,       // Máximo 100 solicitudes en cola
-      processingDelay: 200,    // 200ms entre procesamiento de solicitudes
-      retryDelay: 2000,        // 2 segundos para reintento
-      maxRetries: 3            // Máximo 3 reintentos
+      maxConcurrent: 5, // Máximo 5 solicitudes concurrentes a FacturAPI
+      maxQueueSize: 100, // Máximo 100 solicitudes en cola
+      processingDelay: 200, // 200ms entre procesamiento de solicitudes
+      retryDelay: 2000, // 2 segundos para reintento
+      maxRetries: 3, // Máximo 3 reintentos
     };
-    
+
     // Métricas de la cola
     this.metrics = {
       totalProcessed: 0,
@@ -33,9 +33,9 @@ class FacturapiQueueService {
       currentQueueSize: 0,
       currentProcessing: 0,
       averageWaitTime: 0,
-      peakQueueSize: 0
+      peakQueueSize: 0,
     };
-    
+
     // Iniciar procesamiento de la cola
     this.startQueueProcessor();
   }
@@ -52,11 +52,13 @@ class FacturapiQueueService {
     return new Promise((resolve, reject) => {
       // Verificar que la cola no esté llena
       if (this.queue.length >= this.config.maxQueueSize) {
-        const error = new Error(`Cola de FacturAPI llena (${this.config.maxQueueSize} solicitudes)`);
+        const error = new Error(
+          `Cola de FacturAPI llena (${this.config.maxQueueSize} solicitudes)`
+        );
         queueLogger.error('Cola llena, rechazando solicitud', {
           queueSize: this.queue.length,
           operationType,
-          context
+          context,
         });
         reject(error);
         return;
@@ -72,12 +74,12 @@ class FacturapiQueueService {
         reject,
         enqueuedAt: Date.now(),
         retries: 0,
-        maxRetries: this.config.maxRetries
+        maxRetries: this.config.maxRetries,
       };
 
       // Insertar en la cola manteniendo orden de prioridad
       this.insertByPriority(queueItem);
-      
+
       // Actualizar métricas
       this.metrics.currentQueueSize = this.queue.length;
       this.metrics.peakQueueSize = Math.max(this.metrics.peakQueueSize, this.queue.length);
@@ -87,7 +89,7 @@ class FacturapiQueueService {
         operationType,
         priority,
         queuePosition: this.queue.length,
-        context
+        context,
       });
     });
   }
@@ -98,7 +100,7 @@ class FacturapiQueueService {
    */
   insertByPriority(item) {
     let inserted = false;
-    
+
     for (let i = 0; i < this.queue.length; i++) {
       if (item.priority > this.queue[i].priority) {
         this.queue.splice(i, 0, item);
@@ -106,7 +108,7 @@ class FacturapiQueueService {
         break;
       }
     }
-    
+
     // Si no se insertó, agregar al final
     if (!inserted) {
       this.queue.push(item);
@@ -118,21 +120,20 @@ class FacturapiQueueService {
    */
   async startQueueProcessor() {
     queueLogger.info('Iniciando procesador de cola FacturAPI', this.config);
-    
+
     while (true) {
       try {
         // Si hay espacio para procesar más solicitudes
         if (this.processing.size < this.config.maxConcurrent && this.queue.length > 0) {
           const item = this.queue.shift();
           this.metrics.currentQueueSize = this.queue.length;
-          
+
           // Procesar la solicitud de forma asíncrona
           this.processItem(item);
         }
-        
+
         // Esperar antes del próximo ciclo
         await this.delay(this.config.processingDelay);
-        
       } catch (error) {
         queueLogger.error('Error en procesador de cola', error);
         await this.delay(1000); // Esperar más tiempo si hay error
@@ -147,16 +148,16 @@ class FacturapiQueueService {
   async processItem(item) {
     this.processing.add(item.id);
     this.metrics.currentProcessing = this.processing.size;
-    
+
     const waitTime = Date.now() - item.enqueuedAt;
     this.updateAverageWaitTime(waitTime);
-    
+
     queueLogger.debug('Procesando solicitud', {
       id: item.id,
       operationType: item.operationType,
       waitTime,
       retries: item.retries,
-      currentProcessing: this.processing.size
+      currentProcessing: this.processing.size,
     });
 
     try {
@@ -166,47 +167,45 @@ class FacturapiQueueService {
         item.operationType,
         { context: item.context }
       );
-      
+
       // Operación exitosa
       this.metrics.totalProcessed++;
       item.resolve(result);
-      
+
       queueLogger.debug('Solicitud completada exitosamente', {
         id: item.id,
         operationType: item.operationType,
-        processingTime: Date.now() - (item.enqueuedAt + waitTime)
+        processingTime: Date.now() - (item.enqueuedAt + waitTime),
       });
-      
     } catch (error) {
       // Manejar error - posible reintento
       if (item.retries < item.maxRetries && this.shouldRetry(error)) {
         item.retries++;
-        
+
         queueLogger.warn('Solicitud falló, reintentando', {
           id: item.id,
           operationType: item.operationType,
           error: error.message,
           retries: item.retries,
-          maxRetries: item.maxRetries
+          maxRetries: item.maxRetries,
         });
-        
+
         // Agregar de vuelta a la cola con menor prioridad
         setTimeout(() => {
           item.priority = Math.max(item.priority - 1, 0);
           this.insertByPriority(item);
           this.metrics.currentQueueSize = this.queue.length;
         }, this.config.retryDelay);
-        
       } else {
         // Error final
         this.metrics.totalFailed++;
         item.reject(error);
-        
+
         queueLogger.error('Solicitud falló definitivamente', {
           id: item.id,
           operationType: item.operationType,
           error: error.message,
-          retries: item.retries
+          retries: item.retries,
         });
       }
     } finally {
@@ -229,12 +228,13 @@ class FacturapiQueueService {
       'ENOTFOUND',
       'ECONNREFUSED',
       'ETIMEDOUT',
-      'socket hang up'
+      'socket hang up',
     ];
-    
-    return retryableErrors.some(retryableError => 
-      error.message?.toLowerCase().includes(retryableError.toLowerCase()) ||
-      error.code?.toLowerCase().includes(retryableError.toLowerCase())
+
+    return retryableErrors.some(
+      (retryableError) =>
+        error.message?.toLowerCase().includes(retryableError.toLowerCase()) ||
+        error.code?.toLowerCase().includes(retryableError.toLowerCase())
     );
   }
 
@@ -244,7 +244,7 @@ class FacturapiQueueService {
    */
   updateAverageWaitTime(waitTime) {
     const totalRequests = this.metrics.totalProcessed + this.metrics.totalFailed + 1;
-    this.metrics.averageWaitTime = 
+    this.metrics.averageWaitTime =
       (this.metrics.averageWaitTime * (totalRequests - 1) + waitTime) / totalRequests;
   }
 
@@ -262,7 +262,7 @@ class FacturapiQueueService {
    * @returns {Promise} Promesa que se resuelve después del delay
    */
   delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -271,15 +271,14 @@ class FacturapiQueueService {
    */
   getMetrics() {
     const totalRequests = this.metrics.totalProcessed + this.metrics.totalFailed;
-    const successRate = totalRequests > 0 
-      ? ((this.metrics.totalProcessed / totalRequests) * 100).toFixed(2)
-      : 100;
+    const successRate =
+      totalRequests > 0 ? ((this.metrics.totalProcessed / totalRequests) * 100).toFixed(2) : 100;
 
     return {
       ...this.metrics,
       successRate: `${successRate}%`,
       averageWaitTime: Math.round(this.metrics.averageWaitTime),
-      config: this.config
+      config: this.config,
     };
   }
 
@@ -288,14 +287,14 @@ class FacturapiQueueService {
    */
   clearQueue() {
     const rejectedCount = this.queue.length;
-    
-    this.queue.forEach(item => {
+
+    this.queue.forEach((item) => {
       item.reject(new Error('Cola limpiada por administrador'));
     });
-    
+
     this.queue = [];
     this.metrics.currentQueueSize = 0;
-    
+
     queueLogger.warn('Cola limpiada por administrador', { rejectedCount });
   }
 
@@ -306,15 +305,15 @@ class FacturapiQueueService {
   getStatus() {
     return {
       isHealthy: this.queue.length < this.config.maxQueueSize * 0.8,
-      queueItems: this.queue.map(item => ({
+      queueItems: this.queue.map((item) => ({
         id: item.id,
         operationType: item.operationType,
         priority: item.priority,
         waitTime: Date.now() - item.enqueuedAt,
-        retries: item.retries
+        retries: item.retries,
       })),
       processingItems: Array.from(this.processing),
-      metrics: this.getMetrics()
+      metrics: this.getMetrics(),
     };
   }
 }

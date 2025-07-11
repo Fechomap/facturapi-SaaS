@@ -10,7 +10,7 @@ const getWorkerCount = () => {
   const cpuCount = os.cpus().length;
   const isProduction = process.env.NODE_ENV === 'production';
   const isRailway = process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
-  
+
   // En Railway podemos usar más workers debido a su infraestructura
   if (isRailway && isProduction) {
     // Railway permite hasta 8 workers eficientemente
@@ -45,11 +45,11 @@ if (cluster.isPrimary) {
   // Función para crear un worker
   const createWorker = () => {
     const worker = cluster.fork();
-    
+
     worker.on('online', () => {
       clusterLogger.info(`👷 Worker ${worker.process.pid} iniciado correctamente`);
     });
-    
+
     return worker;
   };
 
@@ -61,7 +61,7 @@ if (cluster.isPrimary) {
   // Manejar workers que mueren
   cluster.on('exit', (worker, code, signal) => {
     const pid = worker.process.pid;
-    
+
     if (signal) {
       clusterLogger.warn(`💀 Worker ${pid} terminado por señal ${signal}`);
     } else if (code !== 0) {
@@ -74,16 +74,18 @@ if (cluster.isPrimary) {
     if (signal !== 'SIGTERM' && signal !== 'SIGINT') {
       const workerId = worker.id;
       const currentRestarts = restartCounts.get(workerId) || 0;
-      
+
       if (currentRestarts < MAX_RESTARTS_PER_MINUTE) {
         clusterLogger.info(`🔄 Reiniciando worker ${workerId} en ${WORKER_RESTART_DELAY}ms`);
-        
+
         setTimeout(() => {
           createWorker();
           restartCounts.set(workerId, currentRestarts + 1);
         }, WORKER_RESTART_DELAY);
       } else {
-        clusterLogger.error(`⚠️ Worker ${workerId} ha fallado demasiadas veces, no se reiniciará automáticamente`);
+        clusterLogger.error(
+          `⚠️ Worker ${workerId} ha fallado demasiadas veces, no se reiniciará automáticamente`
+        );
       }
     }
   });
@@ -91,11 +93,11 @@ if (cluster.isPrimary) {
   // Manejar señales del sistema para cierre limpio
   const shutdown = (signal) => {
     clusterLogger.info(`📴 Recibida señal ${signal}, cerrando cluster...`);
-    
+
     for (const id in cluster.workers) {
       cluster.workers[id].kill('SIGTERM');
     }
-    
+
     // Forzar cierre después de 10 segundos
     setTimeout(() => {
       clusterLogger.warn('⏰ Forzando cierre del cluster');
@@ -107,31 +109,33 @@ if (cluster.isPrimary) {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   // Estadísticas del cluster cada 5 minutos
-  setInterval(() => {
-    const workerIds = Object.keys(cluster.workers);
-    clusterLogger.info(`📊 Cluster activo: ${workerIds.length}/${workerCount} workers`);
-    
-    // Información de memoria y CPU
-    const memUsage = process.memoryUsage();
-    clusterLogger.info(`💾 Memoria principal: ${Math.round(memUsage.rss / 1024 / 1024)}MB`);
-  }, 5 * 60 * 1000);
+  setInterval(
+    () => {
+      const workerIds = Object.keys(cluster.workers);
+      clusterLogger.info(`📊 Cluster activo: ${workerIds.length}/${workerCount} workers`);
 
+      // Información de memoria y CPU
+      const memUsage = process.memoryUsage();
+      clusterLogger.info(`💾 Memoria principal: ${Math.round(memUsage.rss / 1024 / 1024)}MB`);
+    },
+    5 * 60 * 1000
+  );
 } else {
   // Código del worker - importar y ejecutar el servidor
   clusterLogger.info(`👷 Worker ${process.pid} iniciando...`);
-  
+
   // Importar dinámicamente el servidor para evitar problemas de clustering
-  import('./server.js').catch(error => {
+  import('./server.js').catch((error) => {
     clusterLogger.error(`❌ Error al iniciar worker ${process.pid}:`, error);
     process.exit(1);
   });
-  
+
   // Manejar errores no capturados en workers
   process.on('uncaughtException', (error) => {
     clusterLogger.error(`💥 Error no capturado en worker ${process.pid}:`, error);
     process.exit(1);
   });
-  
+
   process.on('unhandledRejection', (reason, promise) => {
     clusterLogger.error(`🚫 Promesa rechazada no manejada en worker ${process.pid}:`, reason);
     process.exit(1);

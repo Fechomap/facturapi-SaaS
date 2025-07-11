@@ -23,42 +23,52 @@ async function tenantContextMiddleware(ctx, next) {
   try {
     // Inicializar userState si no existe
     ctx.userState = ctx.userState || {};
-    
-    middlewareLogger.debug({ telegramId: telegramId, userState: JSON.stringify(ctx.userState) }, 'Estado actual antes de verificar tenant');
+
+    middlewareLogger.debug(
+      { telegramId: telegramId, userState: JSON.stringify(ctx.userState) },
+      'Estado actual antes de verificar tenant'
+    );
 
     // Solo verificar el tenant si no hay uno establecido o si userStatus es 'no_tenant'
     if (!ctx.userState.tenantId || ctx.userState.userStatus === 'no_tenant') {
       // 🔍 MÉTRICAS: Medir tiempo de consulta tenant DB
       const tenantQueryStartTime = Date.now();
-      console.log(`[TENANT_METRICS] Usuario ${telegramId} - Consultando tenant en DB porque tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`);
-      
+      console.log(
+        `[TENANT_METRICS] Usuario ${telegramId} - Consultando tenant en DB porque tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`
+      );
+
       // Buscar el usuario y su tenant asociado
       const user = await TenantService.findUserByTelegramId(telegramId);
-      
+
       const tenantQueryDuration = Date.now() - tenantQueryStartTime;
-      console.log(`[TENANT_METRICS] Usuario ${telegramId} - DB query findUserByTelegramId tomó ${tenantQueryDuration}ms, userFound=${!!user}`);
-      
-      middlewareLogger.debug({ telegramId: telegramId, userFound: !!user }, 'Información de usuario consultada');
-      
+      console.log(
+        `[TENANT_METRICS] Usuario ${telegramId} - DB query findUserByTelegramId tomó ${tenantQueryDuration}ms, userFound=${!!user}`
+      );
+
+      middlewareLogger.debug(
+        { telegramId: telegramId, userFound: !!user },
+        'Información de usuario consultada'
+      );
+
       if (user && user.tenant) {
         // Guardar el ID del tenant en el estado del usuario para futuras referencias
         ctx.userState.tenantId = user.tenant.id;
         ctx.userState.tenantName = user.tenant.businessName;
-        
+
         // También verificar si el usuario está autorizado
         if (!user.isAuthorized) {
           ctx.userState.userStatus = 'pending_authorization';
         } else {
           ctx.userState.userStatus = 'authorized';
         }
-        
+
         middlewareLogger.debug(
-          { 
-            telegramId: telegramId, 
-            tenantId: user.tenant.id, 
-            tenantName: user.tenant.businessName, 
-            userStatus: ctx.userState.userStatus 
-          }, 
+          {
+            telegramId: telegramId,
+            tenantId: user.tenant.id,
+            tenantName: user.tenant.businessName,
+            userStatus: ctx.userState.userStatus,
+          },
           'Estado actualizado con información de tenant'
         );
       } else {
@@ -67,21 +77,28 @@ async function tenantContextMiddleware(ctx, next) {
         middlewareLogger.debug({ telegramId: telegramId }, 'Usuario sin tenant asociado');
       }
     } else {
-      console.log(`[TENANT_METRICS] Usuario ${telegramId} - SKIP DB query porque ya tiene tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`);
+      console.log(
+        `[TENANT_METRICS] Usuario ${telegramId} - SKIP DB query porque ya tiene tenantId=${ctx.userState.tenantId}, userStatus=${ctx.userState.userStatus}`
+      );
     }
 
     // Añadir métodos de utilidad para trabajar con el tenant
     ctx.getTenantId = () => ctx.userState?.tenantId;
     ctx.isUserAuthorized = () => ctx.userState?.userStatus === 'authorized';
     ctx.hasTenant = () => !!ctx.userState?.tenantId;
-    
+
     const middlewareDuration = Date.now() - middlewareStartTime;
-    console.log(`[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant TOTAL tomó ${middlewareDuration}ms`);
-    
+    console.log(
+      `[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant TOTAL tomó ${middlewareDuration}ms`
+    );
+
     return next();
   } catch (error) {
     const middlewareDuration = Date.now() - middlewareStartTime;
-    console.error(`[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant ERROR después de ${middlewareDuration}ms:`, error);
+    console.error(
+      `[TENANT_METRICS] Usuario ${telegramId} - Middleware tenant ERROR después de ${middlewareDuration}ms:`,
+      error
+    );
     middlewareLogger.error({ error, telegramId }, 'Error en tenant middleware');
     return next();
   }
@@ -98,15 +115,16 @@ async function requireTenant(req, res, next) {
   try {
     // Obtener el tenant ID del header o del cuerpo de la solicitud o query parameter
     const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || req.body?.tenantId;
-    
+
     if (!tenantId) {
       middlewareLogger.warn({ path: req.path }, 'Solicitud sin tenant ID');
-      return res.status(400).json({ 
-        error: 'TenantRequired', 
-        message: 'Debe proporcionar un tenant ID en el header X-Tenant-ID, query parameter o en el cuerpo de la solicitud'
+      return res.status(400).json({
+        error: 'TenantRequired',
+        message:
+          'Debe proporcionar un tenant ID en el header X-Tenant-ID, query parameter o en el cuerpo de la solicitud',
       });
     }
-    
+
     // Verificar que el tenant existe directamente en la base de datos
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -115,35 +133,35 @@ async function requireTenant(req, res, next) {
         businessName: true,
         email: true,
         isActive: true,
-        facturapiApiKey: true
-      }
+        facturapiApiKey: true,
+      },
     });
-    
+
     if (!tenant) {
       middlewareLogger.warn({ tenantId, path: req.path }, 'Tenant no encontrado');
-      return res.status(404).json({ 
-        error: 'TenantNotFound', 
-        message: 'El tenant especificado no existe'
+      return res.status(404).json({
+        error: 'TenantNotFound',
+        message: 'El tenant especificado no existe',
       });
     }
-    
+
     // Verificar que el tenant está activo
     if (!tenant.isActive) {
       middlewareLogger.warn({ tenantId, path: req.path }, 'Tenant inactivo');
-      return res.status(403).json({ 
-        error: 'TenantInactive', 
-        message: 'El tenant especificado está desactivado'
+      return res.status(403).json({
+        error: 'TenantInactive',
+        message: 'El tenant especificado está desactivado',
       });
     }
-    
+
     // Añadir el tenant a la solicitud
     req.tenant = tenant;
-    
+
     // Añadir método para obtener la API key
     req.getApiKey = async () => {
       return await TenantService.getDecryptedApiKey(tenantId);
     };
-    
+
     middlewareLogger.debug({ tenantId, path: req.path }, 'Tenant validado correctamente');
     next();
   } catch (error) {

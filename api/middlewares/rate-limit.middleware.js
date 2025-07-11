@@ -14,7 +14,7 @@ export const generalRateLimit = rateLimit({
   max: 100, // máximo 100 requests por IP cada 15 minutos
   message: {
     error: 'Demasiadas solicitudes desde esta IP, intenta nuevamente en 15 minutos.',
-    retryAfter: '15 minutos'
+    retryAfter: '15 minutos',
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -23,14 +23,14 @@ export const generalRateLimit = rateLimit({
       ip: req.ip,
       userAgent: req.get('User-Agent'),
       path: req.path,
-      method: req.method
+      method: req.method,
     });
-    
+
     res.status(429).json({
       error: 'Demasiadas solicitudes desde esta IP, intenta nuevamente en 15 minutos.',
-      retryAfter: '15 minutos'
+      retryAfter: '15 minutos',
     });
-  }
+  },
 });
 
 /**
@@ -42,7 +42,7 @@ export const invoiceRateLimit = rateLimit({
   max: 10, // máximo 10 facturas por IP cada 5 minutos
   message: {
     error: 'Demasiadas facturas creadas desde esta IP, intenta nuevamente en 5 minutos.',
-    retryAfter: '5 minutos'
+    retryAfter: '5 minutos',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -50,14 +50,14 @@ export const invoiceRateLimit = rateLimit({
     rateLimitLogger.warn('Rate limit de facturación excedido', {
       ip: req.ip,
       tenantId: req.headers['x-tenant-id'],
-      userAgent: req.get('User-Agent')
+      userAgent: req.get('User-Agent'),
     });
-    
+
     res.status(429).json({
       error: 'Demasiadas facturas creadas desde esta IP, intenta nuevamente en 5 minutos.',
-      retryAfter: '5 minutos'
+      retryAfter: '5 minutos',
     });
-  }
+  },
 });
 
 /**
@@ -69,7 +69,7 @@ export const queryRateLimit = rateLimit({
   max: 30, // máximo 30 consultas por IP cada minuto
   message: {
     error: 'Demasiadas consultas desde esta IP, intenta nuevamente en 1 minuto.',
-    retryAfter: '1 minuto'
+    retryAfter: '1 minuto',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -77,14 +77,14 @@ export const queryRateLimit = rateLimit({
     rateLimitLogger.warn('Rate limit de consultas excedido', {
       ip: req.ip,
       tenantId: req.headers['x-tenant-id'],
-      path: req.path
+      path: req.path,
     });
-    
+
     res.status(429).json({
       error: 'Demasiadas consultas desde esta IP, intenta nuevamente en 1 minuto.',
-      retryAfter: '1 minuto'
+      retryAfter: '1 minuto',
     });
-  }
+  },
 });
 
 /**
@@ -96,7 +96,7 @@ export const authRateLimit = rateLimit({
   max: 5, // máximo 5 intentos de auth por IP cada 15 minutos
   message: {
     error: 'Demasiados intentos de autenticación, intenta nuevamente en 15 minutos.',
-    retryAfter: '15 minutos'
+    retryAfter: '15 minutos',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -104,14 +104,14 @@ export const authRateLimit = rateLimit({
     rateLimitLogger.error('Rate limit de autenticación excedido - posible ataque', {
       ip: req.ip,
       userAgent: req.get('User-Agent'),
-      path: req.path
+      path: req.path,
     });
-    
+
     res.status(429).json({
       error: 'Demasiados intentos de autenticación, intenta nuevamente en 15 minutos.',
-      retryAfter: '15 minutos'
+      retryAfter: '15 minutos',
     });
-  }
+  },
 });
 
 /**
@@ -126,7 +126,7 @@ export const tenantRateLimit = rateLimit({
   },
   message: {
     error: 'Demasiadas solicitudes para este tenant, intenta nuevamente en 1 minuto.',
-    retryAfter: '1 minuto'
+    retryAfter: '1 minuto',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -134,14 +134,14 @@ export const tenantRateLimit = rateLimit({
     rateLimitLogger.warn('Rate limit por tenant excedido', {
       tenantId: req.headers['x-tenant-id'] || req.query.tenantId,
       ip: req.ip,
-      path: req.path
+      path: req.path,
     });
-    
+
     res.status(429).json({
       error: 'Demasiadas solicitudes para este tenant, intenta nuevamente en 1 minuto.',
-      retryAfter: '1 minuto'
+      retryAfter: '1 minuto',
     });
-  }
+  },
 });
 
 export default {
@@ -149,5 +149,5 @@ export default {
   invoiceRateLimit,
   queryRateLimit,
   authRateLimit,
-  tenantRateLimit
+  tenantRateLimit,
 };

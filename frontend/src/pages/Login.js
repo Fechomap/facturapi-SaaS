@@ -8,18 +8,18 @@ const Login = () => {
   const [tenantId, setTenantId] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  
+
   // Redirigir al dashboard si ya está autenticado
   useEffect(() => {
     if (authService.isAuthenticated()) {
       navigate('/dashboard');
     }
   }, [navigate]);
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     try {
       await authService.login(email, tenantId);
       navigate('/dashboard');
@@ -27,7 +27,7 @@ const Login = () => {
       setError(err.response?.data?.message || 'Error al iniciar sesión');
     }
   };
-  
+
   return (
     <div className="login-container">
       <div className="login-form-container">
@@ -58,8 +58,12 @@ const Login = () => {
               required
             />
           </div>
-          <button type="submit" className="login-button">Ingresar</button>
-          <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#6c757d', textAlign: 'center' }}>
+          <button type="submit" className="login-button">
+            Ingresar
+          </button>
+          <div
+            style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#6c757d', textAlign: 'center' }}
+          >
             <p>El Tenant ID es el identificador único de su cuenta</p>
           </div>
         </form>

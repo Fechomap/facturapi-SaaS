@@ -16,7 +16,7 @@ export function debeDetectarExcel(ctx, tipoCliente) {
   // SIMPLE: Estado esperando O flujo activo
   const estaEsperando = ctx.userState?.esperando === esperandoValue;
   const flujoActivo = ctx.userState?.[clientIdField] && !ctx.userState?.facturaGenerada;
-  
+
   if (estaEsperando || flujoActivo) {
     console.log(`✅ Excel ${tipoCliente.toUpperCase()} detectado`);
     return true;
@@ -25,7 +25,6 @@ export function debeDetectarExcel(ctx, tipoCliente) {
   console.log(`❌ Excel ${tipoCliente.toUpperCase()} no detectado`);
   return false;
 }
-
 
 /**
  * Validar si un archivo es Excel válido
@@ -50,5 +49,5 @@ export function esArchivoExcelValido(document) {
 
 export default {
   debeDetectarExcel,
-  esArchivoExcelValido
+  esArchivoExcelValido,
 };

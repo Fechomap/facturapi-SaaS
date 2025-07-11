@@ -9,24 +9,23 @@ import { prisma } from '../../config/database.js';
 async function cleanupExpiredSessions() {
   try {
     console.log('🧹 Iniciando limpieza de sesiones expiradas...');
-    
+
     // Eliminar sesiones más viejas de 2 horas
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    
+
     const result = await prisma.userSession.deleteMany({
       where: {
         updatedAt: {
-          lt: twoHoursAgo
-        }
-      }
+          lt: twoHoursAgo,
+        },
+      },
     });
-    
+
     console.log(`✅ Eliminadas ${result.count} sesiones expiradas`);
-    
+
     // Mostrar estadísticas actuales
     const totalSessions = await prisma.userSession.count();
     console.log(`📊 Sesiones activas restantes: ${totalSessions}`);
-    
   } catch (error) {
     console.error('❌ Error en limpieza de sesiones:', error);
   } finally {

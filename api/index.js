@@ -11,20 +11,23 @@ import tenantMiddleware from './middlewares/tenant.middleware.js';
  */
 function setupAPI(app) {
   // Configuración especial para webhooks que necesitan el cuerpo raw
-  app.use(['/api/webhooks/stripe', '/api/webhooks/facturapi'], express.raw({ type: 'application/json' }));
-  
+  app.use(
+    ['/api/webhooks/stripe', '/api/webhooks/facturapi'],
+    express.raw({ type: 'application/json' })
+  );
+
   // Registrar middleware de parsing de JSON para las demás rutas
   app.use(express.json());
-  
+
   // Middleware para extraer información de tenant
   app.use('/api', tenantMiddleware);
-  
+
   // Registrar todas las rutas bajo el prefijo /api
   app.use('/api', routes);
-  
+
   // Middleware de manejo de errores (debe ser el último)
   app.use(errorMiddleware);
-  
+
   return app;
 }
 

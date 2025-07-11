@@ -19,11 +19,14 @@ class TenantService {
       return await prisma.tenantCustomer.findFirst({
         where: {
           tenantId,
-          legalName: { contains: namePattern }
-        }
+          legalName: { contains: namePattern },
+        },
       });
     } catch (error) {
-      tenantServiceLogger.error({ tenantId, namePattern, error: error.message }, 'Error al buscar cliente por nombre');
+      tenantServiceLogger.error(
+        { tenantId, namePattern, error: error.message },
+        'Error al buscar cliente por nombre'
+      );
       return null;
     }
   }
@@ -36,11 +39,11 @@ class TenantService {
     return prisma.tenantUser.findUnique({
       where: { telegramId },
       include: {
-        tenant: true
-      }
+        tenant: true,
+      },
     });
   }
-  
+
   /**
    * Obtiene el próximo folio disponible para un tenant
    * VERSIÓN OPTIMIZADA: Una sola query atómica
@@ -60,32 +63,35 @@ class TenantService {
           updated_at = NOW()
         RETURNING current_number - 1 as folio;
       `;
-      
+
       return result[0]?.folio || 800;
     } catch (error) {
-      tenantServiceLogger.error({ tenantId, series, error: error.message }, 'Error al obtener próximo folio');
-      
+      tenantServiceLogger.error(
+        { tenantId, series, error: error.message },
+        'Error al obtener próximo folio'
+      );
+
       // Fallback al método anterior si falla
       const folio = await prisma.tenantFolio.findUnique({
-        where: { tenantId_series: { tenantId, series } }
+        where: { tenantId_series: { tenantId, series } },
       });
-      
+
       if (!folio) {
         await prisma.tenantFolio.create({
-          data: { tenantId, series, currentNumber: 801 }
+          data: { tenantId, series, currentNumber: 801 },
         });
         return 800;
       }
-      
+
       await prisma.tenantFolio.update({
         where: { id: folio.id },
-        data: { currentNumber: { increment: 1 } }
+        data: { currentNumber: { increment: 1 } },
       });
-      
+
       return folio.currentNumber - 1;
     }
   }
-  
+
   /**
    * Verifica si un tenant puede generar más facturas según su plan
    * @param {string} tenantId - ID del tenant
@@ -104,12 +110,17 @@ class TenantService {
       if (!subscription) {
         // Considerar si un tenant sin suscripción puede operar (quizás un plan gratuito implícito)
         // Por ahora, asumimos que se requiere una suscripción.
-        return { canGenerate: false, reason: 'No se encontró una suscripción activa.', subscriptionStatus: 'none' };
+        return {
+          canGenerate: false,
+          reason: 'No se encontró una suscripción activa.',
+          subscriptionStatus: 'none',
+        };
       }
 
       const status = subscription.status;
       const plan = subscription.plan;
-      const paymentLink = tenant.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Usar link del tenant o fallback
+      const paymentLink =
+        tenant.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Usar link del tenant o fallback
 
       // 1. Verificar Estado de la Suscripción
       const isActiveStatus = status === 'active' || status === 'trial'; // Cambiado 'trialing' por 'trial'
@@ -118,37 +129,40 @@ class TenantService {
         if (status === 'pending_payment') reason = 'Suscripción pendiente de pago.';
         else if (status === 'expired') reason = 'Suscripción expirada.';
         else if (status === 'canceled') reason = 'Suscripción cancelada.';
-        
-        return { 
-          canGenerate: false, 
-          reason: reason, 
-          subscriptionStatus: status, 
-          paymentLink: paymentLink 
+
+        return {
+          canGenerate: false,
+          reason: reason,
+          subscriptionStatus: status,
+          paymentLink: paymentLink,
         };
       }
 
       // 2. Verificar Límite de Facturas (si el plan tiene uno)
-      if (plan && plan.invoiceLimit !== null && plan.invoiceLimit > 0) { // Asumiendo 0 o null significa ilimitado
+      if (plan && plan.invoiceLimit !== null && plan.invoiceLimit > 0) {
+        // Asumiendo 0 o null significa ilimitado
         const invoicesUsed = subscription.invoicesUsed || 0;
         if (invoicesUsed >= plan.invoiceLimit) {
-          return { 
-            canGenerate: false, 
+          return {
+            canGenerate: false,
             reason: `Límite de ${plan.invoiceLimit} facturas alcanzado para el plan ${plan.name}.`,
-            subscriptionStatus: status, 
-            paymentLink: paymentLink 
+            subscriptionStatus: status,
+            paymentLink: paymentLink,
           };
         }
       }
 
       // Si pasa todas las verificaciones
       return { canGenerate: true, subscriptionStatus: status };
-
     } catch (error) {
-      tenantServiceLogger.error({ tenantId, error: error.message }, 'Error al verificar capacidad de generar factura');
+      tenantServiceLogger.error(
+        { tenantId, error: error.message },
+        'Error al verificar capacidad de generar factura'
+      );
       return { canGenerate: false, reason: 'Error interno al verificar la suscripción.' };
     }
   }
-  
+
   /**
    * Registra una factura generada
    * @param {string} tenantId - ID del tenant
@@ -161,16 +175,16 @@ class TenantService {
    * @returns {Promise<Object>} - Factura registrada
    */
   static async registerInvoice(
-    tenantId, 
-    facturapiInvoiceId, 
-    series, 
-    folioNumber, 
-    customerId, 
-    total, 
+    tenantId,
+    facturapiInvoiceId,
+    series,
+    folioNumber,
+    customerId,
+    total,
     createdById
   ) {
     tenantServiceLogger.info({ tenantId, series, folioNumber }, 'Registrando factura');
-    
+
     try {
       // Guardar realmente en la base de datos usando Prisma
       const invoice = await prisma.tenantInvoice.create({
@@ -183,15 +197,15 @@ class TenantService {
           total,
           status: 'valid',
           createdById, // Si es null, Prisma lo manejará
-          invoiceDate: new Date()
-        }
+          invoiceDate: new Date(),
+        },
       });
-      
+
       console.log(`Factura guardada en base de datos con ID: ${invoice.id}`);
-      
+
       // Incrementar el contador de facturas (mantener esta funcionalidad)
       await this.incrementInvoiceCount(tenantId);
-      
+
       return invoice;
     } catch (error) {
       console.error(`Error al registrar factura en base de datos: ${error.message}`);
@@ -205,11 +219,11 @@ class TenantService {
         total,
         createdById,
         status: 'valid',
-        createdAt: new Date()
+        createdAt: new Date(),
       };
     }
   }
-  
+
   /**
    * Crea una suscripción para un tenant
    * @param {string} tenantId - ID del tenant
@@ -219,17 +233,17 @@ class TenantService {
   static async createSubscription(tenantId, planId) {
     // Simular la creación de una suscripción
     console.log(`Creando suscripción para tenant ${tenantId} con plan ${planId}`);
-    
+
     // En un caso real, aquí se guardaría en la base de datos
     return {
       tenantId,
       planId,
       status: 'trial',
       trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 días
-      invoicesUsed: 0
+      invoicesUsed: 0,
     };
   }
-  
+
   /**
    * Encuentra un tenant con su suscripción
    * @param {string} id - ID del tenant
@@ -242,22 +256,22 @@ class TenantService {
         include: {
           subscriptions: {
             include: {
-              plan: true
+              plan: true,
             },
             orderBy: {
-              createdAt: 'desc'
+              createdAt: 'desc',
             },
-            take: 1
-          }
-        }
+            take: 1,
+          },
+        },
       });
     } catch (error) {
       console.error(`Error al buscar tenant con suscripción: ${error.message}`);
       throw error;
     }
   }
-  
-    /**
+
+  /**
    * Genera un enlace de pago para un tenant
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<Object>} - Enlace de pago generado
@@ -266,26 +280,26 @@ class TenantService {
     try {
       // Obtener el tenant con su suscripción y plan
       const tenant = await this.findTenantWithSubscription(tenantId);
-      
+
       if (!tenant) {
         throw new Error('Tenant no encontrado');
       }
-      
+
       const subscription = tenant.subscriptions?.[0];
-      
+
       if (!subscription) {
         throw new Error('No se encontró una suscripción para este tenant');
       }
-      
+
       const plan = subscription.plan;
-      
+
       if (!plan || !plan.stripePriceId) {
         throw new Error('El plan no tiene un ID de precio de Stripe configurado');
       }
-      
+
       // Importar el servicio de Stripe
       const StripeService = (await import('../services/stripe.service.js')).default;
-      
+
       // Generar el enlace de pago
       const paymentLink = await StripeService.createPaymentLink({
         priceId: plan.stripePriceId,
@@ -293,10 +307,10 @@ class TenantService {
         metadata: {
           tenant_id: tenantId,
           subscription_id: subscription.id,
-          plan_name: plan.name
-        }
+          plan_name: plan.name,
+        },
       });
-      
+
       return paymentLink;
     } catch (error) {
       console.error(`Error al generar enlace de pago para tenant ${tenantId}:`, error);
@@ -304,7 +318,6 @@ class TenantService {
     }
   }
 
-  
   /**
    * Incrementa el contador de facturas usadas en la suscripción actual
    * @param {string} tenantId - ID del tenant
@@ -312,20 +325,17 @@ class TenantService {
    */
   static async incrementInvoiceCount(tenantId) {
     console.log(`Incrementando contador de facturas para tenant ${tenantId}`);
-    
+
     try {
       // Obtener la suscripción activa
       const subscription = await prisma.tenantSubscription.findFirst({
         where: {
           tenantId,
-          OR: [
-            { status: 'active' },
-            { status: 'trial' }
-          ]
+          OR: [{ status: 'active' }, { status: 'trial' }],
         },
         orderBy: {
-          createdAt: 'desc'
-        }
+          createdAt: 'desc',
+        },
       });
 
       if (!subscription) {
@@ -338,12 +348,14 @@ class TenantService {
         where: { id: subscription.id },
         data: {
           invoicesUsed: {
-            increment: 1
-          }
-        }
+            increment: 1,
+          },
+        },
       });
 
-      console.log(`Contador incrementado para tenant ${tenantId}: ${updatedSubscription.invoicesUsed} facturas`);
+      console.log(
+        `Contador incrementado para tenant ${tenantId}: ${updatedSubscription.invoicesUsed} facturas`
+      );
       return updatedSubscription;
     } catch (error) {
       console.error(`Error al incrementar contador de facturas para tenant ${tenantId}:`, error);

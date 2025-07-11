@@ -5,14 +5,17 @@ Scripts para configuración y administración del sistema SaaS.
 ## 📝 Scripts Disponibles
 
 ### `create-subscription-plan.js`
+
 **Propósito**: Crear nuevos planes de suscripción en Stripe y base de datos
 
 **Funcionalidad**:
+
 - Crea producto en Stripe
 - Configura precios y intervalos
 - Registra plan en base de datos local
 
 **Uso**:
+
 ```bash
 node scripts/admin/create-subscription-plan.js
 ```
@@ -20,14 +23,17 @@ node scripts/admin/create-subscription-plan.js
 ---
 
 ### `check-plans.js`
+
 **Propósito**: Verificar estado y consistencia de planes de suscripción
 
 **Funcionalidad**:
+
 - Valida planes en Stripe vs BD local
 - Verifica precios y configuraciones
 - Detecta inconsistencias
 
 **Uso**:
+
 ```bash
 node scripts/admin/check-plans.js
 ```
@@ -35,14 +41,17 @@ node scripts/admin/check-plans.js
 ---
 
 ### `update-plan-price.js`
+
 **Propósito**: Actualizar precios de planes existentes
 
 **Funcionalidad**:
+
 - Modifica precios en Stripe
 - Actualiza base de datos local
 - Mantiene consistencia de datos
 
 **Uso**:
+
 ```bash
 node scripts/admin/update-plan-price.js
 ```

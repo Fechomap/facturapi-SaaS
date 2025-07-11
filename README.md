@@ -5,7 +5,7 @@ Sistema de facturación multitenant basado en FacturAPI. Plataforma que permite 
 ## 📋 Estado del Proyecto
 
 - ✅ **Desarrollo Completo**: Sistema funcional con todas las características
-- ✅ **Despliegue en Railway**: Producción estable 
+- ✅ **Despliegue en Railway**: Producción estable
 - ✅ **Optimización de Performance**: Bot optimizado de 8-10s a 1.6s (83% mejora)
 - ✅ **Documentación Completa**: Proyecto totalmente documentado
 - ✅ **Testing**: Suite de tests unitarios e integración
@@ -83,23 +83,23 @@ Sistema de facturación multitenant basado en FacturAPI. Plataforma que permite 
 
 ### Obligatorias
 
-| Variable | Descripción |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string (para clustering) |
-| `FACTURAPI_USER_KEY` | Clave administrativa de FacturAPI |
-| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram |
-| `STRIPE_SECRET_KEY` | Clave secreta de Stripe |
-| `JWT_SECRET` | Secreto para tokens JWT |
-| `ADMIN_CHAT_IDS` | IDs de admins separados por comas |
+| Variable             | Descripción                               |
+| -------------------- | ----------------------------------------- |
+| `DATABASE_URL`       | PostgreSQL connection string              |
+| `REDIS_URL`          | Redis connection string (para clustering) |
+| `FACTURAPI_USER_KEY` | Clave administrativa de FacturAPI         |
+| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram                 |
+| `STRIPE_SECRET_KEY`  | Clave secreta de Stripe                   |
+| `JWT_SECRET`         | Secreto para tokens JWT                   |
+| `ADMIN_CHAT_IDS`     | IDs de admins separados por comas         |
 
 ### Opcionales
 
-| Variable | Descripción | Default |
-|----------|-------------|---------|
-| `NODE_ENV` | Entorno de ejecución | `development` |
-| `API_BASE_URL` | URL base de la API | `http://localhost:3001` |
-| `PORT` | Puerto del servidor | `3000` |
+| Variable       | Descripción          | Default                 |
+| -------------- | -------------------- | ----------------------- |
+| `NODE_ENV`     | Entorno de ejecución | `development`           |
+| `API_BASE_URL` | URL base de la API   | `http://localhost:3001` |
+| `PORT`         | Puerto del servidor  | `3000`                  |
 
 ## 🛠️ Desarrollo Local
 
@@ -159,12 +159,12 @@ npm run studio       # Prisma Studio
 
 ### Métricas de Performance (Post-Optimización)
 
-| Operación | Antes | Después | Mejora |
-|-----------|-------|---------|--------|
-| **Bot Total** | 8-10s | 1.6s | **83%** |
-| getNextFolio | 1,987ms | 190ms | 90.4% |
-| getFacturapiClient | 70ms | 7ms | 90.0% |
-| getUserState | 65ms | 68ms | Estable |
+| Operación          | Antes   | Después | Mejora  |
+| ------------------ | ------- | ------- | ------- |
+| **Bot Total**      | 8-10s   | 1.6s    | **83%** |
+| getNextFolio       | 1,987ms | 190ms   | 90.4%   |
+| getFacturapiClient | 70ms    | 7ms     | 90.0%   |
+| getUserState       | 65ms    | 68ms    | Estable |
 
 ### Endpoints de Monitoreo
 
@@ -199,6 +199,7 @@ railway connect
 ### API Keys de FacturAPI
 
 - **FACTURAPI_USER_KEY**: Clave administrativa para:
+
   - Crear nuevas organizaciones
   - Operaciones de onboarding
   - Administración del SaaS
@@ -286,15 +287,17 @@ railway logs --deployment
 ### Problemas Comunes
 
 1. **Bot no responde**:
+
    ```bash
    # Verificar webhook
    curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
-   
+
    # Ver logs
    railway logs --filter="telegram"
    ```
 
 2. **Database lenta**:
+
    ```bash
    # Verificar bloat
    railway run node scripts/monitoring/benchmark-before-after.js

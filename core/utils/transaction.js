@@ -13,21 +13,21 @@ const transactionLogger = logger.child({ module: 'transaction' });
  */
 export async function withTransaction(callback, options = {}) {
   const { logParams = false, description = 'Transacción' } = options;
-  
+
   transactionLogger.debug(`Iniciando: ${description}`);
-  
+
   try {
     // Ejecutar la operación dentro de una transacción
     const result = await prisma.$transaction(async (tx) => {
       return await callback(tx);
     });
-    
+
     if (logParams) {
       transactionLogger.debug({ result }, `Completada: ${description}`);
     } else {
       transactionLogger.debug(`Completada: ${description}`);
     }
-    
+
     return result;
   } catch (error) {
     transactionLogger.error(
@@ -46,7 +46,7 @@ export async function withTransaction(callback, options = {}) {
  */
 export async function auditLog(prismaClient, params) {
   const { tenantId, userId, action, entityType, entityId, details, ipAddress } = params;
-  
+
   try {
     const log = await prismaClient.auditLog.create({
       data: {
@@ -56,21 +56,21 @@ export async function auditLog(prismaClient, params) {
         entityType,
         entityId,
         details,
-        ipAddress
-      }
+        ipAddress,
+      },
     });
-    
+
     transactionLogger.info(
       {
         tenantId,
         userId,
         action,
         entityType,
-        entityId
+        entityId,
       },
       'Acción registrada en auditoría'
     );
-    
+
     return log;
   } catch (error) {
     transactionLogger.error(
@@ -84,5 +84,5 @@ export async function auditLog(prismaClient, params) {
 
 export default {
   withTransaction,
-  auditLog
+  auditLog,
 };
