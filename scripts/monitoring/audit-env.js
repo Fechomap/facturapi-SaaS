@@ -7,12 +7,13 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
+const projectRoot = path.resolve(__dirname, '../..');
 
 // Variables encontradas en tu .env actual
 const ENV_VARIABLES = [
   'NODE_ENV',
   'DATABASE_URL',
+  'REDIS_URL',
   'API_BASE_URL',
   'FACTURAPI_USER_KEY',
   'STRIPE_SECRET_KEY',

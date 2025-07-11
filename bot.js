@@ -4,7 +4,7 @@ import { connectDatabase } from './config/database.js';
 import logger from './core/utils/logger.js';
 import { createBot } from './bot/index.js';
 import cron from 'node-cron';
-import cleanupExpiredSessions from './scripts/cleanup-sessions.js';
+import cleanupExpiredSessions from './scripts/database/cleanup-sessions.js';
 import redisSessionService from './services/redis-session.service.js'; // Importar el servicio de Redis
 
 // Logger específico para el bot

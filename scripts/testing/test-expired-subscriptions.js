@@ -1,6 +1,6 @@
 // scripts/test-expired-subscriptions.js
-import { processExpiredSubscriptions } from '../jobs/subscription.job.js';
-import logger from '../core/utils/logger.js';
+import { processExpiredSubscriptions } from '../../jobs/subscription.job.js';
+import logger from '../../core/utils/logger.js';
 
 // Configurar el logger para mostrar información detallada
 logger.level = 'debug';

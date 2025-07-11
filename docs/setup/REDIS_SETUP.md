@@ -23,7 +23,7 @@ REDIS_URL="redis://default:password@redis-service.railway.internal:6379"
 ### 3️⃣ **Verificar Configuración**
 Una vez configurado Redis, ejecuta:
 ```bash
-node scripts/test-redis.js
+node scripts/testing/test-redis.js
 ```
 
 Debería mostrar:

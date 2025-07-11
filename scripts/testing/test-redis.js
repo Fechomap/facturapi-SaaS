@@ -1,6 +1,6 @@
 // scripts/test-redis.js - Probar conexión y funcionalidad Redis
-import redisSessionService from '../services/redis-session.service.js';
-import logger from '../core/utils/logger.js';
+import redisSessionService from '../../services/redis-session.service.js';
+import logger from '../../core/utils/logger.js';
 
 const testLogger = logger.child({ module: 'redis-test' });
 

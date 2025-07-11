@@ -9,8 +9,10 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-# Variables
-BACKUP_FOLDER="backups/$1"
+# Variables (ruta absoluta)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
+BACKUP_FOLDER="${PROJECT_ROOT}/backups/$1"
 
 # Verifica que existan los archivos
 if [ ! -f "$BACKUP_FOLDER/staging.dump" ] && [ ! -f "$BACKUP_FOLDER/saas.dump" ]; then

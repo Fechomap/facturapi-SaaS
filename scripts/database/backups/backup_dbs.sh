@@ -5,8 +5,10 @@
 # Timestamp actual
 TIMESTAMP=$(date +%Y%m%d_%H%M)
 
-# Ruta base
-BACKUP_DIR="backups/${TIMESTAMP}"
+# Ruta base (absoluta desde el directorio de ejecución)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../" && pwd)"
+BACKUP_DIR="${PROJECT_ROOT}/backups/${TIMESTAMP}"
 
 # URLs de conexión a bases
 STAGING_URL="postgres://u4ad4ejkviurjc:p631b55abb6f683d2b976021af44279f0cac59ebc398a4452bd31b40c16854446@ca932070ke6bv1.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/dapeugj3ip9rt"

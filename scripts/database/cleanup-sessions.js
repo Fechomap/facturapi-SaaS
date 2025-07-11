@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/cleanup-sessions.js - Limpieza automática de sesiones expiradas
 
-import { prisma } from '../config/database.js';
+import { prisma } from '../../config/database.js';
 
 /**
  * Limpia sesiones expiradas automáticamente

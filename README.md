@@ -297,13 +297,13 @@ railway logs --deployment
 2. **Database lenta**:
    ```bash
    # Verificar bloat
-   railway run node scripts/benchmark-before-after.js
+   railway run node scripts/monitoring/benchmark-before-after.js
    ```
 
 3. **Redis disconnected**:
    ```bash
    # Test Redis connection
-   railway run node scripts/test-redis.js
+   railway run node scripts/testing/test-redis.js
    ```
 
 ### Contacto de Soporte

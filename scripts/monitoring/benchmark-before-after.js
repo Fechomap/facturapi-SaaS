@@ -1,9 +1,9 @@
 import { performance } from 'perf_hooks';
 import fs from 'fs';
-import prisma from '../lib/prisma.js';
-import TenantService from '../services/tenant.service.js';
-import FacturapiService from '../services/facturapi.service.js';
-import SessionService from '../core/auth/session.service.js';
+import prisma from '../../lib/prisma.js';
+import TenantService from '../../services/tenant.service.js';
+import FacturapiService from '../../services/facturapi.service.js';
+import SessionService from '../../core/auth/session.service.js';
 
 const CHAT_ID = 7143094298; // Usuario de prueba
 const ITERATIONS = 20; // Más iteraciones para mejor promedio
