@@ -119,11 +119,10 @@ async function errorMiddleware(err, req, res, next) {
     try {
       const isProduction = process.env.NODE_ENV === 'production';
       const isRailway = process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
-      const isHeroku = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
       
-      // Notificar si estamos en producción (Railway, Heroku) o si está explícitamente activado
-      if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || (isProduction && (isRailway || isHeroku))) {
-        const platformName = isRailway ? 'Railway' : isHeroku ? 'Heroku' : 'Producción';
+      // Notificar si estamos en producción (Railway) o si está explícitamente activado
+      if (process.env.NOTIFY_CRITICAL_ERRORS === 'true' || (isProduction && isRailway)) {
+        const platformName = isRailway ? 'Railway' : 'Producción';
         
         const adminMessage = `🚨 *Error Crítico en API (${platformName})*\n\n` +
           `*Tipo:* ${normalizedError.type}\n` +

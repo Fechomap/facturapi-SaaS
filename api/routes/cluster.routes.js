@@ -238,7 +238,6 @@ router.get('/metrics', (req, res) => {
       environment: {
         nodeEnv: process.env.NODE_ENV,
         isRailway: process.env.IS_RAILWAY === 'true',
-        isHeroku: process.env.IS_HEROKU === 'true',
         port: process.env.PORT
       },
       timestamp: new Date().toISOString()

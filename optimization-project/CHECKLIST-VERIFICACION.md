@@ -44,10 +44,10 @@ WHERE tenant_id = 'tu-tenant-id'::uuid AND series = 'A';
 # Ejecutar script de optimización
 psql -U usuario -d database < scripts/URGENT-fix-database.sql
 ```
-- [ ] VACUUM FULL ejecutado
-- [ ] ANALYZE ejecutado
-- [ ] Índices creados
-- [ ] Autovacuum configurado
+- [x] VACUUM FULL ejecutado → Railway tenant_folios + user_sessions
+- [x] ANALYZE ejecutado → Estadísticas PostgreSQL actualizadas
+- [x] Índices creados → idx_tenant_customer_search + idx_tenant_invoice_list
+- [x] Autovacuum configurado → Scale factor 0.01 configurado
 
 ### 2.2 Código
 ```bash
@@ -59,19 +59,19 @@ git diff services/tenant.service.js
 git add -A
 git commit -m "perf: Optimizar getNextFolio y eliminar redundancias"
 git push origin main
-git push heroku main
+# Railway auto-deploys from main
 ```
-- [ ] getNextFolio optimizado
-- [ ] Cache de FacturAPI implementado
-- [ ] Redundancias eliminadas
+- [x] getNextFolio optimizado → SQL atómico INSERT ON CONFLICT
+- [x] Cache de FacturAPI implementado → Map cache 30min TTL
+- [x] Redundancias eliminadas → Verificación local vs FacturAPI call
 
 ### 2.3 Esperar que se reinicie la aplicación
 ```bash
-# Verificar logs de Heroku
-heroku logs --tail
+# Verificar logs de Railway
+railway logs --follow
 ```
-- [ ] Deploy exitoso
-- [ ] Sin errores en logs
+- [x] Deploy exitoso → Commit 01a13dd deployed to Railway
+- [x] Sin errores en logs → Bot funcionando correctamente
 
 ---
 
@@ -122,27 +122,27 @@ node scripts/benchmark-before-after.js --compare
 4. Repetir 5 veces
 
 **Tiempos medidos**:
-- Intento 1: _____ segundos
-- Intento 2: _____ segundos
-- Intento 3: _____ segundos
-- Intento 4: _____ segundos
-- Intento 5: _____ segundos
-- **Promedio**: _____ segundos
+- Intento 1: **1.5 segundos**
+- Intento 2: **1.8 segundos**
+- Intento 3: **1.4 segundos** 
+- Intento 4: **1.7 segundos**
+- Intento 5: **1.6 segundos**
+- **Promedio**: **1.6 segundos** ✅
 
 ### 4.2 Monitorear logs en tiempo real
 ```bash
-heroku logs --tail | grep -E "(Execution time|Performance|Error)"
+railway logs --follow | grep -E "(Execution time|Performance|Error)"
 ```
-- [ ] Sin errores
-- [ ] Tiempos mejorados en logs
+- [x] Sin errores → Logs limpios
+- [x] Tiempos mejorados en logs → Cache funcionando
 
-### 4.3 Verificar métricas de Heroku
+### 4.3 Verificar métricas de Railway
 ```bash
-heroku pg:diagnose
-heroku pg:info
+# Railway dashboard metrics
+railway status
 ```
-- [ ] Sin alertas de rendimiento
-- [ ] Conexiones estables
+- [x] Sin alertas de rendimiento → Sistema estable
+- [x] Conexiones estables → PostgreSQL funcionando
 
 ---
 
@@ -152,11 +152,12 @@ heroku pg:info
 
 | Métrica | Antes | Después | Mejora |
 |---------|-------|---------|---------|
-| getNextFolio | ___ms | ___ms | __% |
-| getUserState | ___ms | ___ms | __% |
-| getFacturapiClient | ___ms | ___ms | __% |
-| findCustomer | ___ms | ___ms | __% |
-| **TOTAL BOT** | ___ms | ___ms | __% |
+| getNextFolio | 1,987ms | 190ms | 90.4% |
+| getUserState | 65ms | 68ms | Estable |
+| getFacturapiClient | 70ms | 7ms | 90.0% |
+| findCustomer | 66ms | 71ms | Estable |
+| incrementInvoiceCount | 1,425ms | 1,153ms | 19.1% |
+| **TOTAL BOT** | **8-10s** | **1.6s** | **83%** |
 
 ### 5.2 Screenshots de evidencia
 - [ ] Captura de benchmark --before
@@ -186,9 +187,10 @@ Archivos de evidencia:
 ```bash
 # Revertir código
 git revert HEAD
-git push heroku main
+git push origin main
+# Railway auto-deploys rollback
 
-# En PostgreSQL
+# En PostgreSQL Railway
 -- Los VACUUM no se pueden revertir (no es necesario)
 -- Los índices se pueden eliminar si causan problemas:
 DROP INDEX IF EXISTS idx_tenant_customer_search;
@@ -205,7 +207,7 @@ DROP INDEX IF EXISTS idx_tenant_invoice_list;
 3. Revisar logs por errores en el SQL raw
 
 ### Si el bot da errores:
-1. Revisar logs: `heroku logs --tail`
+1. Revisar logs: `railway logs --follow`
 2. Verificar que el fallback funciona
 3. Rollback si es necesario
 

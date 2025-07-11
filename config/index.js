@@ -15,7 +15,6 @@ const configLogger = logger.child({ module: 'config' });
 // Determinar el entorno actual
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_RAILWAY = process.env.IS_RAILWAY === 'true' || Boolean(process.env.RAILWAY_ENVIRONMENT);
-const IS_HEROKU = process.env.IS_HEROKU === 'true' || Boolean(process.env.DYNO);
 
 // Obtener la ruta del directorio actual
 const __filename = fileURLToPath(import.meta.url);
@@ -24,14 +23,10 @@ const __dirname = path.dirname(__filename);
 // Cargar variables de entorno
 if (IS_RAILWAY) {
   configLogger.info('Detectado entorno Railway, usando variables de entorno configuradas');
-  dotenv.config();
-} else if (IS_HEROKU) {
-  configLogger.info('Detectado entorno Heroku, usando variables de entorno configuradas');
-  dotenv.config();
 } else {
   configLogger.info('Cargando variables de entorno desde: .env');
-  dotenv.config();
 }
+dotenv.config();
 
 // Función para validar variables de entorno críticas
 const validateEnv = () => {
@@ -57,8 +52,6 @@ const validateEnv = () => {
     configLogger.error(`Variables de entorno requeridas no encontradas: ${missing.join(', ')}`);
     if (IS_RAILWAY) {
       configLogger.error(`Por favor, configura estas variables en el dashboard de Railway`);
-    } else if (IS_HEROKU) {
-      configLogger.error(`Por favor, configura estas variables en el dashboard de Heroku`);
     } else {
       configLogger.error(`Por favor, configura estas variables en tu archivo .env`);
     }
@@ -86,17 +79,6 @@ if (IS_RAILWAY) {
     apiBaseUrlConfig = 'https://app.railway.app';
   }
   configLogger.info(`Entorno Railway detectado, usando URL base: ${apiBaseUrlConfig}`);
-} else if (IS_HEROKU) {
-  const herokuAppName = process.env.HEROKU_APP_NAME;
-  if (herokuAppName) {
-    apiBaseUrlConfig = `https://${herokuAppName}.herokuapp.com`;
-  } else if (process.env.API_BASE_URL) {
-    apiBaseUrlConfig = process.env.API_BASE_URL;
-  } else {
-    configLogger.warn('No se encontró HEROKU_APP_NAME ni API_BASE_URL, usando valor genérico');
-    apiBaseUrlConfig = 'https://app.herokuapp.com';
-  }
-  configLogger.info(`Entorno Heroku detectado, usando URL base: ${apiBaseUrlConfig}`);
 } else if (process.env.API_BASE_URL) {
   apiBaseUrlConfig = process.env.API_BASE_URL;
   configLogger.info(`Usando API_BASE_URL desde variables de entorno: ${apiBaseUrlConfig}`);
@@ -116,7 +98,6 @@ const config = {
   // Entorno de la aplicación y plataforma
   env: NODE_ENV,
   isRailway: IS_RAILWAY,
-  isHeroku: IS_HEROKU,
   
   // Puerto para el servidor
   port: process.env.PORT || 3000,
@@ -154,8 +135,8 @@ const config = {
   
   // Configuración de almacenamiento
   storage: {
-    basePath: IS_RAILWAY || IS_HEROKU
-      ? '/tmp/storage' // En Railway y Heroku usamos /tmp
+    basePath: IS_RAILWAY
+      ? '/tmp/storage' // En Railway usamos /tmp
       : path.resolve(__dirname, '../storage'),
     maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '10', 10)
   },
@@ -171,7 +152,6 @@ const config = {
     return {
       env: this.env,
       isRailway: this.isRailway,
-      isHeroku: this.isHeroku,
       port: this.port,
       apiBaseUrl: this.apiBaseUrl,
       facturapi: {

@@ -41,7 +41,7 @@ git add services/tenant.service.js
 git commit -m "perf: Optimizar getNextFolio con query atómica
 
 Reduce tiempo de 3.4s a ~50ms usando INSERT ON CONFLICT"
-git push heroku main
+git push origin main  # Railway auto-deploy
 ```
 
 ### FASE 3: IMPLEMENTAR CACHE (30 minutos)
@@ -141,7 +141,7 @@ node scripts/diagnose-bottlenecks.js
 ```
 
 ### 3. Monitorear en producción:
-- Logs de Heroku
+- Logs de Railway: `railway logs --follow`
 - Métricas de New Relic/DataDog si tienes
 - Feedback de usuarios
 

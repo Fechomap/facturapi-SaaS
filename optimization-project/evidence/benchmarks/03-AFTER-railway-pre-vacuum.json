@@ -1,0 +1,79 @@
+{
+  "phase": "AFTER",
+  "timestamp": "2025-07-11T03:39:48.511Z",
+  "environment": "development",
+  "results": [
+    {
+      "operation": "getNextFolio",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 69.98354199999994,
+      "max": 5781.573957999999,
+      "avg": 498.59330010000014,
+      "median": 77.24387500000012,
+      "p95": 2452.219917,
+      "stdDev": 1317.462205635252
+    },
+    {
+      "operation": "getUserState_cold",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 62.3765829999993,
+      "max": 126.96079099999952,
+      "avg": 70.15406245000004,
+      "median": 64.04641700000047,
+      "p95": 123.57754199999908,
+      "stdDev": 18.413021786015413
+    },
+    {
+      "operation": "getUserState_warm",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 61.43516699999964,
+      "max": 67.17566699999952,
+      "avg": 63.33884799999978,
+      "median": 63.13214599999992,
+      "p95": 65.6675000000032,
+      "stdDev": 1.3934281364772634
+    },
+    {
+      "operation": "getFacturapiClient",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 0.06783299999733572,
+      "max": 138.81624999999985,
+      "avg": 7.181914399999187,
+      "median": 0.28883349999887287,
+      "p95": 0.42354100000011385,
+      "stdDev": 30.199209472399424
+    },
+    {
+      "operation": "findCustomer",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 61.95866699999897,
+      "max": 127.79049999999916,
+      "avg": 67.39445620000079,
+      "median": 64.17927050000071,
+      "p95": 67.40591700000004,
+      "stdDev": 13.902108934776427
+    },
+    {
+      "operation": "incrementInvoiceCount",
+      "iterations": 20,
+      "successful": 20,
+      "failed": 0,
+      "min": 128.3379999999961,
+      "max": 15284.459833000004,
+      "avg": 1074.1310667,
+      "median": 136.85185450000063,
+      "p95": 3649.141334,
+      "stdDev": 3348.29236019559
+    }
+  ]
+}

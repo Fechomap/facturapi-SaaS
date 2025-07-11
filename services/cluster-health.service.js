@@ -247,8 +247,7 @@ class ClusterHealthService {
       totalWorkers: cluster.isPrimary ? Object.keys(cluster.workers || {}).length : 'unknown',
       environment: {
         nodeEnv: process.env.NODE_ENV,
-        isRailway: process.env.IS_RAILWAY === 'true',
-        isHeroku: process.env.IS_HEROKU === 'true'
+        isRailway: process.env.IS_RAILWAY === 'true'
       }
     };
   }

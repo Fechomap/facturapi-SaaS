@@ -71,7 +71,7 @@ class TenantService {
       });
       
       if (!folio) {
-        const newFolio = await prisma.tenantFolio.create({
+        await prisma.tenantFolio.create({
           data: { tenantId, series, currentNumber: 801 }
         });
         return 800;

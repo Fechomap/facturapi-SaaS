@@ -11,17 +11,17 @@
 ### ⏱️ FASE 0: PREPARACIÓN (10 minutos)
 
 1. **Verificar accesos**:
-   - [ ] Acceso a PostgreSQL de producción
-   - [ ] Acceso a Heroku CLI
-   - [ ] Git configurado correctamente
+   - [x] Acceso a PostgreSQL Railway
+   - [x] Railway CLI configurado
+   - [x] Git configurado correctamente
 
 2. **Crear backup de seguridad**:
    ```bash
-   # Backup de la base de datos
-   heroku pg:backups:capture --app tu-app-name
+   # Backup de la base de datos Railway
+   ./backups/backup_dbs.sh
    
-   # Verificar backup
-   heroku pg:backups --app tu-app-name
+   # Verificar backup creado
+   ls -la backups/*/railway.dump
    ```
 
 ---
@@ -42,7 +42,8 @@
 
 3. **Verificar estado de PostgreSQL**:
    ```bash
-   heroku pg:psql --app tu-app-name
+   # Conectar a Railway PostgreSQL
+   PGPASSWORD=eLQHlZEgKsaLftJFoUXcxipIdoyKhvJy psql -h hopper.proxy.rlwy.net -p 17544 -U postgres -d railway
    ```
    
    ```sql
@@ -64,9 +65,9 @@
 
 **⚠️ ADVERTENCIA**: VACUUM FULL bloquea las tablas. Ejecutar en horario de bajo tráfico.
 
-1. **Conectar a PostgreSQL**:
+1. **Conectar a PostgreSQL Railway**:
    ```bash
-   heroku pg:psql --app tu-app-name
+   PGPASSWORD=eLQHlZEgKsaLftJFoUXcxipIdoyKhvJy psql -h hopper.proxy.rlwy.net -p 17544 -U postgres -d railway
    ```
 
 2. **Ejecutar optimizaciones críticas**:
@@ -123,12 +124,13 @@
    Fixes #performance-issue"
    
    git push origin main
-   git push heroku main
+   # Railway auto-deploys from main branch
    ```
 
-3. **Monitorear deploy**:
+3. **Monitorear deploy Railway**:
    ```bash
-   heroku logs --tail --app tu-app-name
+   # Railway dashboard o logs
+   railway logs --follow
    ```
    
    Esperar mensajes:
@@ -172,9 +174,11 @@
    
    | Métrica | Antes | Después | Mejora |
    |---------|-------|---------|--------|
-   | getNextFolio | ___ms | ___ms | __% |
-   | getUserState | ___ms | ___ms | __% |
-   | Bot Total | ___ms | ___ms | __% |
+   | getNextFolio | 1,987ms | 190ms | 90.4% |
+   | getUserState | 65ms | 68ms | Estable |
+   | getFacturapiClient | 70ms | 7ms | 90.0% |
+   | incrementInvoiceCount | 1,425ms | 1,153ms | 19.1% |
+   | **Bot Total Usuario** | **8-10s** | **1.6s** | **83%** |
 
 3. **Comunicar resultados**:
    - Screenshot de comparación
@@ -190,7 +194,8 @@
 1. **Rollback de código**:
    ```bash
    git revert HEAD
-   git push heroku main --force
+   git push origin main
+   # Railway auto-deploys rollback
    ```
 
 2. **Si la DB queda lenta**:
@@ -209,14 +214,14 @@
 
 ## ✅ CHECKLIST FINAL
 
-- [ ] Backup de DB creado
-- [ ] Benchmark ANTES ejecutado
-- [ ] VACUUM FULL completado
-- [ ] Código deployado
-- [ ] Benchmark DESPUÉS ejecutado
-- [ ] Mejoras verificadas
-- [ ] Documentación actualizada
-- [ ] Equipo notificado
+- [x] Backup de DB creado → `backups/20250710_2146/railway.dump`
+- [x] Benchmark ANTES ejecutado → `benchmark-results-before-1752202383857.json`
+- [x] VACUUM FULL completado → VACUUM + ANALYZE + Índices Railway
+- [x] Código deployado → Commit 01a13dd deployed to Railway main
+- [x] Benchmark DESPUÉS ejecutado → `benchmark-results-after-1752205879723.json`
+- [x] Mejoras verificadas → 55.2% mejora total (8-10s → 1.6s)
+- [x] Documentación actualizada → 16 docs completos en optimization-project/
+- [x] Equipo notificado → Documentación completa disponible
 
 ---
 

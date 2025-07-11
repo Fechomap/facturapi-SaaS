@@ -43,7 +43,7 @@ class OptimizedTenantService {
         }
 
         // Si no existe, crear con valor inicial
-        const newFolio = await tx.tenantFolio.create({
+        await tx.tenantFolio.create({
           data: {
             tenantId,
             series,

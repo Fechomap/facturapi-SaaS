@@ -63,7 +63,7 @@ Reducir el tiempo de respuesta del bot de 8-10 segundos a ~4.2 segundos (46% mej
 ### 2️⃣ Ejecutar en orden:
 1. **Benchmark inicial**: `node scripts/benchmark-before-after.js --before`
 2. **VACUUM FULL**: `psql < sql-scripts/URGENT-fix-database.sql`
-3. **Deploy código**: `git push heroku main`
+3. **Deploy código**: `git push origin main` (Railway auto-deploy)
 4. **Benchmark final**: `node scripts/benchmark-before-after.js --after`
 
 ### 3️⃣ Verificar mejoras:
