@@ -323,6 +323,18 @@ class FacturapiService {
       throw error;
     }
   }
+
+  /**
+   * Limpia el cache del cliente FacturAPI para un tenant específico
+   * @param {string} tenantId - ID del tenant
+   */
+  static clearClientCache(tenantId) {
+    const cacheKey = tenantId;
+    if (clientCache.has(cacheKey)) {
+      clientCache.delete(cacheKey);
+      console.log(`🧹 Cache eliminado para tenant ${tenantId}`);
+    }
+  }
 }
 
 export default FacturapiService;

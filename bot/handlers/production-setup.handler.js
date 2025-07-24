@@ -510,6 +510,15 @@ export function registerProductionSetupHandler(bot) {
         },
       });
 
+      // CRÍTICO: Limpiar cache de FacturAPI después de actualizar API key
+      try {
+        const facturapIService = await import('../../services/facturapi.service.js');
+        facturapIService.default.clearClientCache(tenantId);
+        console.log(`🧹 Cache de FacturAPI limpiado después de actualizar API key para tenant ${tenantId}`);
+      } catch (cacheError) {
+        console.log('⚠️ Error al limpiar cache después de actualizar API key:', cacheError.message);
+      }
+
       // Registrar en el log de auditoría
       await prisma.auditLog.create({
         data: {

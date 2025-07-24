@@ -158,7 +158,7 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
           },
         });
 
-        if (existingCustomer) {
+        if (existingCustomer && !forceAll) {
           if (!results.some((r) => r.legalName === clientData.legal_name)) {
             results.push({
               legalName: clientData.legal_name,
@@ -170,25 +170,59 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
           continue;
         }
 
+        // Si forceAll = true Y existe cliente, recrearlo en FacturAPI
+        if (existingCustomer && forceAll) {
+          console.log(`🔄 Recreando cliente ${clientData.legal_name} en FacturAPI (forceAll=true)...`);
+          
+          // Intentar eliminar cliente existente en FacturAPI (si existe)
+          try {
+            if (existingCustomer.facturapiCustomerId) {
+              await facturapi.customers.del(existingCustomer.facturapiCustomerId);
+              console.log(`🗑️ Cliente eliminado de FacturAPI: ${existingCustomer.facturapiCustomerId}`);
+            }
+          } catch (deleteError) {
+            console.log(`⚠️ Cliente no existía en FacturAPI o error al eliminar: ${deleteError.message}`);
+          }
+        }
+
         const nuevoCliente = await facturapi.customers.create(clientData);
 
-        await prisma.tenantCustomer.create({
-          data: {
-            tenantId,
-            facturapiCustomerId: nuevoCliente.id,
-            legalName: nuevoCliente.legal_name,
-            rfc: nuevoCliente.tax_id,
-            email: nuevoCliente.email || null,
-            phone: nuevoCliente.phone || null,
-            address: nuevoCliente.address ? JSON.stringify(nuevoCliente.address) : null,
-            isActive: true,
-          },
-        });
+        if (existingCustomer && forceAll) {
+          // Actualizar cliente existente con nuevo ID de FacturAPI
+          await prisma.tenantCustomer.update({
+            where: { id: existingCustomer.id },
+            data: {
+              facturapiCustomerId: nuevoCliente.id,
+              legalName: nuevoCliente.legal_name,
+              rfc: nuevoCliente.tax_id,
+              email: nuevoCliente.email || null,
+              phone: nuevoCliente.phone || null,
+              address: nuevoCliente.address ? JSON.stringify(nuevoCliente.address) : null,
+              isActive: true,
+            },
+          });
+          console.log(`✅ Cliente actualizado: ${nuevoCliente.legal_name} (nuevo ID: ${nuevoCliente.id})`);
+        } else {
+          // Crear nuevo cliente
+          await prisma.tenantCustomer.create({
+            data: {
+              tenantId,
+              facturapiCustomerId: nuevoCliente.id,
+              legalName: nuevoCliente.legal_name,
+              rfc: nuevoCliente.tax_id,
+              email: nuevoCliente.email || null,
+              phone: nuevoCliente.phone || null,
+              address: nuevoCliente.address ? JSON.stringify(nuevoCliente.address) : null,
+              isActive: true,
+            },
+          });
+        }
 
         results.push({
           legalName: clientData.legal_name,
           success: true,
           id: nuevoCliente.id,
+          message: existingCustomer && forceAll ? 'Cliente recreado en FacturAPI' : 'Cliente creado',
         });
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -242,6 +276,17 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
             error: error.response?.data?.message || error.message,
           });
         }
+      }
+    }
+
+    // Limpiar cache del cliente FacturAPI después de cambios
+    if (forceAll) {
+      try {
+        const facturapIService = await import('./facturapi.service.js');
+        facturapIService.default.clearClientCache(tenantId);
+        console.log(`🧹 Cache de FacturAPI limpiado para tenant ${tenantId}`);
+      } catch (cacheError) {
+        console.log('⚠️ Error al limpiar cache:', cacheError.message);
       }
     }
 
