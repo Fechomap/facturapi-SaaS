@@ -17,11 +17,12 @@ class RedisOnlySessionService {
   /**
    * Inicia la sincronización periódica con BD
    */
-  static startPeriodicSync(intervalMs = 60000) { // 1 minuto por defecto
+  static startPeriodicSync(intervalMs = 60000) {
+    // 1 minuto por defecto
     if (this.syncInterval) return;
-    
+
     this.syncInterval = setInterval(() => {
-      this.syncToDB().catch(error => {
+      this.syncToDB().catch((error) => {
         sessionLogger.error({ error }, 'Error en sincronización periódica');
       });
     }, intervalMs);
@@ -43,13 +44,13 @@ class RedisOnlySessionService {
   static async getTenantOnly(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     const cacheKey = `tenant:${telegramIdBigInt.toString()}`;
-    
+
     // Intentar obtener de Redis primero
     const cached = await redisSessionService.get(cacheKey);
     if (cached.success && cached.data) {
       return cached.data;
     }
-    
+
     // Si no está en cache, obtener de BD
     try {
       const tenantUser = await prisma.tenantUser.findUnique({
@@ -76,7 +77,7 @@ class RedisOnlySessionService {
 
       // Cachear en Redis por 1 hora (tenant info no cambia frecuentemente)
       await redisSessionService.set(cacheKey, result, 3600);
-      
+
       return result;
     } catch (error) {
       sessionLogger.error({ error, telegramId }, 'Error obteniendo tenant');
@@ -90,13 +91,13 @@ class RedisOnlySessionService {
   static async getUserState(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     const cacheKey = `session:${telegramIdBigInt.toString()}`;
-    
+
     // Solo Redis - ultra rápido
     const redisResult = await redisSessionService.getSession(cacheKey);
     if (redisResult.success) {
       return redisResult.data;
     }
-    
+
     // Si no está en Redis, devolver estado vacío
     // (la BD se sincronizará periódicamente)
     return { esperando: null };
@@ -108,17 +109,17 @@ class RedisOnlySessionService {
   static async saveUserState(telegramId, state) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     const cacheKey = `session:${telegramIdBigInt.toString()}`;
-    
+
     // Guardar SOLO en Redis - instantáneo
     await redisSessionService.setSession(cacheKey, state);
-    
+
     // Marcar para sincronización posterior
     this.syncQueue.set(telegramIdBigInt.toString(), {
       telegramIdBigInt,
       state,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    
+
     return { sessionData: state };
   }
 
@@ -127,20 +128,20 @@ class RedisOnlySessionService {
    */
   static async syncToDB() {
     if (this.syncQueue.size === 0) return;
-    
+
     const toSync = Array.from(this.syncQueue.entries());
     this.syncQueue.clear();
-    
+
     sessionLogger.info(`Sincronizando ${toSync.length} sesiones con BD`);
     const startTime = Date.now();
-    
+
     // Sincronizar en batches
     const batchSize = 10;
     let synced = 0;
-    
+
     for (let i = 0; i < toSync.length; i += batchSize) {
       const batch = toSync.slice(i, i + batchSize);
-      
+
       await Promise.all(
         batch.map(async ([_, { telegramIdBigInt, state }]) => {
           try {
@@ -165,11 +166,9 @@ class RedisOnlySessionService {
         })
       );
     }
-    
+
     const duration = Date.now() - startTime;
-    sessionLogger.info(
-      `Sincronización completada: ${synced}/${toSync.length} en ${duration}ms`
-    );
+    sessionLogger.info(`Sincronización completada: ${synced}/${toSync.length} en ${duration}ms`);
   }
 
   /**
@@ -178,10 +177,10 @@ class RedisOnlySessionService {
   static async forceSyncNow(telegramId) {
     const telegramIdBigInt = typeof telegramId === 'bigint' ? telegramId : BigInt(telegramId);
     const cacheKey = `session:${telegramIdBigInt.toString()}`;
-    
+
     const redisResult = await redisSessionService.getSession(cacheKey);
     if (!redisResult.success) return;
-    
+
     try {
       await prisma.userSession.upsert({
         where: { telegramId: telegramIdBigInt },

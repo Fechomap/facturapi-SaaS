@@ -29,7 +29,7 @@ const workerCount = getWorkerCount();
 const WORKER_RESTART_DELAY = 1000; // 1 segundo
 const MAX_RESTARTS_PER_MINUTE = 5;
 
-let restartCounts = new Map();
+const restartCounts = new Map();
 
 if (cluster.isPrimary) {
   clusterLogger.info(`🚀 Iniciando cluster principal con ${workerCount} workers`);
@@ -130,15 +130,33 @@ if (cluster.isPrimary) {
     process.exit(1);
   });
 
-  // Manejar errores no capturados en workers
+  // Manejar errores no capturados en workers - GRACEFUL HANDLING
   process.on('uncaughtException', (error) => {
-    clusterLogger.error(`💥 Error no capturado en worker ${process.pid}:`, error);
-    process.exit(1);
+    clusterLogger.error(`💥 Error no capturado en worker ${process.pid}:`, {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Solo salir si es un error crítico del sistema
+    if (error.code === 'EADDRINUSE' || error.code === 'EACCES' || !error.recoverable) {
+      clusterLogger.fatal('Error crítico del sistema, terminando worker');
+      process.exit(1);
+    } else {
+      clusterLogger.warn('Error recuperable, continuando operación');
+    }
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    clusterLogger.error(`🚫 Promesa rechazada no manejada en worker ${process.pid}:`, reason);
-    process.exit(1);
+    clusterLogger.error(`🚫 Promesa rechazada no manejada en worker ${process.pid}:`, {
+      reason: reason?.message || reason,
+      stack: reason?.stack,
+      promise: promise?.toString?.() || 'Promise sin información',
+      timestamp: new Date().toISOString(),
+    });
+
+    // No terminar el proceso por promesas rechazadas - solo logear
+    clusterLogger.warn('Continuando operación después de promesa rechazada');
   });
 }
 

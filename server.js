@@ -44,9 +44,14 @@ async function initializeTelegramBot() {
     telegramBot = createBot(botLogger);
 
     if (config.env === 'production' && config.isRailway) {
+      // En producción usar webhook
       const webhookUrl = `${config.apiBaseUrl}/telegram-webhook`;
       await telegramBot.telegram.setWebhook(webhookUrl);
       serverLogger.info(`Webhook de Telegram configurado: ${webhookUrl}`);
+    } else {
+      // En desarrollo o entornos sin webhook, usar polling
+      await telegramBot.launch();
+      serverLogger.info('Bot de Telegram iniciado en modo polling');
     }
 
     return telegramBot;
@@ -247,8 +252,11 @@ async function startServer() {
     // Habilitar el cierre correcto
     process.once('SIGINT', () => {
       serverLogger.info('Señal SIGINT recibida, cerrando servidor y bot');
-      if (telegramBot) {
+      if (telegramBot && telegramBot.running) {
+        serverLogger.info('Deteniendo bot de Telegram...');
         telegramBot.stop('SIGINT');
+      } else if (telegramBot) {
+        serverLogger.warn('Bot de Telegram no está corriendo, omitiendo stop()');
       }
       server.close(() => {
         process.exit(0);
@@ -257,8 +265,11 @@ async function startServer() {
 
     process.once('SIGTERM', () => {
       serverLogger.info('Señal SIGTERM recibida, cerrando servidor y bot');
-      if (telegramBot) {
+      if (telegramBot && telegramBot.running) {
+        serverLogger.info('Deteniendo bot de Telegram...');
         telegramBot.stop('SIGTERM');
+      } else if (telegramBot) {
+        serverLogger.warn('Bot de Telegram no está corriendo, omitiendo stop()');
       }
       server.close(() => {
         process.exit(0);

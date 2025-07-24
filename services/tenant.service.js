@@ -60,9 +60,9 @@ class TenantService {
           where: {
             tenantId_series: {
               tenantId,
-              series
-            }
-          }
+              series,
+            },
+          },
         });
 
         if (!folio) {
@@ -71,16 +71,16 @@ class TenantService {
             data: {
               tenantId,
               series,
-              currentNumber: 801
-            }
+              currentNumber: 801,
+            },
           });
           return 800;
         }
 
         // Actualizar e incrementar
-        const updated = await tx.tenantFolio.update({
+        await tx.tenantFolio.update({
           where: { id: folio.id },
-          data: { currentNumber: { increment: 1 } }
+          data: { currentNumber: { increment: 1 } },
         });
 
         return folio.currentNumber;

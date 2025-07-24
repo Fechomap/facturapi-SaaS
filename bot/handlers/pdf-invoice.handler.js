@@ -511,10 +511,10 @@ async function generateSimpleInvoice(ctx, analysisData, progressMessageId = null
     // 🔍 MÉTRICAS: Medir tiempo total de generación
     const totalStartTime = Date.now();
     console.log(`[INVOICE_METRICS] Iniciando InvoiceService.generateInvoice()`);
-    
+
     // Generar la factura real en FacturAPI
     const factura = await InvoiceService.generateInvoice(facturaData, tenantId);
-    
+
     const totalDuration = Date.now() - totalStartTime;
     console.log(`[INVOICE_METRICS] InvoiceService.generateInvoice() TOTAL tomó ${totalDuration}ms`);
     console.log('Factura generada exitosamente:', factura.id, 'Folio:', factura.folio_number);

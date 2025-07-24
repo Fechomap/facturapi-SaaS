@@ -801,14 +801,21 @@ async function uploadCertificateToFacturAPI(organizationId, cerPath, keyPath, pa
  * @param {Object} user - Datos del usuario
  */
 async function notifyAdmins(bot, setup, user) {
-  // Modificar esta parte para evitar problemas con el formato Markdown
+  // Sanitizar datos para evitar problemas con Markdown
+  const sanitizeForMarkdown = (text) => {
+    if (!text) return '';
+    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+  };
+
+  // Formatear username de manera segura
+  const safeUsername = user.username ? `@${sanitizeForMarkdown(user.username)}` : 'sin\\_username';
+
   const message =
     '🔔 *Nueva solicitud de configuración productiva*\n\n' +
-    `*Empresa:* ${setup.businessName}\n` +
-    `*RFC:* ${setup.rfc || 'No disponible'}\n` +
-    // Eliminar los backticks (`) que causan el problema
-    `*ID Organización:* ${setup.orgId}\n` +
-    `*Usuario:* ${user.first_name} ${user.last_name || ''} (@${user.username || 'sin_username'})\n` +
+    `*Empresa:* ${sanitizeForMarkdown(setup.businessName)}\n` +
+    `*RFC:* ${sanitizeForMarkdown(setup.rfc || 'No disponible')}\n` +
+    `*ID Organización:* ${sanitizeForMarkdown(setup.orgId)}\n` +
+    `*Usuario:* ${sanitizeForMarkdown(user.first_name)} ${sanitizeForMarkdown(user.last_name || '')} (${safeUsername})\n` +
     `*ID Telegram:* ${user.id}\n\n` +
     'Por favor, verifica los certificados en el dashboard de FacturAPI y genera la API Key Live.';
 

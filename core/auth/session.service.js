@@ -156,16 +156,18 @@ class SessionService {
 
     // 🚀 OPTIMIZACIÓN AGRESIVA: Solo escribir a DB si es realmente importante
     const isImportantState = state.facturaGenerada || state.esperando || !state.tenantId;
-    
+
     if (!isImportantState) {
       // Para estados temporales (análisis PDF, etc.), solo Redis
-      console.log(`[SESSION_SKIP] Saltando DB write para estado temporal de usuario ${telegramIdBigInt}`);
+      console.log(
+        `[SESSION_SKIP] Saltando DB write para estado temporal de usuario ${telegramIdBigInt}`
+      );
       return { sessionData: state };
     }
 
     // 🔧 DEBOUNCING MEJORADO: Solo para estados importantes
     const queueKey = `save-user-state-${telegramIdBigInt.toString()}`;
-    
+
     // Cancelar operación pendiente si existe
     if (this.pendingSaves) {
       const existingTimeout = this.pendingSaves.get(queueKey);
@@ -176,7 +178,7 @@ class SessionService {
     } else {
       this.pendingSaves = new Map();
     }
-    
+
     // Programar nueva operación con debounce de 2000ms (muy agresivo)
     const timeoutId = setTimeout(() => {
       facturapiQueueService.enqueue(
@@ -186,7 +188,7 @@ class SessionService {
       );
       this.pendingSaves.delete(queueKey);
     }, 2000);
-    
+
     this.pendingSaves.set(queueKey, timeoutId);
 
     return { sessionData: state };
@@ -396,8 +398,8 @@ class SessionService {
   static isSignificantStateChange(oldState, newState) {
     // Solo cambios ESENCIALES
     const significantFields = ['esperando', 'facturaGenerada', 'tenantId', 'userStatus'];
-    
-    return significantFields.some(field => oldState[field] !== newState[field]);
+
+    return significantFields.some((field) => oldState[field] !== newState[field]);
   }
 
   /**
@@ -476,10 +478,10 @@ class SessionService {
         ) {
           // Verificar si es un cambio importante que merece escritura DB
           const isSignificantChange = this.isSignificantStateChange(
-            JSON.parse(initialState || '{}'), 
+            JSON.parse(initialState || '{}'),
             ctx.userState
           );
-          
+
           if (isSignificantChange) {
             sessionLogger.debug({ telegramId: userId }, 'Guardando estado actualizado');
             await this.saveUserState(userId, ctx.userState);

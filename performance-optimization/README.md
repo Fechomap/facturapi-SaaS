@@ -7,16 +7,19 @@ Optimización crítica del sistema de facturación que redujo los tiempos de gen
 ## Problemas Identificados y Resueltos
 
 ### 1. Import Dinámico de Facturapi (9-10 segundos)
+
 - **Problema**: `await import('facturapi')` en cada solicitud
 - **Solución**: Import estático al inicio del módulo
 - **Resultado**: Eliminación de 9-10 segundos de latencia
 
 ### 2. Cálculo Innecesario de Folios (2-5 segundos)
+
 - **Problema**: `getNextFolio()` con query a BD remota
 - **Solución**: Eliminar llamada - FacturAPI asigna folios automáticamente
 - **Resultado**: Eliminación de 2-5 segundos de latencia
 
 ### 3. Base de Datos Remota
+
 - **Problema**: BD en AWS RDS con alta latencia
 - **Solución Parcial**: Operaciones asíncronas y cache agresivo
 - **Pendiente**: Migración a Redis-only sessions
@@ -41,11 +44,13 @@ performance-optimization/
 ## Métricas de Éxito
 
 ### Antes de la Optimización
+
 - PDF Invoice: 10,069ms
 - Excel CHUBB: ~5-8 segundos
 - Excel AXA: ~5-7 segundos
 
 ### Después de la Optimización
+
 - PDF Invoice: 500-700ms ✅
 - Excel CHUBB: 2-3 segundos ✅
 - Excel AXA: ~2 segundos ✅
@@ -57,5 +62,6 @@ performance-optimization/
 3. Implementar connection pooling para BD remota
 
 ---
+
 Fecha: 11 de Julio, 2025
 Branch: feature/performance-optimizations

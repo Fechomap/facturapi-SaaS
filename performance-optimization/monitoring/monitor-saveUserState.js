@@ -4,7 +4,7 @@
 
 import prisma from '../../lib/prisma.js';
 
-let monitoringActive = true;
+const monitoringActive = true;
 
 console.log('🔍 MONITOR DE saveUserState INICIADO');
 console.log('=====================================');
@@ -14,7 +14,7 @@ console.log('Ctrl+C para salir\n');
 async function monitorDatabase() {
   try {
     const timestamp = new Date().toISOString().substring(11, 19);
-    
+
     // 1. Verificar conexiones activas
     const connections = await prisma.$queryRaw`
       SELECT 
@@ -24,9 +24,9 @@ async function monitorDatabase() {
       FROM pg_stat_activity 
       WHERE datname = current_database()
     `;
-    
+
     const conn = connections[0];
-    
+
     // 2. Detectar queries lentas
     const slowQueries = await prisma.$queryRaw`
       SELECT 
@@ -41,7 +41,7 @@ async function monitorDatabase() {
       AND EXTRACT(EPOCH FROM (now() - query_start)) > 0.5
       ORDER BY query_start
     `;
-    
+
     // 3. Detectar locks específicos en user_sessions
     const sessionLocks = await prisma.$queryRaw`
       SELECT 
@@ -56,38 +56,45 @@ async function monitorDatabase() {
       WHERE l.relation::regclass::text = 'user_sessions'
       AND NOT l.granted
     `;
-    
+
     // Solo mostrar si hay algo interesante
     let hasIssues = false;
-    
+
     if (conn.active > 5 || conn.session_queries > 2) {
-      console.log(`[${timestamp}] ⚠️ Conexiones: ${conn.total} total, ${conn.active} activas, ${conn.session_queries} session queries`);
+      console.log(
+        `[${timestamp}] ⚠️ Conexiones: ${conn.total} total, ${conn.active} activas, ${conn.session_queries} session queries`
+      );
       hasIssues = true;
     }
-    
+
     if (slowQueries.length > 0) {
       console.log(`[${timestamp}] 🐌 QUERIES LENTAS DETECTADAS:`);
       slowQueries.forEach((q, i) => {
-        console.log(`  ${i+1}. PID ${q.pid}: ${q.duration_seconds.toFixed(1)}s - ${q.query_preview}...`);
+        console.log(
+          `  ${i + 1}. PID ${q.pid}: ${q.duration_seconds.toFixed(1)}s - ${q.query_preview}...`
+        );
       });
       hasIssues = true;
     }
-    
+
     if (sessionLocks.length > 0) {
       console.log(`[${timestamp}] 🔒 LOCKS EN user_sessions:`);
       sessionLocks.forEach((lock, i) => {
-        console.log(`  ${i+1}. ${lock.mode} lock, duración: ${lock.duration_seconds.toFixed(1)}s`);
+        console.log(
+          `  ${i + 1}. ${lock.mode} lock, duración: ${lock.duration_seconds.toFixed(1)}s`
+        );
         console.log(`     Query: ${lock.query_preview}...`);
       });
       hasIssues = true;
     }
-    
+
     if (!hasIssues) {
-      process.stdout.write(`[${timestamp}] ✅ Normal (${conn.total} conn, ${conn.active} activas)\r`);
+      process.stdout.write(
+        `[${timestamp}] ✅ Normal (${conn.total} conn, ${conn.active} activas)\r`
+      );
     } else {
       console.log(''); // Nueva línea después de issues
     }
-    
   } catch (error) {
     console.error(`❌ Error en monitor: ${error.message}`);
   }

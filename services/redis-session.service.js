@@ -249,7 +249,7 @@ class RedisSessionService {
           cursor = newCursor;
           keys.push(...foundKeys);
         } while (cursor !== '0');
-        
+
         stats.activeSessions = keys.length;
       } else {
         // Estadísticas de memoria

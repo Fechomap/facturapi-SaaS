@@ -21,26 +21,31 @@ tests/
 ## Ejecutar Tests
 
 ### Todos los tests
+
 ```bash
 npm test
 ```
 
 ### Solo tests de rendimiento
+
 ```bash
 npm test -- --selectProjects=performance
 ```
 
 ### Solo tests de integración
+
 ```bash
 npm test -- --selectProjects=integration
 ```
 
 ### Test específico
+
 ```bash
 npm test -- pdf-analysis.test.js
 ```
 
 ### Con coverage
+
 ```bash
 npm test -- --coverage
 ```
@@ -48,26 +53,31 @@ npm test -- --coverage
 ## Tests de Rendimiento Clave
 
 ### 1. PDF Analysis Performance
+
 - Valida que la lectura de PDF no bloquee el event loop
 - Verifica el uso eficiente de memoria
 - Prueba concurrencia sin degradación
 
 ### 2. Tenant Middleware Cache
+
 - Verifica implementación de cache (pendiente)
 - Valida tiempos de respuesta < 100ms
 - Prueba períodos de gracia de suscripción
 
 ### 3. Invoice Pagination
+
 - Compara paginación en memoria vs BD
 - Mide uso de memoria con datasets grandes
 - Propone implementación optimizada
 
 ### 4. Redis Session Service
+
 - Identifica uso problemático de KEYS
 - Propone implementación con SCAN
 - Valida limpieza eficiente de sesiones
 
 ### 5. Invoice Download Streaming
+
 - Detecta carga completa en memoria
 - Propone implementación con streaming
 - Prueba descargas concurrentes

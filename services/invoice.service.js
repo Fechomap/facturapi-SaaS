@@ -35,7 +35,9 @@ class InvoiceService {
       console.log(`[INVOICE_METRICS] Iniciando facturapIService.getFacturapiClient()`);
       const clientStartTime = Date.now();
       const facturapi = await facturapIService.getFacturapiClient(tenantId);
-      console.log(`[INVOICE_METRICS] facturapIService.getFacturapiClient() tomó ${Date.now() - clientStartTime}ms`);
+      console.log(
+        `[INVOICE_METRICS] facturapIService.getFacturapiClient() tomó ${Date.now() - clientStartTime}ms`
+      );
 
       // Verificar si el clienteId es un código corto o un ID hexadecimal
       let facturapiClienteId = data.clienteId;
@@ -165,10 +167,10 @@ class InvoiceService {
       // 🔍 MÉTRICAS: Medir tiempo de FacturAPI
       const facturapiStartTime = Date.now();
       console.log(`[FACTURAPI_METRICS] Iniciando llamada a FacturAPI.invoices.create()`);
-      
+
       // Llamar a FacturAPI para crear la factura
       const factura = await facturapi.invoices.create(facturaData);
-      
+
       const facturapiDuration = Date.now() - facturapiStartTime;
       console.log(`[FACTURAPI_METRICS] FacturAPI.invoices.create() tomó ${facturapiDuration}ms`);
 
@@ -206,16 +208,16 @@ class InvoiceService {
    * @returns {Promise<Object>} - {data: facturas, pagination: info}
    */
   static async searchInvoices(criteria) {
-    const { 
-      tenantId, 
-      startDate, 
-      endDate, 
-      customerId, 
-      status, 
-      minAmount, 
+    const {
+      tenantId,
+      startDate,
+      endDate,
+      customerId,
+      status,
+      minAmount,
       maxAmount,
       page = 1,
-      limit = 10
+      limit = 10,
     } = criteria;
 
     // Construir la consulta Prisma

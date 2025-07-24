@@ -6,12 +6,12 @@ import prisma from '../../lib/prisma.js';
 const mockPrisma = {
   tenantInvoice: {
     findMany: jest.fn(),
-    count: jest.fn()
-  }
+    count: jest.fn(),
+  },
 };
 
 jest.unstable_mockModule('../../lib/prisma.js', () => ({
-  default: mockPrisma
+  default: mockPrisma,
 }));
 
 describe('Invoice Pagination', () => {
@@ -27,9 +27,9 @@ describe('Invoice Pagination', () => {
     customer: {
       id: `cust-${i}`,
       legalName: `Customer ${i}`,
-      rfc: 'XAXX010101000'
+      rfc: 'XAXX010101000',
     },
-    documents: []
+    documents: [],
   }));
 
   beforeEach(() => {
@@ -40,30 +40,30 @@ describe('Invoice Pagination', () => {
     it('should load all invoices into memory', async () => {
       mockPrisma.tenantInvoice.findMany.mockResolvedValue(mockInvoices.slice(0, 10));
       mockPrisma.tenantInvoice.count.mockResolvedValue(50);
-      
+
       const criteria = {
         tenantId: 'test-tenant',
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-        endDate: new Date()
+        endDate: new Date(),
       };
-      
+
       const result = await InvoiceService.searchInvoices(criteria);
-      
+
       expect(mockPrisma.tenantInvoice.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          tenantId: 'test-tenant'
+          tenantId: 'test-tenant',
         }),
         include: {
           customer: true,
-          documents: true
+          documents: true,
         },
         orderBy: {
-          invoiceDate: 'desc'
+          invoiceDate: 'desc',
         },
         skip: 0,
-        take: 10
+        take: 10,
       });
-      
+
       expect(result.data).toHaveLength(10); // Only page data
       expect(result.pagination.total).toBe(50); // Total count
       expect(result.pagination.pages).toBe(5); // Total pages
@@ -75,22 +75,22 @@ describe('Invoice Pagination', () => {
         ...mockInvoices[0],
         id: `inv-${i}`,
         // Add some data to make each invoice heavier
-        metadata: { 
-          items: Array(10).fill({ description: 'Product description with some text' })
-        }
+        metadata: {
+          items: Array(10).fill({ description: 'Product description with some text' }),
+        },
       }));
-      
+
       prisma.tenantInvoice.findMany.mockResolvedValue(largeDataset);
-      
+
       const memBefore = process.memoryUsage().heapUsed;
-      
+
       await InvoiceService.searchInvoices({ tenantId: 'test-tenant' });
-      
+
       const memAfter = process.memoryUsage().heapUsed;
       const memUsedMB = (memAfter - memBefore) / 1024 / 1024;
-      
+
       console.log(`Memory used for 10k invoices: ${memUsedMB.toFixed(2)} MB`);
-      
+
       // This is expected to use significant memory
       expect(memUsedMB).toBeGreaterThan(5); // At least 5MB for 10k records
     });
@@ -103,7 +103,7 @@ describe('Invoice Pagination', () => {
       const searchInvoicesPaginated = async (criteria) => {
         const { page = 1, limit = 10 } = criteria;
         const skip = (page - 1) * limit;
-        
+
         const [invoices, total] = await Promise.all([
           prisma.tenantInvoice.findMany({
             where: { tenantId: criteria.tenantId },
@@ -111,48 +111,48 @@ describe('Invoice Pagination', () => {
             take: limit,
             include: {
               customer: true,
-              documents: true
+              documents: true,
             },
-            orderBy: { invoiceDate: 'desc' }
+            orderBy: { invoiceDate: 'desc' },
           }),
           prisma.tenantInvoice.count({
-            where: { tenantId: criteria.tenantId }
-          })
+            where: { tenantId: criteria.tenantId },
+          }),
         ]);
-        
+
         return {
           data: invoices,
           pagination: {
             total,
             page,
             limit,
-            pages: Math.ceil(total / limit)
-          }
+            pages: Math.ceil(total / limit),
+          },
         };
       };
-      
+
       prisma.tenantInvoice.findMany.mockResolvedValue(mockInvoices.slice(10, 20));
       prisma.tenantInvoice.count.mockResolvedValue(50);
-      
+
       const result = await searchInvoicesPaginated({
         tenantId: 'test-tenant',
         page: 2,
-        limit: 10
+        limit: 10,
       });
-      
+
       expect(prisma.tenantInvoice.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 10,
-          take: 10
+          take: 10,
         })
       );
-      
+
       expect(result.data).toHaveLength(10);
       expect(result.pagination).toEqual({
         total: 50,
         page: 2,
         limit: 10,
-        pages: 5
+        pages: 5,
       });
     });
 
@@ -164,32 +164,32 @@ describe('Invoice Pagination', () => {
         customerId: 'cust-123',
         status: 'valid',
         minAmount: 1000,
-        maxAmount: 5000
+        maxAmount: 5000,
       };
-      
+
       await InvoiceService.searchInvoices(criteria);
-      
+
       expect(prisma.tenantInvoice.findMany).toHaveBeenCalledWith({
         where: {
           tenantId: 'test-tenant',
           invoiceDate: {
             gte: criteria.startDate,
-            lte: criteria.endDate
+            lte: criteria.endDate,
           },
           customerId: 'cust-123',
           status: 'valid',
           total: {
             gte: 1000,
-            lte: 5000
-          }
+            lte: 5000,
+          },
         },
         include: {
           customer: true,
-          documents: true
+          documents: true,
         },
         orderBy: {
-          invoiceDate: 'desc'
-        }
+          invoiceDate: 'desc',
+        },
       });
     });
   });
@@ -198,27 +198,27 @@ describe('Invoice Pagination', () => {
     it('should compare memory vs database pagination performance', async () => {
       const invoiceCount = 1000;
       const pageSize = 20;
-      
+
       // Memory pagination (current)
       const largeDataset = Array.from({ length: invoiceCount }, (_, i) => ({
         ...mockInvoices[0],
-        id: `inv-${i}`
+        id: `inv-${i}`,
       }));
-      
+
       prisma.tenantInvoice.findMany.mockResolvedValue(largeDataset);
-      
+
       const memoryStart = Date.now();
-      const memoryResult = await InvoiceService.searchInvoices({ 
-        tenantId: 'test-tenant' 
+      const memoryResult = await InvoiceService.searchInvoices({
+        tenantId: 'test-tenant',
       });
       const memoryTime = Date.now() - memoryStart;
-      
+
       // Simulate getting page 3
       const page3 = memoryResult.slice(40, 60);
-      
+
       console.log(`Memory pagination: ${memoryTime}ms for ${invoiceCount} records`);
       console.log(`Page 3 contains ${page3.length} records`);
-      
+
       // Database pagination would be much faster for large datasets
       expect(memoryTime).toBeLessThan(1000); // Should complete reasonably fast
     });

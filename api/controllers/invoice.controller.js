@@ -205,7 +205,7 @@ class InvoiceController {
       const result = await InvoiceService.searchInvoices(criteria);
 
       invoiceLogger.info(
-        { tenantId, count: result.data.length, total: result.pagination.total }, 
+        { tenantId, count: result.data.length, total: result.pagination.total },
         'Facturas encontradas con paginación'
       );
 

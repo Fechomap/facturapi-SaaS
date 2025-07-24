@@ -22,8 +22,8 @@ async function applyPerformanceIndexes() {
     // Dividir en statements individuales
     const statements = sqlContent
       .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--') && !stmt.startsWith('/*'));
+      .map((stmt) => stmt.trim())
+      .filter((stmt) => stmt.length > 0 && !stmt.startsWith('--') && !stmt.startsWith('/*'));
 
     migrationLogger.info(`📝 Encontrados ${statements.length} statements para ejecutar`);
 
@@ -41,7 +41,6 @@ async function applyPerformanceIndexes() {
         const result = await prisma.$executeRawUnsafe(statement);
         migrationLogger.debug(`✅ Statement ${index + 1} ejecutado exitosamente`);
         successCount++;
-
       } catch (error) {
         // Los errores de "already exists" son OK
         if (error.message.includes('already exists')) {
@@ -67,9 +66,9 @@ async function applyPerformanceIndexes() {
     `;
 
     const indexes = await prisma.$queryRawUnsafe(indexQuery);
-    
+
     migrationLogger.info('📋 Índices de performance existentes:');
-    indexes.forEach(idx => {
+    indexes.forEach((idx) => {
       migrationLogger.info(`  - ${idx.tablename}.${idx.indexname}`);
     });
 
@@ -86,23 +85,24 @@ async function applyPerformanceIndexes() {
     `;
 
     const indexSizes = await prisma.$queryRawUnsafe(sizeQuery);
-    
+
     if (indexSizes.length > 0) {
       migrationLogger.info('📊 Tamaño de índices:');
-      indexSizes.forEach(idx => {
+      indexSizes.forEach((idx) => {
         migrationLogger.info(`  - ${idx.indexname}: ${idx.size}`);
       });
     }
 
-    migrationLogger.info(`🎉 Migración completada: ${successCount} exitosos, ${errorCount} errores`);
+    migrationLogger.info(
+      `🎉 Migración completada: ${successCount} exitosos, ${errorCount} errores`
+    );
 
     return {
       success: true,
       successCount,
       errorCount,
-      totalIndexes: indexes.length
+      totalIndexes: indexes.length,
     };
-
   } catch (error) {
     migrationLogger.error(`💥 Error crítico en migración: ${error.message}`);
     throw error;
@@ -112,13 +112,13 @@ async function applyPerformanceIndexes() {
 // Ejecutar si se llama directamente
 if (import.meta.url === `file://${process.argv[1]}`) {
   applyPerformanceIndexes()
-    .then(result => {
+    .then((result) => {
       console.log('\n✅ Migración de índices completada');
       console.log(`📊 Resultados: ${result.successCount} exitosos, ${result.errorCount} errores`);
       console.log(`📋 Total de índices: ${result.totalIndexes}`);
       process.exit(0);
     })
-    .catch(error => {
+    .catch((error) => {
       console.error('\n❌ Error en migración:', error.message);
       process.exit(1);
     });

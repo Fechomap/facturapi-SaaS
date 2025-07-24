@@ -205,7 +205,7 @@ describe('Clustering Integration Tests', () => {
       });
 
       // Operaciones concurrentes
-      const concurrentOperations = workers.map(async (worker, index) => {
+      const concurrentOperations = workers.map(async (worker, _index) => {
         // Cada worker carga la sesión
         await worker.loadSession();
 
