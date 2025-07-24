@@ -579,4 +579,107 @@ export function registerAdminCommands(bot) {
     ctx.message = { text: '/sus' };
     await bot.handleUpdate({ message: ctx.message, from: ctx.from });
   });
+
+  // Comando para eliminar tenant específico (SOLO ADMINS)
+  bot.command('delete_tenant', async (ctx) => {
+    // Verificar que sea admin
+    const adminChatIds = process.env.ADMIN_CHAT_IDS?.split(',').map((id) => id.trim()) || [];
+    const userId = ctx.from.id.toString();
+
+    if (!adminChatIds.includes(userId)) {
+      return ctx.reply('❌ No tienes permisos para usar este comando.');
+    }
+
+    const args = ctx.message.text.split(' ');
+    if (args.length !== 2) {
+      return ctx.reply('❌ Uso: /delete_tenant <tenant-id>');
+    }
+
+    const tenantId = args[1];
+
+    try {
+      // Verificar que el tenant existe y obtener información
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: {
+          users: true,
+          invoices: true,
+          customers: true,
+          subscriptions: true,
+          folios: true,
+          settings: true,
+          documents: true,
+          payments: true,
+          auditLogs: true
+        }
+      });
+
+      if (!tenant) {
+        return ctx.reply(`❌ Tenant ${tenantId} no encontrado`);
+      }
+
+      // Mostrar información del tenant
+      const infoMessage = `🔍 **Tenant encontrado:**\n\n` +
+        `• **Empresa:** ${tenant.businessName}\n` +
+        `• **RFC:** ${tenant.rfc}\n` +
+        `• **Email:** ${tenant.email}\n` +
+        `• **Usuarios:** ${tenant.users.length}\n` +
+        `• **Facturas:** ${tenant.invoices.length}\n` +
+        `• **Clientes:** ${tenant.customers.length}\n` +
+        `• **Suscripciones:** ${tenant.subscriptions.length}\n` +
+        `• **Folios:** ${tenant.folios.length}\n` +
+        `• **Configuraciones:** ${tenant.settings.length}\n` +
+        `• **Documentos:** ${tenant.documents.length}\n` +
+        `• **Pagos:** ${tenant.payments.length}\n` +
+        `• **Logs auditoría:** ${tenant.auditLogs.length}\n\n` +
+        `⚠️ **ADVERTENCIA:** Esta operación eliminará PERMANENTEMENTE todos los datos del tenant.\n\n` +
+        `¿Confirmas la eliminación?`;
+
+      await ctx.reply(infoMessage, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ Confirmar Eliminación', `confirm_delete_${tenantId}`)],
+          [Markup.button.callback('❌ Cancelar', 'cancel_delete')]
+        ])
+      });
+
+    } catch (error) {
+      console.error('Error verificando tenant:', error);
+      await ctx.reply(`❌ Error: ${error.message}`);
+    }
+  });
+
+  // Action para confirmar eliminación de tenant
+  bot.action(/confirm_delete_(.+)/, async (ctx) => {
+    await ctx.answerCbQuery();
+    const tenantId = ctx.match[1];
+
+    try {
+      await ctx.editMessageText('⏳ Eliminando tenant...');
+
+      // Eliminar tenant (CASCADE eliminará automáticamente registros relacionados)
+      const deletedTenant = await prisma.tenant.delete({
+        where: { id: tenantId }
+      });
+
+      await ctx.editMessageText(
+        `✅ **Tenant eliminado exitosamente:**\n\n` +
+        `• **ID:** ${deletedTenant.id}\n` +
+        `• **Empresa:** ${deletedTenant.businessName}\n` +
+        `• **RFC:** ${deletedTenant.rfc}\n\n` +
+        `🎯 Todos los registros relacionados fueron eliminados automáticamente.`,
+        { parse_mode: 'Markdown' }
+      );
+
+    } catch (error) {
+      console.error('Error eliminando tenant:', error);
+      await ctx.editMessageText(`❌ Error al eliminar tenant: ${error.message}`);
+    }
+  });
+
+  // Action para cancelar eliminación
+  bot.action('cancel_delete', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('❌ Eliminación cancelada por el usuario.');
+  });
 }

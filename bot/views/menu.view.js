@@ -2,6 +2,15 @@
 import { Markup } from 'telegraf';
 
 /**
+ * Genera el teclado persistente con botón MENU
+ */
+export function persistentKeyboard() {
+  return Markup.keyboard([
+    ['📱 MENU']
+  ]).resize().persistent();
+}
+
+/**
  * Genera el menú principal para usuarios con tenant
  */
 export function mainMenu() {
