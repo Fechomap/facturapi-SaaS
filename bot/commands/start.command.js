@@ -12,6 +12,27 @@ async function executeStartLogic(ctx, source = 'start') {
   console.log(`[${source.toUpperCase()}_METRICS] Usuario ${telegramId} - Comando iniciado`);
 
   try {
+    // 🧹 LIMPIEZA DE ESTADO: Limpiar cualquier estado pendiente para empezar desde cero
+    if (ctx.userState?.esperando) {
+      console.log(`🧹 ${source.toUpperCase()} - Limpiando estado pendiente: ${ctx.userState.esperando}`);
+      ctx.userState.esperando = null;
+    }
+
+    // Limpiar datos temporales de facturas y flujos (preservando tenant info)
+    const statesToClean = [
+      'numeroPedido', 'claveProducto', 'monto', 'clienteNombre', 'clienteId',
+      'facturaId', 'folioFactura', 'facturaGenerada', 'facturaIdCancelar', 
+      'folioFacturaCancelar', 'axaData', 'chubbGrupos', 'pdfAnalysis',
+      'selectedClientId', 'selectedClientName', 'invoiceData', 'currentStep'
+    ];
+
+    statesToClean.forEach(state => {
+      if (ctx.userState?.[state]) {
+        delete ctx.userState[state];
+      }
+    });
+
+    console.log(`🧹 ${source.toUpperCase()} - Estado limpiado, usuario puede operar desde cero`);
     // 🚀 SUPER OPTIMIZACIÓN: Usar directamente la información de tenant que ya fue cargada por el middleware
     // Evitamos completamente una consulta adicional a la base de datos
 
