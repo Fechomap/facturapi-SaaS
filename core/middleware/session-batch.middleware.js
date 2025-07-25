@@ -43,10 +43,16 @@ export function sessionBatchMiddleware(ctx, next) {
   // Interceptar guardado de estado
   ctx.saveSession = async () => {
     const userId = ctx.from?.id;
-    if (!userId || !ctx.userState) return;
+    if (!userId) return;
+
+    // Combinar userState y session para batch processing
+    const combinedState = {
+      ...ctx.userState,
+      ...ctx.session
+    };
 
     // Agregar a la cola de actualizaciones
-    pendingUpdates.set(userId, { ...ctx.userState });
+    pendingUpdates.set(userId, combinedState);
 
     // Disparar el procesamiento en el siguiente tick del event loop
     if (!isProcessing) {

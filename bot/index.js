@@ -7,7 +7,8 @@ import { registerAllCommands } from './commands/index.js';
 import authMiddleware from './middlewares/auth.middleware.js';
 
 // Importación directa de handlers
-import { registerPDFInvoiceHandler } from './handlers/pdf-invoice.handler.js'; // Nuevo handler para PDFs
+import { registerPDFInvoiceHandler } from './handlers/pdf-invoice.handler.js'; // Handler para PDFs
+import { handleBatchGenerateInvoices } from './handlers/pdf-batch-simple.handler.js'; // Handler simplificado para batch
 import { registerClientHandler } from './handlers/client.handler.js';
 import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
@@ -78,6 +79,7 @@ export function createBot(logger) {
 
   // Registrar handlers en orden: IMPORTANTE - el handler de PDF debe ir PRIMERO
   registerPDFInvoiceHandler(bot); // 1. PDF (PRIMERO)
+  handleBatchGenerateInvoices(bot); // 1.1. Handler simplificado para batch
   registerClientHandler(bot); // 2. Clientes
   registerInvoiceHandler(bot); // 3. Facturas
   registerChubbHandler(bot); // 4. Excel CHUBB
