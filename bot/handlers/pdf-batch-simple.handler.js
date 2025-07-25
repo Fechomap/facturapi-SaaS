@@ -515,7 +515,7 @@ async function downloadBatchZip(ctx, type) {
         const fileData = Buffer.from(response.data);
         console.log(`✅ Descargado ${type} - Tamaño: ${fileData.length} bytes`);
 
-        const fileName = `${series}${folio}_${inv.client.legalName.replace(/[^a-zA-Z0-9]/g, '_')}.${type}`;
+        const fileName = `${series}${folio}.${type}`;
         archive.append(fileData, { name: fileName });
         filesAdded++;
         console.log(`✅ Agregado al ZIP: ${fileName}`);

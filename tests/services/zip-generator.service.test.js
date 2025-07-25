@@ -366,7 +366,7 @@ describe('ZipGeneratorService', () => {
   });
 
   describe('generateFileName', () => {
-    test('debe generar nombre de archivo correctamente', () => {
+    test('debe generar nombre de archivo correctamente con formato serie+folio', () => {
       const invoiceResult = {
         analysis: { orderNumber: 'ORD-001' },
         client: { legalName: 'Empresa Test SA' },
@@ -379,7 +379,7 @@ describe('ZipGeneratorService', () => {
 
       const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'pdf');
 
-      expect(fileName).toBe('A123_ORD_001_Empresa_Test_SA.pdf');
+      expect(fileName).toBe('A123.pdf');
     });
 
     test('debe manejar datos faltantes', () => {
@@ -392,10 +392,10 @@ describe('ZipGeneratorService', () => {
 
       const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'xml');
 
-      expect(fileName).toBe('ASIN_FOLIO_SIN_ORDEN_CLIENTE.xml');
+      expect(fileName).toBe('ASIN_FOLIO.xml');
     });
 
-    test('debe limpiar caracteres especiales', () => {
+    test('debe usar formato simple serie+folio incluso con datos complejos', () => {
       const invoiceResult = {
         analysis: { orderNumber: 'ORD/001-TEST#2024' },
         client: { legalName: 'Empresa & Cia. S.A. de C.V.' },
@@ -408,7 +408,7 @@ describe('ZipGeneratorService', () => {
 
       const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'pdf');
 
-      expect(fileName).toBe('B456_ORD_001_TEST_2024_Empresa_Cia_SA_.pdf');
+      expect(fileName).toBe('B456.pdf');
     });
   });
 

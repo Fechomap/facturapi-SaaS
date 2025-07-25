@@ -269,19 +269,11 @@ class ZipGeneratorService {
    * Genera un nombre de archivo único para la factura
    */
   static generateFileName(invoiceResult, invoice, extension) {
-    const orderNumber = invoiceResult.analysis?.orderNumber || 'SIN_ORDEN';
     const folio = invoice.folio || invoice.folioNumber || 'SIN_FOLIO';
     const serie = invoice.series || invoice.serie || 'A'; // Soportar ambos campos por compatibilidad
-    const clientName = invoiceResult.client?.legalName || 'CLIENTE';
-
-    // Limpiar caracteres especiales
-    const cleanOrderNumber = orderNumber.toString().replace(/[^a-zA-Z0-9]/g, '_');
-    const cleanClientName = clientName
-      .substring(0, 20)
-      .replace(/[^a-zA-Z0-9\s]/g, '')
-      .replace(/\s+/g, '_');
-
-    return `${serie}${folio}_${cleanOrderNumber}_${cleanClientName}.${extension}`;
+    
+    // Usar el mismo formato que el procesamiento individual: serie + folio
+    return `${serie}${folio}.${extension}`;
   }
 
   /**
