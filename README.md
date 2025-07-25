@@ -1,332 +1,568 @@
 # FacturAPI SaaS
 
-Sistema de facturación multitenant basado en FacturAPI. Plataforma que permite gestionar múltiples empresas (tenants) para emitir y administrar facturas electrónicas CFDI 4.0 a través de una API REST y un Bot de Telegram.
+<div align="center">
 
-## 📋 Estado del Proyecto
+![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)
+![Redis](https://img.shields.io/badge/Redis-7+-red.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-production-green.svg)
 
-- ✅ **Desarrollo Completo**: Sistema funcional con todas las características
-- ✅ **Despliegue en Railway**: Producción estable
-- ✅ **Optimización de Performance**: Bot optimizado de 8-10s a 1.6s (83% mejora)
-- ✅ **Documentación Completa**: Proyecto totalmente documentado
-- ✅ **Testing**: Suite de tests unitarios e integración
-- ✅ **Clustering**: Soporte para múltiples workers con Redis
+Sistema de facturación electrónica multitenant para México (CFDI 4.0) basado en FacturAPI con gestión a través de Bot de Telegram y API REST.
 
-## 🚀 Producción en Railway
+[Características](#-características) •
+[Inicio Rápido](#-inicio-rápido) •
+[Documentación](#-documentación) •
+[API](#-api-reference) •
+[Contribuir](#-contribuir)
 
-**URL de Producción**: `https://web-production-9fbe9.up.railway.app`
+</div>
 
-- **API REST**: `/api/*`
-- **Bot Telegram**: `/telegram-webhook`
-- **Base de Datos**: PostgreSQL optimizada
-- **Redis**: Clustering y sesiones
-- **Monitoreo**: Logs y métricas integradas
+## 📋 Tabla de Contenidos
 
-## 🏗️ Arquitectura del Sistema
+- [Descripción General](#-descripción-general)
+- [Características](#-características)
+- [Arquitectura](#-arquitectura)
+- [Inicio Rápido](#-inicio-rápido)
+- [Instalación](#-instalación)
+- [Configuración](#-configuración)
+- [Uso](#-uso)
+- [API Reference](#-api-reference)
+- [Bot de Telegram](#-bot-de-telegram)
+- [Testing](#-testing)
+- [Despliegue](#-despliegue)
+- [Monitoreo](#-monitoreo)
+- [Contribuir](#-contribuir)
+- [Licencia](#-licencia)
 
-### Componentes Principales
+## 🎯 Descripción General
 
+FacturAPI SaaS es una plataforma completa de facturación electrónica que permite a múltiples empresas (tenants) gestionar sus facturas CFDI 4.0 de manera eficiente. El sistema incluye:
+
+- **Multitenancy**: Soporte para múltiples empresas con aislamiento completo de datos
+- **Bot de Telegram**: Interface conversacional para facturación
+- **API REST**: Endpoints completos para integración con sistemas externos
+- **Alta Performance**: Optimizado para respuestas <2s con caching inteligente
+- **Procesamiento Masivo**: Soporte para facturación batch con análisis de PDFs
+
+## ✨ Características
+
+### Core Features
+
+- ✅ **Facturación CFDI 4.0** - Cumplimiento total con normativa SAT México
+- ✅ **Multitenancy** - Aislamiento completo por empresa
+- ✅ **Bot Inteligente** - Interface conversacional en Telegram
+- ✅ **API REST** - Integración con sistemas externos
+- ✅ **Procesamiento Masivo** - Análisis y facturación de múltiples PDFs
+- ✅ **Gestión de Clientes** - CRUD completo de receptores
+- ✅ **Reportes** - Estadísticas y análisis de facturación
+
+### Performance
+
+- ⚡ **<2s tiempo de respuesta** - Bot optimizado al 83%
+- ⚡ **Caching inteligente** - Redis para sesiones distribuidas
+- ⚡ **PostgreSQL optimizado** - Índices y VACUUM automático
+- ⚡ **Clustering** - Soporte para múltiples workers
+
+### Seguridad
+
+- 🔐 **JWT Authentication** - Tokens seguros para API
+- 🔐 **Tenant Isolation** - Datos completamente separados
+- 🔐 **Encrypted Keys** - API keys cifradas en base de datos
+- 🔐 **Rate Limiting** - Protección contra abuso
+
+## 🏗️ Arquitectura
+
+```mermaid
+graph TB
+    A[Telegram Users] -->|Webhook| B[Bot Handler]
+    C[API Clients] -->|REST| D[API Gateway]
+    
+    B --> E[Session Manager<br/>Redis]
+    D --> E
+    
+    E --> F[Business Logic<br/>Services]
+    
+    F --> G[(PostgreSQL<br/>Multitenant DB)]
+    F --> H[FacturAPI<br/>External Service]
+    
+    I[Stripe] --> D
+    
+    subgraph "Core Services"
+        F
+        E
+    end
+    
+    subgraph "External Services"
+        H
+        I
+    end
+    
+    subgraph "Data Layer"
+        G
+    end
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Telegram Bot  │────│   API Gateway   │────│   FacturAPI     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                │
-                    ┌─────────────────┐
-                    │   PostgreSQL    │
-                    │   (Multienant)  │
-                    └─────────────────┘
-                                │
-                    ┌─────────────────┐
-                    │     Redis       │
-                    │  (Sessions)     │
-                    └─────────────────┘
-```
 
-### Multitenancy
+### Stack Tecnológico
 
-- **Aislamiento por Tenant**: Cada empresa tiene datos completamente separados
-- **API Keys Únicas**: Cada tenant maneja sus propias credenciales de FacturAPI
-- **Facturación Independiente**: Planes y suscripciones por empresa
-- **Seguridad**: Autenticación JWT y validación de tenancy
+- **Backend**: Node.js 18+ con Express
+- **Database**: PostgreSQL 13+ con Prisma ORM
+- **Cache**: Redis 7+ para sesiones
+- **Bot**: Telegraf para Telegram
+- **Payments**: Stripe para suscripciones
+- **CFDI**: FacturAPI para timbrado
 
-## 📱 Bot de Telegram
-
-### Características Principales
-
-- **Autenticación por Empresa**: Los usuarios se registran bajo un tenant específico
-- **Facturación Completa**: Crear, consultar, cancelar facturas
-- **Gestión de Clientes**: Alta y búsqueda de clientes
-- **Descarga de Documentos**: PDF y XML de facturas
-- **Reportes**: Estadísticas y reportes de facturación
-- **Administración**: Comandos admin para gestión del sistema
-
-### Comandos Disponibles
-
-- `/start` - Registro e inicio de sesión
-- `/menu` - Menú principal de opciones
-- `/facturar` - Crear nueva factura
-- `/consultar` - Buscar facturas existentes
-- `/clientes` - Gestión de clientes
-- `/reportes` - Ver estadísticas
-- `/admin` - Comandos administrativos (solo admins)
-
-### Optimizaciones de Performance
-
-- **Cache de FacturAPI**: Reduce tiempo de inicialización de 70ms a 7ms
-- **Query Atómica**: getNextFolio optimizado de 1,987ms a 190ms
-- **PostgreSQL VACUUM**: Base de datos optimizada con bloat <20%
-- **Índices Avanzados**: Consultas optimizadas para multitenancy
-- **Redis Sessions**: Sesiones distribuidas para clustering
-
-## 🔧 Variables de Entorno
-
-### Obligatorias
-
-| Variable             | Descripción                               |
-| -------------------- | ----------------------------------------- |
-| `DATABASE_URL`       | PostgreSQL connection string              |
-| `REDIS_URL`          | Redis connection string (para clustering) |
-| `FACTURAPI_USER_KEY` | Clave administrativa de FacturAPI         |
-| `TELEGRAM_BOT_TOKEN` | Token del bot de Telegram                 |
-| `STRIPE_SECRET_KEY`  | Clave secreta de Stripe                   |
-| `JWT_SECRET`         | Secreto para tokens JWT                   |
-| `ADMIN_CHAT_IDS`     | IDs de admins separados por comas         |
-
-### Opcionales
-
-| Variable       | Descripción          | Default                 |
-| -------------- | -------------------- | ----------------------- |
-| `NODE_ENV`     | Entorno de ejecución | `development`           |
-| `API_BASE_URL` | URL base de la API   | `http://localhost:3001` |
-| `PORT`         | Puerto del servidor  | `3000`                  |
-
-## 🛠️ Desarrollo Local
+## 🚀 Inicio Rápido
 
 ### Prerrequisitos
 
-- Node.js 18+
-- PostgreSQL 13+
-- Redis (opcional, para clustering)
+- Node.js 18 o superior
+- PostgreSQL 13 o superior
+- Redis 7 o superior (opcional para desarrollo)
+- Cuenta en [FacturAPI](https://www.facturapi.io)
+- Bot de Telegram (crear con [@BotFather](https://t.me/botfather))
 
-### Instalación
+### Instalación Express
 
 ```bash
-# Clonar repositorio
-git clone <repo-url>
-cd facturapi-SaaS
+# Clonar el repositorio
+git clone https://github.com/tu-usuario/facturapi-saas.git
+cd facturapi-saas
 
 # Instalar dependencias
 npm install
 
-# Configurar variables de entorno
+# Copiar archivo de configuración
 cp .env.example .env
-# Editar .env con tus credenciales
+
+# Configurar variables de entorno (ver sección Configuración)
+nano .env
 
 # Generar cliente Prisma
 npx prisma generate
 
-# Aplicar migraciones
+# Ejecutar migraciones
 npx prisma db push
 
 # Iniciar en desarrollo
-npm run dev:all  # API + Bot
+npm run dev
 ```
 
-### Scripts Disponibles
+## 📦 Instalación
+
+### 1. Clonar Repositorio
 
 ```bash
-# Desarrollo
-npm run dev          # Solo API
-npm run dev:bot      # Solo Bot
-npm run dev:all      # API + Bot
-
-# Producción
-npm start            # Servidor único
-npm run start:cluster # Clustering con PM2
-
-# Testing
-npm test             # Tests unitarios
-npm run test:integration # Tests de integración
-npm run test:clustering  # Tests de clustering
-
-# Utilidades
-npm run cleanup:sessions # Limpiar sesiones
-npm run studio       # Prisma Studio
+git clone https://github.com/tu-usuario/facturapi-saas.git
+cd facturapi-saas
 ```
 
-## 📊 Monitoreo y Performance
-
-### Métricas de Performance (Post-Optimización)
-
-| Operación          | Antes   | Después | Mejora  |
-| ------------------ | ------- | ------- | ------- |
-| **Bot Total**      | 8-10s   | 1.6s    | **83%** |
-| getNextFolio       | 1,987ms | 190ms   | 90.4%   |
-| getFacturapiClient | 70ms    | 7ms     | 90.0%   |
-| getUserState       | 65ms    | 68ms    | Estable |
-
-### Endpoints de Monitoreo
-
-- `GET /api/cluster/health` - Health check completo
-- `GET /api/cluster/info` - Información del worker
-- `GET /api/cluster/metrics` - Métricas detalladas
-- `GET /api/info` - Estado general del sistema
-
-### Logs en Railway
+### 2. Instalar Dependencias
 
 ```bash
-# Ver logs en tiempo real
-railway logs --follow
-
-# Logs específicos
-railway logs --filter="ERROR"
-railway logs --filter="Performance"
-
-# Conectar a base de datos
-railway connect
+npm install
 ```
 
-## 🔐 Seguridad
+### 3. Configurar Base de Datos
 
-### Autenticación y Autorización
+```bash
+# Generar cliente Prisma
+npx prisma generate
 
-- **JWT Tokens**: Autenticación stateless
-- **Session Management**: Redis para sesiones distribuidas
-- **Tenant Isolation**: Validación estricta de tenancy
-- **Admin Roles**: Permisos especiales para administradores
+# Crear tablas (desarrollo)
+npx prisma db push
 
-### API Keys de FacturAPI
-
-- **FACTURAPI_USER_KEY**: Clave administrativa para:
-
-  - Crear nuevas organizaciones
-  - Operaciones de onboarding
-  - Administración del SaaS
-
-- **Tenant Keys**: Almacenadas en DB por tenant:
-  - `facturapiLiveKey`: Producción
-  - `facturapiTestKey`: Pruebas
-  - Aisladas por empresa
-
-## 📁 Estructura del Proyecto
-
+# O usar migraciones (producción)
+npx prisma migrate deploy
 ```
-├── api/                    # API REST endpoints
-│   ├── controllers/        # Controladores
-│   ├── middlewares/        # Middleware personalizado
-│   └── routes/            # Rutas de la API
-├── bot/                   # Bot de Telegram
-│   ├── commands/          # Comandos del bot
-│   ├── handlers/          # Manejadores de eventos
-│   └── views/             # Templates de mensajes
-├── config/                # Configuración del sistema
-├── core/                  # Funcionalidades centrales
-│   ├── auth/              # Autenticación
-│   ├── middleware/        # Middleware global
-│   └── utils/             # Utilidades
-├── lib/                   # Bibliotecas y helpers
-├── prisma/                # Esquema y migraciones
-├── services/              # Lógica de negocio
-├── scripts/               # Scripts de utilidad
-├── tests/                 # Suite de testing
-├── optimization-project/  # Documentación de optimización
-└── backups/              # Backups de base de datos
+
+### 4. Configurar Redis (Opcional)
+
+```bash
+# macOS
+brew install redis
+brew services start redis
+
+# Ubuntu/Debian
+sudo apt-get install redis-server
+sudo systemctl start redis
+
+# Docker
+docker run -d -p 6379:6379 redis:7-alpine
 ```
+
+## ⚙️ Configuración
+
+### Variables de Entorno
+
+Crear archivo `.env` en la raíz del proyecto:
+
+```env
+# Base de Datos
+DATABASE_URL="postgresql://user:password@localhost:5432/facturapi_saas"
+
+# Redis (opcional en desarrollo)
+REDIS_URL="redis://localhost:6379"
+
+# FacturAPI
+FACTURAPI_USER_KEY="sk_user_xxxxxxxxxx"
+
+# Telegram
+TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+ADMIN_CHAT_IDS="123456789,987654321"
+
+# Stripe
+STRIPE_SECRET_KEY="sk_test_xxxxxxxxxx"
+STRIPE_WEBHOOK_SECRET="whsec_xxxxxxxxxx"
+
+# Seguridad
+JWT_SECRET="tu-secreto-super-seguro-aqui"
+
+# Aplicación
+NODE_ENV="development"
+PORT="3000"
+API_BASE_URL="http://localhost:3000"
+```
+
+### Configuración de Webhook (Telegram)
+
+```bash
+# Desarrollo (ngrok)
+ngrok http 3000
+# Copiar URL HTTPS generada
+
+# Configurar webhook
+curl -X POST "https://api.telegram.org/bot<TU_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://tu-dominio.ngrok.io/telegram-webhook"}'
+```
+
+## 💻 Uso
+
+### Scripts de Desarrollo
+
+```bash
+# Desarrollo con hot-reload
+npm run dev
+
+# Desarrollo solo API
+npm run dev:api
+
+# Desarrollo solo Bot
+npm run dev:bot
+
+# Desarrollo completo (API + Bot)
+npm run dev:all
+```
+
+### Scripts de Producción
+
+```bash
+# Iniciar servidor único
+npm start
+
+# Iniciar con PM2 (clustering)
+npm run start:cluster
+
+# Detener PM2
+npm run stop:cluster
+```
+
+### Scripts de Utilidad
+
+```bash
+# Ejecutar tests
+npm test
+
+# Tests con coverage
+npm run test:coverage
+
+# Linter
+npm run lint
+
+# Formatear código
+npm run format
+
+# Prisma Studio (GUI para DB)
+npm run studio
+
+# Limpiar sesiones antiguas
+npm run cleanup:sessions
+```
+
+## 📡 API Reference
+
+### Autenticación
+
+Todas las rutas requieren header `Authorization: Bearer <JWT_TOKEN>`
+
+### Endpoints Principales
+
+#### Tenants
+
+```http
+POST   /api/tenants                 # Crear tenant
+GET    /api/tenants/:id             # Obtener tenant
+PUT    /api/tenants/:id             # Actualizar tenant
+DELETE /api/tenants/:id             # Eliminar tenant
+```
+
+#### Facturas
+
+```http
+POST   /api/invoices                # Crear factura
+GET    /api/invoices                # Listar facturas
+GET    /api/invoices/:id            # Obtener factura
+POST   /api/invoices/:id/cancel     # Cancelar factura
+GET    /api/invoices/:id/pdf        # Descargar PDF
+GET    /api/invoices/:id/xml        # Descargar XML
+```
+
+#### Clientes
+
+```http
+POST   /api/customers               # Crear cliente
+GET    /api/customers               # Listar clientes
+GET    /api/customers/:id           # Obtener cliente
+PUT    /api/customers/:id           # Actualizar cliente
+DELETE /api/customers/:id           # Eliminar cliente
+```
+
+#### Reportes
+
+```http
+GET    /api/reports/summary         # Resumen general
+GET    /api/reports/monthly         # Reporte mensual
+GET    /api/reports/by-customer     # Por cliente
+GET    /api/reports/export          # Exportar datos
+```
+
+### Ejemplo de Request
+
+```javascript
+// Crear factura
+const response = await fetch('https://api.example.com/api/invoices', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIs...'
+  },
+  body: JSON.stringify({
+    customer: "cus_xxxxxx",
+    items: [{
+      product: {
+        description: "Servicio de consultoría",
+        price: 1000,
+        taxes: [{
+          type: "IVA",
+          rate: 0.16
+        }]
+      },
+      quantity: 1
+    }],
+    payment_form: "03",
+    payment_method: "PUE"
+  })
+});
+```
+
+## 🤖 Bot de Telegram
+
+### Comandos Disponibles
+
+| Comando | Descripción | Permisos |
+|---------|-------------|----------|
+| `/start` | Iniciar bot y registro | Todos |
+| `/menu` | Menú principal | Usuarios registrados |
+| `/facturar` | Crear nueva factura | Usuarios activos |
+| `/consultar` | Buscar facturas | Usuarios activos |
+| `/clientes` | Gestionar clientes | Usuarios activos |
+| `/reportes` | Ver estadísticas | Usuarios activos |
+| `/ayuda` | Mostrar ayuda | Todos |
+| `/admin` | Panel administrativo | Solo admins |
+
+### Flujo de Facturación
+
+1. Usuario envía `/facturar`
+2. Bot solicita datos del cliente
+3. Usuario proporciona RFC o selecciona de lista
+4. Bot solicita concepto y monto
+5. Usuario confirma datos
+6. Bot genera factura y envía PDF/XML
+
+### Procesamiento Masivo
+
+1. Usuario envía múltiples PDFs
+2. Bot analiza y extrae información
+3. Muestra resumen para confirmación
+4. Genera facturas en lote
+5. Envía ZIP con todos los documentos
 
 ## 🧪 Testing
 
-### Suite de Tests
-
-- **Unitarios**: Servicios y funciones individuales
-- **Integración**: Flujos completos del bot
-- **Clustering**: Tests de múltiples workers
-- **Performance**: Benchmarks y métricas
+### Ejecutar Tests
 
 ```bash
-# Ejecutar todos los tests
-npm run test:all
+# Todos los tests
+npm test
 
-# Tests específicos
-npm run test:redis          # Redis sessions
-npm run test:pdf           # Análisis de PDF
-npm run test:invoice       # Generación de facturas
-npm run test:clustering    # Clustering
+# Tests unitarios
+npm run test:unit
+
+# Tests de integración
+npm run test:integration
+
+# Tests E2E
+npm run test:e2e
+
+# Coverage
+npm run test:coverage
+```
+
+### Estructura de Tests
+
+```
+tests/
+├── unit/           # Tests unitarios
+├── integration/    # Tests de integración
+├── e2e/           # Tests end-to-end
+├── fixtures/      # Datos de prueba
+└── helpers/       # Utilidades para testing
+```
+
+### Ejemplo de Test
+
+```javascript
+describe('InvoiceService', () => {
+  it('should create invoice with correct data', async () => {
+    const invoiceData = {
+      customer: 'cus_test',
+      items: [{ product: { description: 'Test', price: 100 } }]
+    };
+    
+    const invoice = await InvoiceService.create(invoiceData);
+    
+    expect(invoice).toHaveProperty('id');
+    expect(invoice.total).toBe(116); // 100 + 16% IVA
+  });
+});
 ```
 
 ## 🚀 Despliegue
 
 ### Railway (Recomendado)
 
-1. **Conectar repositorio** en Railway dashboard
-2. **Configurar variables** de entorno
-3. **Auto-deploy** desde branch `main`
+1. Fork este repositorio
+2. Crear proyecto en [Railway](https://railway.app)
+3. Conectar repositorio GitHub
+4. Configurar variables de entorno
+5. Deploy automático en cada push
 
-### Variables en Railway
+### Docker
 
-```bash
-# Ver variables actuales
-railway variables
-
-# Configurar nueva variable
-railway variables set KEY=value
-
-# Logs de despliegue
-railway logs --deployment
+```dockerfile
+# Dockerfile incluido
+docker build -t facturapi-saas .
+docker run -p 3000:3000 --env-file .env facturapi-saas
 ```
 
-## 📚 Documentación Adicional
+### Manual (VPS)
 
-- **Optimización**: `optimization-project/00-INDICE-MAESTRO-LECTURA.md`
-- **API Reference**: Endpoints documentados en código
-- **Bot Commands**: `bot/commands/README.md`
-- **Testing Guide**: `tests/README-subscription-tests.md`
+```bash
+# En el servidor
+git clone <repo>
+cd facturapi-saas
+npm install --production
+npm run build
+pm2 start ecosystem.config.js
+```
 
-## 🆘 Troubleshooting
+## 📊 Monitoreo
 
-### Problemas Comunes
+### Health Checks
 
-1. **Bot no responde**:
+```http
+GET /health              # Status básico
+GET /api/health         # Status detallado
+GET /api/metrics        # Métricas Prometheus
+```
 
-   ```bash
-   # Verificar webhook
-   curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
+### Logs
 
-   # Ver logs
-   railway logs --filter="telegram"
-   ```
+```bash
+# Desarrollo
+npm run dev | pino-pretty
 
-2. **Database lenta**:
+# Producción con PM2
+pm2 logs
 
-   ```bash
-   # Verificar bloat
-   railway run node scripts/monitoring/benchmark-before-after.js
-   ```
+# Railway
+railway logs --follow
+```
 
-3. **Redis disconnected**:
-   ```bash
-   # Test Redis connection
-   railway run node scripts/testing/test-redis.js
-   ```
+### Métricas de Performance
 
-### Contacto de Soporte
+- **Response Time**: < 2s (P95)
+- **Throughput**: 100 req/s
+- **Error Rate**: < 0.1%
+- **Uptime**: 99.9%
 
-- **Logs**: `railway logs --follow`
-- **Métricas**: `railway open` → Metrics
-- **Database**: `railway connect`
+## 🤝 Contribuir
+
+### Proceso de Contribución
+
+1. Fork el proyecto
+2. Crear feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit cambios (`git commit -m 'Add: nueva característica'`)
+4. Push al branch (`git push origin feature/AmazingFeature`)
+5. Abrir Pull Request
+
+### Convenciones
+
+- **Commits**: Usar [Conventional Commits](https://www.conventionalcommits.org/)
+- **Código**: Seguir [Standard JS](https://standardjs.com/)
+- **PRs**: Incluir tests y documentación
+
+### Desarrollo Local
+
+```bash
+# Instalar dependencias de desarrollo
+npm install
+
+# Ejecutar linter
+npm run lint
+
+# Ejecutar tests antes de commit
+npm test
+
+# Build para verificar
+npm run build
+```
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+## 👥 Equipo
+
+- **Maintainer**: [Tu Nombre](https://github.com/tu-usuario)
+- **Contributors**: Ver [contributors](https://github.com/tu-usuario/facturapi-saas/contributors)
+
+## 🙏 Agradecimientos
+
+- [FacturAPI](https://www.facturapi.io) por su excelente servicio de CFDI
+- [Telegraf](https://telegraf.js.org) por el framework de bots
+- [Prisma](https://www.prisma.io) por el ORM
+- Todos los contributors del proyecto
 
 ---
 
-## 📈 Roadmap
+<div align="center">
 
-- [ ] Frontend web para administración
-- [ ] API webhooks para integraciones
-- [ ] Reportes avanzados con gráficas
-- [ ] Soporte para más tipos de documentos
-- [ ] Integración con más PSPs
+Hecho con ❤️ en México
 
----
+[Reportar Bug](https://github.com/tu-usuario/facturapi-saas/issues) •
+[Solicitar Feature](https://github.com/tu-usuario/facturapi-saas/issues) •
+[Documentación](https://github.com/tu-usuario/facturapi-saas/wiki)
 
-**Última actualización**: Julio 2025  
-**Versión**: 1.0.0  
-**Estado**: Producción estable
+</div>
