@@ -610,8 +610,8 @@ export function registerAdminCommands(bot) {
           settings: true,
           documents: true,
           payments: true,
-          auditLogs: true
-        }
+          auditLogs: true,
+        },
       });
 
       if (!tenant) {
@@ -619,7 +619,8 @@ export function registerAdminCommands(bot) {
       }
 
       // Mostrar información del tenant
-      const infoMessage = `🔍 **Tenant encontrado:**\n\n` +
+      const infoMessage =
+        `🔍 **Tenant encontrado:**\n\n` +
         `• **Empresa:** ${tenant.businessName}\n` +
         `• **RFC:** ${tenant.rfc}\n` +
         `• **Email:** ${tenant.email}\n` +
@@ -639,10 +640,9 @@ export function registerAdminCommands(bot) {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('✅ Confirmar Eliminación', `confirm_delete_${tenantId}`)],
-          [Markup.button.callback('❌ Cancelar', 'cancel_delete')]
-        ])
+          [Markup.button.callback('❌ Cancelar', 'cancel_delete')],
+        ]),
       });
-
     } catch (error) {
       console.error('Error verificando tenant:', error);
       await ctx.reply(`❌ Error: ${error.message}`);
@@ -659,18 +659,17 @@ export function registerAdminCommands(bot) {
 
       // Eliminar tenant (CASCADE eliminará automáticamente registros relacionados)
       const deletedTenant = await prisma.tenant.delete({
-        where: { id: tenantId }
+        where: { id: tenantId },
       });
 
       await ctx.editMessageText(
         `✅ **Tenant eliminado exitosamente:**\n\n` +
-        `• **ID:** ${deletedTenant.id}\n` +
-        `• **Empresa:** ${deletedTenant.businessName}\n` +
-        `• **RFC:** ${deletedTenant.rfc}\n\n` +
-        `🎯 Todos los registros relacionados fueron eliminados automáticamente.`,
+          `• **ID:** ${deletedTenant.id}\n` +
+          `• **Empresa:** ${deletedTenant.businessName}\n` +
+          `• **RFC:** ${deletedTenant.rfc}\n\n` +
+          `🎯 Todos los registros relacionados fueron eliminados automáticamente.`,
         { parse_mode: 'Markdown' }
       );
-
     } catch (error) {
       console.error('Error eliminando tenant:', error);
       await ctx.editMessageText(`❌ Error al eliminar tenant: ${error.message}`);

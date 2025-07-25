@@ -5,9 +5,9 @@ import { Markup } from 'telegraf';
  * Genera el teclado persistente con botón MENU
  */
 export function persistentKeyboard() {
-  return Markup.keyboard([
-    ['📱 MENU']
-  ]).resize().persistent();
+  return Markup.keyboard([['📱 MENU']])
+    .resize()
+    .persistent();
 }
 
 /**

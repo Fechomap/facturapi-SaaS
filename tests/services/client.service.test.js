@@ -59,7 +59,7 @@ describe('Client Service - setupPredefinedClients', () => {
     },
     {
       id: 81,
-      legalName: 'ARSA ASESORIA INTEGRAL PROFESIONAL',  
+      legalName: 'ARSA ASESORIA INTEGRAL PROFESIONAL',
       facturapiCustomerId: '6882acb931161708e773d529',
       tenantId: mockTenantId,
     },
@@ -81,7 +81,7 @@ describe('Client Service - setupPredefinedClients', () => {
   beforeEach(() => {
     // Reset all mocks
     jest.clearAllMocks();
-    
+
     // Setup default mocks
     mockPrisma.tenant.findUnique.mockResolvedValue(mockTenant);
     mockFacturapiService.getFacturapiClient.mockResolvedValue(mockFacturapiClient);
@@ -98,7 +98,10 @@ describe('Client Service - setupPredefinedClients', () => {
       // Arrange
       mockPrisma.tenantCustomer.findMany.mockResolvedValue(mockExistingCustomers);
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(mockExistingCustomers[0]);
-      mockPrisma.tenantCustomer.update.mockResolvedValue({ ...mockExistingCustomers[0], facturapiCustomerId: mockNewFacturapiCustomer.id });
+      mockPrisma.tenantCustomer.update.mockResolvedValue({
+        ...mockExistingCustomers[0],
+        facturapiCustomerId: mockNewFacturapiCustomer.id,
+      });
 
       // Act
       const results = await setupPredefinedClients(mockTenantId, true);
@@ -109,10 +112,10 @@ describe('Client Service - setupPredefinedClients', () => {
       });
 
       expect(mockFacturapiService.getFacturapiClient).toHaveBeenCalledWith(mockTenantId);
-      
+
       // Debe intentar eliminar el cliente existente de FacturAPI
       expect(mockFacturapiClient.customers.del).toHaveBeenCalledWith('6882acb6432628082e88d933');
-      
+
       // Debe crear nuevo cliente en FacturAPI
       expect(mockFacturapiClient.customers.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -153,8 +156,11 @@ describe('Client Service - setupPredefinedClients', () => {
       // Arrange
       mockPrisma.tenantCustomer.findMany.mockResolvedValue([mockExistingCustomers[0]]);
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(mockExistingCustomers[0]);
-      mockPrisma.tenantCustomer.update.mockResolvedValue({ ...mockExistingCustomers[0], facturapiCustomerId: mockNewFacturapiCustomer.id });
-      
+      mockPrisma.tenantCustomer.update.mockResolvedValue({
+        ...mockExistingCustomers[0],
+        facturapiCustomerId: mockNewFacturapiCustomer.id,
+      });
+
       // Simular que el cliente no existe en FacturAPI
       mockFacturapiClient.customers.del.mockRejectedValue(new Error('Customer not found'));
 
@@ -168,7 +174,7 @@ describe('Client Service - setupPredefinedClients', () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Cliente no existía en FacturAPI o error al eliminar')
       );
-      
+
       // Debe continuar y crear el nuevo cliente
       expect(mockFacturapiClient.customers.create).toHaveBeenCalled();
       expect(results[0].success).toBe(true);
@@ -192,10 +198,10 @@ describe('Client Service - setupPredefinedClients', () => {
       // Assert
       // NO debe intentar eliminar (no existe cliente)
       expect(mockFacturapiClient.customers.del).not.toHaveBeenCalled();
-      
+
       // Debe crear cliente en FacturAPI
       expect(mockFacturapiClient.customers.create).toHaveBeenCalled();
-      
+
       // Debe crear nuevo registro en BD local
       expect(mockPrisma.tenantCustomer.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -221,10 +227,10 @@ describe('Client Service - setupPredefinedClients', () => {
       // Assert
       // NO debe intentar eliminar clientes existentes
       expect(mockFacturapiClient.customers.del).not.toHaveBeenCalled();
-      
+
       // NO debe crear clientes en FacturAPI
       expect(mockFacturapiClient.customers.create).not.toHaveBeenCalled();
-      
+
       // NO debe limpiar cache
       expect(mockFacturapiService.clearClientCache).not.toHaveBeenCalled();
 
@@ -247,8 +253,9 @@ describe('Client Service - setupPredefinedClients', () => {
       mockPrisma.tenant.findUnique.mockResolvedValue(null);
 
       // Act & Assert
-      await expect(setupPredefinedClients('invalid-tenant-id', true))
-        .rejects.toThrow('No se encontró el tenant con ID invalid-tenant-id');
+      await expect(setupPredefinedClients('invalid-tenant-id', true)).rejects.toThrow(
+        'No se encontró el tenant con ID invalid-tenant-id'
+      );
     });
 
     test('debe lanzar error si el tenant no tiene API key', async () => {
@@ -259,8 +266,9 @@ describe('Client Service - setupPredefinedClients', () => {
       });
 
       // Act & Assert
-      await expect(setupPredefinedClients(mockTenantId, true))
-        .rejects.toThrow('no tiene una API key configurada');
+      await expect(setupPredefinedClients(mockTenantId, true)).rejects.toThrow(
+        'no tiene una API key configurada'
+      );
     });
 
     test('debe manejar errores al crear cliente en FacturAPI', async () => {
@@ -290,9 +298,21 @@ describe('Client Service - setupPredefinedClients', () => {
     test('debe procesar todos los 5 clientes predefinidos con forceAll=true', async () => {
       // Arrange - simular que existen los 5 clientes
       const allExistingCustomers = [
-        { id: 80, legalName: 'INFOASIST INFORMACION Y ASISTENCIA', facturapiCustomerId: 'old_id_1' },
-        { id: 81, legalName: 'ARSA ASESORIA INTEGRAL PROFESIONAL', facturapiCustomerId: 'old_id_2' },
-        { id: 82, legalName: 'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA', facturapiCustomerId: 'old_id_3' },
+        {
+          id: 80,
+          legalName: 'INFOASIST INFORMACION Y ASISTENCIA',
+          facturapiCustomerId: 'old_id_1',
+        },
+        {
+          id: 81,
+          legalName: 'ARSA ASESORIA INTEGRAL PROFESIONAL',
+          facturapiCustomerId: 'old_id_2',
+        },
+        {
+          id: 82,
+          legalName: 'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA',
+          facturapiCustomerId: 'old_id_3',
+        },
         { id: 83, legalName: 'CHUBB DIGITAL SERVICES', facturapiCustomerId: 'old_id_4' },
         { id: 84, legalName: 'AXA ASSISTANCE MEXICO', facturapiCustomerId: 'old_id_5' },
       ];
@@ -300,7 +320,7 @@ describe('Client Service - setupPredefinedClients', () => {
       mockPrisma.tenantCustomer.findMany.mockResolvedValue(allExistingCustomers);
       mockPrisma.tenantCustomer.findFirst.mockImplementation((query) => {
         return Promise.resolve(
-          allExistingCustomers.find(c => c.legalName === query.where.legalName)
+          allExistingCustomers.find((c) => c.legalName === query.where.legalName)
         );
       });
       mockPrisma.tenantCustomer.update.mockResolvedValue({ updated: true });
@@ -311,9 +331,9 @@ describe('Client Service - setupPredefinedClients', () => {
       // Assert
       // Los resultados incluyen clientes existentes + clientes recreados
       // Filtramos solo los clientes recreados para la verificación principal
-      const recreatedClients = results.filter(r => r.message === 'Cliente recreado en FacturAPI');
+      const recreatedClients = results.filter((r) => r.message === 'Cliente recreado en FacturAPI');
       expect(recreatedClients).toHaveLength(5); // Los 5 clientes predefinidos recreados
-      expect(results.every(r => r.success)).toBe(true);
+      expect(results.every((r) => r.success)).toBe(true);
       expect(mockFacturapiClient.customers.create).toHaveBeenCalledTimes(5);
       expect(mockPrisma.tenantCustomer.update).toHaveBeenCalledTimes(5);
       expect(mockFacturapiService.clearClientCache).toHaveBeenCalledWith(mockTenantId);

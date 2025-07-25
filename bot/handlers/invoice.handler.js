@@ -80,16 +80,6 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   const tempDir = ensureTempDirExists();
   const folioStr = folio || 'unknown';
 
-  // Intentar obtener la serie del estado del usuario
-  const series = ctx.userState?.series || 'A'; // 'A' como fallback
-  console.log(`Serie utilizada para el archivo: ${series}`);
-
-  // Construir el nombre del archivo con la serie correcta
-  const filePath = `${tempDir}/${series}${folioStr}.${formato}`;
-  console.log('Creando archivo temporal en:', filePath);
-
-  fs.createWriteStream(filePath);
-
   try {
     // Obtener el tenant ID del contexto del usuario
     const tenantId = ctx.userState?.tenantId;
@@ -99,7 +89,31 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
 
     // Obtener el cliente de FacturAPI para este tenant
     const facturapIService = (await import('../../services/facturapi.service.js')).default;
-    await facturapIService.getFacturapiClient(tenantId);
+    const facturapi = await facturapIService.getFacturapiClient(tenantId);
+
+    // Intentar obtener la serie de diferentes fuentes
+    let series = ctx.userState?.series || ctx.session?.series;
+
+    // Si no tenemos la serie, obtenerla directamente de la factura en FacturAPI
+    if (!series) {
+      try {
+        console.log(`Obteniendo información de la factura ${facturaId} de FacturAPI...`);
+        const invoice = await facturapi.invoices.retrieve(facturaId);
+        series = invoice.series || 'F';
+        console.log(`Serie obtenida de FacturAPI: ${series}`);
+      } catch (error) {
+        console.error('Error obteniendo serie de FacturAPI:', error);
+        series = 'F'; // Usar F como fallback en lugar de A
+      }
+    }
+
+    console.log(`Serie utilizada para el archivo: ${series}`);
+
+    // Construir el nombre del archivo con la serie correcta
+    const filePath = `${tempDir}/${series}${folioStr}.${formato}`;
+    console.log('Creando archivo temporal en:', filePath);
+
+    fs.createWriteStream(filePath);
 
     console.log(`Cliente FacturAPI obtenido para tenant ${tenantId}, descargando ${formato}...`);
 

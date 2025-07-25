@@ -63,19 +63,19 @@ describe('BatchProcessorService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Setup default mocks
     mockCtx.telegram.getFileLink.mockResolvedValue({
-      href: 'https://api.telegram.org/file/test.pdf'
+      href: 'https://api.telegram.org/file/test.pdf',
     });
-    
+
     mockAxios.mockResolvedValue({
       data: {
         pipe: jest.fn((writer) => {
           // Simular escritura exitosa
           setTimeout(() => writer.emit('finish'), 10);
-        })
-      }
+        }),
+      },
     });
   });
 
@@ -114,10 +114,12 @@ describe('BatchProcessorService', () => {
     });
 
     test('debe rechazar más de 10 PDFs', () => {
-      const documents = Array(11).fill().map((_, i) => ({
-        file_name: `test${i}.pdf`,
-        file_size: 1000
-      }));
+      const documents = Array(11)
+        .fill()
+        .map((_, i) => ({
+          file_name: `test${i}.pdf`,
+          file_size: 1000,
+        }));
 
       expect(() => {
         BatchProcessorService.default.validateBatch(documents);
@@ -153,14 +155,14 @@ describe('BatchProcessorService', () => {
         clientName: 'Test Client',
         orderNumber: '12345',
         totalAmount: 100,
-        confidence: 95
+        confidence: 95,
       };
 
       mockPDFAnalysisService.analyzePDF.mockResolvedValue(mockAnalysis);
 
       const pdfInfo = {
         filePath: '/temp/test.pdf',
-        originalName: 'test.pdf'
+        originalName: 'test.pdf',
       };
 
       const result = await BatchProcessorService.default.analyzeSinglePDF(pdfInfo, mockTenantId);
@@ -170,7 +172,7 @@ describe('BatchProcessorService', () => {
         fileName: 'test.pdf',
         filePath: '/temp/test.pdf',
         analysis: mockAnalysis,
-        processingTime: expect.any(Number)
+        processingTime: expect.any(Number),
       });
 
       expect(mockPDFAnalysisService.analyzePDF).toHaveBeenCalledWith('/temp/test.pdf');
@@ -181,7 +183,7 @@ describe('BatchProcessorService', () => {
 
       const pdfInfo = {
         filePath: '/temp/test.pdf',
-        originalName: 'test.pdf'
+        originalName: 'test.pdf',
       };
 
       const result = await BatchProcessorService.default.analyzeSinglePDF(pdfInfo, mockTenantId);
@@ -191,19 +193,19 @@ describe('BatchProcessorService', () => {
         fileName: 'test.pdf',
         filePath: '/temp/test.pdf',
         error: 'PDF corrupto',
-        processingTime: expect.any(Number)
+        processingTime: expect.any(Number),
       });
     });
 
     test('debe manejar timeout en análisis', async () => {
       // Mock que nunca resuelve para simular timeout
-      mockPDFAnalysisService.analyzePDF.mockImplementation(() => 
-        new Promise(() => {}) // Promise que nunca resuelve
+      mockPDFAnalysisService.analyzePDF.mockImplementation(
+        () => new Promise(() => {}) // Promise que nunca resuelve
       );
 
       const pdfInfo = {
         filePath: '/temp/test.pdf',
-        originalName: 'test.pdf'
+        originalName: 'test.pdf',
       };
 
       const result = await BatchProcessorService.default.analyzeSinglePDF(pdfInfo, mockTenantId);
@@ -218,12 +220,15 @@ describe('BatchProcessorService', () => {
       const mockClient = {
         id: 1,
         legalName: 'Test Client',
-        facturapiCustomerId: 'facturapi123'
+        facturapiCustomerId: 'facturapi123',
       };
 
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(mockClient);
 
-      const result = await BatchProcessorService.default.findClientInDatabase('Test Client', mockTenantId);
+      const result = await BatchProcessorService.default.findClientInDatabase(
+        'Test Client',
+        mockTenantId
+      );
 
       expect(result).toEqual(mockClient);
       expect(mockPrisma.tenantCustomer.findFirst).toHaveBeenCalledWith({
@@ -231,16 +236,19 @@ describe('BatchProcessorService', () => {
           tenantId: mockTenantId,
           OR: [
             { legalName: { equals: 'Test Client', mode: 'insensitive' } },
-            { legalName: { contains: 'Test Client', mode: 'insensitive' } }
-          ]
-        }
+            { legalName: { contains: 'Test Client', mode: 'insensitive' } },
+          ],
+        },
       });
     });
 
     test('debe retornar null si no encuentra cliente', async () => {
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(null);
 
-      const result = await BatchProcessorService.default.findClientInDatabase('Nonexistent Client', mockTenantId);
+      const result = await BatchProcessorService.default.findClientInDatabase(
+        'Nonexistent Client',
+        mockTenantId
+      );
 
       expect(result).toBeNull();
     });
@@ -248,7 +256,10 @@ describe('BatchProcessorService', () => {
     test('debe manejar errores de base de datos', async () => {
       mockPrisma.tenantCustomer.findFirst.mockRejectedValue(new Error('DB Error'));
 
-      const result = await BatchProcessorService.default.findClientInDatabase('Test Client', mockTenantId);
+      const result = await BatchProcessorService.default.findClientInDatabase(
+        'Test Client',
+        mockTenantId
+      );
 
       expect(result).toBeNull();
     });
@@ -265,46 +276,51 @@ describe('BatchProcessorService', () => {
             analysis: {
               clientName: 'Test Client',
               orderNumber: '12345',
-              totalAmount: 100
-            }
+              totalAmount: 100,
+            },
           },
           {
             success: false,
             fileName: 'test2.pdf',
-            error: 'Analysis failed'
-          }
+            error: 'Analysis failed',
+          },
         ],
-        tenantId: mockTenantId
+        tenantId: mockTenantId,
       };
 
       const mockClient = {
         id: 1,
         legalName: 'Test Client',
-        facturapiCustomerId: 'facturapi123'
+        facturapiCustomerId: 'facturapi123',
       };
 
       const mockInvoice = {
         facturaId: 'invoice123',
         folio: '001',
-        series: 'A'
+        series: 'A',
       };
 
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(mockClient);
       mockFacturapiQueueService.enqueue.mockResolvedValue(mockInvoice);
 
-      const result = await BatchProcessorService.default.generateBatchInvoices(mockBatchResults, mockCtx);
+      const result = await BatchProcessorService.default.generateBatchInvoices(
+        mockBatchResults,
+        mockCtx
+      );
 
       expect(result).toEqual({
         batchId: 'batch-123',
-        successful: [{
-          fileName: 'test1.pdf',
-          success: true,
-          invoice: mockInvoice,
-          client: mockClient,
-          analysis: mockBatchResults.results[0].analysis
-        }],
+        successful: [
+          {
+            fileName: 'test1.pdf',
+            success: true,
+            invoice: mockInvoice,
+            client: mockClient,
+            analysis: mockBatchResults.results[0].analysis,
+          },
+        ],
         failed: [],
-        total: 1
+        total: 1,
       });
 
       expect(mockFacturapiQueueService.enqueue).toHaveBeenCalledTimes(1);
@@ -320,22 +336,25 @@ describe('BatchProcessorService', () => {
             analysis: {
               clientName: 'Nonexistent Client',
               orderNumber: '12345',
-              totalAmount: 100
-            }
-          }
+              totalAmount: 100,
+            },
+          },
         ],
-        tenantId: mockTenantId
+        tenantId: mockTenantId,
       };
 
       mockPrisma.tenantCustomer.findFirst.mockResolvedValue(null);
 
-      const result = await BatchProcessorService.default.generateBatchInvoices(mockBatchResults, mockCtx);
+      const result = await BatchProcessorService.default.generateBatchInvoices(
+        mockBatchResults,
+        mockCtx
+      );
 
       expect(result.failed).toHaveLength(1);
       expect(result.failed[0]).toEqual({
         fileName: 'test1.pdf',
         success: false,
-        error: 'Cliente no encontrado: Nonexistent Client'
+        error: 'Cliente no encontrado: Nonexistent Client',
       });
 
       expect(mockFacturapiQueueService.enqueue).not.toHaveBeenCalled();
@@ -348,10 +367,10 @@ describe('BatchProcessorService', () => {
           {
             success: false,
             fileName: 'test1.pdf',
-            error: 'Analysis failed'
-          }
+            error: 'Analysis failed',
+          },
         ],
-        tenantId: mockTenantId
+        tenantId: mockTenantId,
       };
 
       await expect(
@@ -365,13 +384,13 @@ describe('BatchProcessorService', () => {
       const mockBatchResults = {
         batchId: 'batch-123',
         successful: 2,
-        failed: 1
+        failed: 1,
       };
 
-      const ctx = { 
+      const ctx = {
         userState: {},
         session: {},
-        saveSession: jest.fn().mockResolvedValue()
+        saveSession: jest.fn().mockResolvedValue(),
       };
 
       await BatchProcessorService.default.storeBatchResults(ctx, mockBatchResults);
@@ -380,7 +399,7 @@ describe('BatchProcessorService', () => {
         batchId: 'batch-123',
         results: mockBatchResults,
         timestamp: expect.any(Number),
-        status: 'completed'
+        status: 'completed',
       };
 
       expect(ctx.userState.batchProcessing).toEqual(expectedData);
@@ -392,11 +411,11 @@ describe('BatchProcessorService', () => {
       const mockBatchResults = {
         batchId: 'batch-123',
         successful: 2,
-        failed: 1
+        failed: 1,
       };
 
       const ctx = {
-        saveSession: jest.fn().mockResolvedValue()
+        saveSession: jest.fn().mockResolvedValue(),
       };
 
       await BatchProcessorService.default.storeBatchResults(ctx, mockBatchResults);
@@ -409,17 +428,17 @@ describe('BatchProcessorService', () => {
 
     test('debe manejar error al guardar sesión', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const mockBatchResults = {
         batchId: 'batch-123',
         successful: 2,
-        failed: 1
+        failed: 1,
       };
 
       const ctx = {
         userState: {},
         session: {},
-        saveSession: jest.fn().mockRejectedValue(new Error('Redis error'))
+        saveSession: jest.fn().mockRejectedValue(new Error('Redis error')),
       };
 
       await BatchProcessorService.default.storeBatchResults(ctx, mockBatchResults);
@@ -436,12 +455,12 @@ describe('BatchProcessorService', () => {
       const mockBatchResults = {
         batchId: 'batch-123',
         successful: 2,
-        failed: 1
+        failed: 1,
       };
 
-      const ctx = { 
+      const ctx = {
         userState: {},
-        session: {}
+        session: {},
       };
 
       // No debería lanzar error

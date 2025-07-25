@@ -686,7 +686,7 @@ async function handleBatchPDFs(ctx, document) {
         userId: ctx.from.id,
         tenantId: tenantId,
         createdAt: Date.now(),
-        timeout: null
+        timeout: null,
       });
 
       // Configurar timeout para procesar el lote automáticamente
@@ -702,15 +702,17 @@ async function handleBatchPDFs(ctx, document) {
     const buffer = mediaGroupBuffers.get(mediaGroupId);
     buffer.documents.push(document);
 
-    console.log(`📄 PDF agregado al lote: ${document.file_name} (${buffer.documents.length} archivos)`);
+    console.log(
+      `📄 PDF agregado al lote: ${document.file_name} (${buffer.documents.length} archivos)`
+    );
 
     // Si es el primer PDF del grupo, mostrar mensaje de recepción
     if (buffer.documents.length === 1) {
       await ctx.reply(
         `📥 **Recibiendo lote de PDFs...**\n\n` +
-        `🆔 **ID del lote:** \`${mediaGroupId}\`\n` +
-        `📄 **Archivos recibidos:** ${buffer.documents.length}\n\n` +
-        `⏳ **Esperando más archivos...** (procesamiento automático en 3s)`
+          `🆔 **ID del lote:** \`${mediaGroupId}\`\n` +
+          `📄 **Archivos recibidos:** ${buffer.documents.length}\n\n` +
+          `⏳ **Esperando más archivos...** (procesamiento automático en 3s)`
       );
     } else {
       // Editar mensaje existente con el conteo actualizado
@@ -721,20 +723,19 @@ async function handleBatchPDFs(ctx, document) {
         // Por simplicidad, enviaremos un nuevo mensaje
         await ctx.reply(
           `📥 **Lote actualizado**\n\n` +
-          `📄 **Archivos recibidos:** ${buffer.documents.length}\n` +
-          `⏳ **Procesando automáticamente...**`
+            `📄 **Archivos recibidos:** ${buffer.documents.length}\n` +
+            `⏳ **Procesando automáticamente...**`
         );
       } catch (error) {
         console.log('No se pudo actualizar mensaje de progreso:', error.message);
       }
     }
-
   } catch (error) {
     console.error(`❌ Error manejando PDF en lote:`, error.message);
     await ctx.reply(
       `❌ **Error procesando lote**\n\n` +
-      `💬 ${error.message}\n\n` +
-      `🔄 Por favor, intente enviando los PDFs nuevamente.`
+        `💬 ${error.message}\n\n` +
+        `🔄 Por favor, intente enviando los PDFs nuevamente.`
     );
   }
 }
@@ -744,7 +745,7 @@ async function handleBatchPDFs(ctx, document) {
  */
 async function processBatchFromBuffer(ctx, mediaGroupId) {
   const buffer = mediaGroupBuffers.get(mediaGroupId);
-  
+
   if (!buffer) {
     console.warn(`⚠️ Buffer no encontrado para media group ${mediaGroupId}`);
     return;
@@ -756,7 +757,7 @@ async function processBatchFromBuffer(ctx, mediaGroupId) {
   }
 
   const { documents, tenantId } = buffer;
-  
+
   console.log(`🚀 Iniciando procesamiento de lote con ${documents.length} PDFs`);
 
   try {
@@ -768,21 +769,32 @@ async function processBatchFromBuffer(ctx, mediaGroupId) {
     await progressTracker.startProgress(documents.length);
 
     // Fase 1: Procesar lote (análisis)
-    await progressTracker.updatePhase('download', 0, documents.length, 'Iniciando descarga de PDFs...');
-    
-    const batchResults = await BatchProcessorService.processBatch(ctx, documents, tenantId, mediaGroupId);
-    
+    await progressTracker.updatePhase(
+      'download',
+      0,
+      documents.length,
+      'Iniciando descarga de PDFs...'
+    );
+
+    const batchResults = await BatchProcessorService.processBatch(
+      ctx,
+      documents,
+      tenantId,
+      mediaGroupId
+    );
+
     // Almacenar resultados en sesión
     await BatchProcessorService.storeBatchResults(ctx, batchResults);
 
     // Mostrar resultados de análisis
     await progressTracker.showAnalysisResults(batchResults);
 
-    console.log(`✅ Lote ${mediaGroupId} analizado: ${batchResults.successful} exitosos, ${batchResults.failed} fallidos`);
-
+    console.log(
+      `✅ Lote ${mediaGroupId} analizado: ${batchResults.successful} exitosos, ${batchResults.failed} fallidos`
+    );
   } catch (error) {
     console.error(`❌ Error procesando lote ${mediaGroupId}:`, error.message);
-    
+
     const progressTracker = createBatchProgressTracker(ctx, mediaGroupId);
     await progressTracker.showError(error);
   } finally {
@@ -799,41 +811,46 @@ export function registerBatchHandlers(bot) {
   // Handler para confirmar generación de facturas por lotes
   bot.action(/^confirm_batch_(.+)$/, async (ctx) => {
     await ctx.answerCbQuery();
-    
+
     const batchId = ctx.match[1];
     console.log(`✅ Confirmación recibida para lote ${batchId}`);
 
     try {
       // CRÍTICO: Buscar primero en userState, luego en session (Redis)
       let batchProcessing = ctx.userState?.batchProcessing;
-      
+
       if (!batchProcessing || batchProcessing.batchId !== batchId) {
         // Intentar recuperar de session (Redis)
         batchProcessing = ctx.session?.batchProcessing;
-        
+
         if (!batchProcessing || batchProcessing.batchId !== batchId) {
           console.error(`❌ Datos de lote no encontrados:`, {
             requestedBatchId: batchId,
             userStateBatchId: ctx.userState?.batchProcessing?.batchId,
-            sessionBatchId: ctx.session?.batchProcessing?.batchId
+            sessionBatchId: ctx.session?.batchProcessing?.batchId,
           });
           return ctx.reply('❌ Sesión de lote expirada. Por favor, envíe los PDFs nuevamente.');
         }
-        
+
         // Restaurar en userState para uso local
         if (!ctx.userState) ctx.userState = {};
         ctx.userState.batchProcessing = batchProcessing;
         console.log(`💾 Datos de lote recuperados desde Redis: ${batchId}`);
       }
-      
+
       const batchResults = batchProcessing.results;
 
       const tenantId = ctx.getTenantId();
       const progressTracker = createBatchProgressTracker(ctx, batchId);
 
       // Fase 2: Generar facturas
-      await progressTracker.updatePhase('invoice_generation', 0, batchResults.successful, 'Generando facturas...');
-      
+      await progressTracker.updatePhase(
+        'invoice_generation',
+        0,
+        batchResults.successful,
+        'Generando facturas...'
+      );
+
       const invoiceResults = await BatchProcessorService.generateBatchInvoices(batchResults, ctx);
 
       if (invoiceResults.successful.length === 0) {
@@ -843,9 +860,9 @@ export function registerBatchHandlers(bot) {
 
       // Fase 3: Generar ZIPs
       await progressTracker.updatePhase('zip_creation', 0, 2, 'Creando archivos ZIP...');
-      
+
       const zipInfo = await ZipGeneratorService.createInvoiceZips(invoiceResults, tenantId);
-      
+
       // Almacenar info de ZIPs en sesión
       ctx.userState.batchProcessing.zipInfo = zipInfo;
 
@@ -855,8 +872,9 @@ export function registerBatchHandlers(bot) {
       // Mostrar resultados finales
       await progressTracker.showFinalResults(invoiceResults, zipInfo);
 
-      console.log(`🎉 Lote ${batchId} completado: ${invoiceResults.successful.length} facturas, ZIPs generados`);
-
+      console.log(
+        `🎉 Lote ${batchId} completado: ${invoiceResults.successful.length} facturas, ZIPs generados`
+      );
     } catch (error) {
       console.error(`❌ Error procesando confirmación de lote ${batchId}:`, error.message);
       const progressTracker = createBatchProgressTracker(ctx, batchId);
@@ -867,25 +885,23 @@ export function registerBatchHandlers(bot) {
   // Handler para cancelar procesamiento por lotes
   bot.action(/^cancel_batch_(.+)$/, async (ctx) => {
     await ctx.answerCbQuery();
-    
+
     const batchId = ctx.match[1];
     console.log(`❌ Lote cancelado: ${batchId}`);
 
     cleanupBatchProcessing(ctx);
-    
+
     await ctx.reply(
       '❌ **Procesamiento por lotes cancelado**\n\n' +
-      'Puede enviar PDFs nuevamente cuando esté listo.',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('🏠 Menú Principal', 'menu_principal')]
-      ])
+        'Puede enviar PDFs nuevamente cuando esté listo.',
+      Markup.inlineKeyboard([[Markup.button.callback('🏠 Menú Principal', 'menu_principal')]])
     );
   });
 
   // Handler para descargar ZIP de PDFs
   bot.action(/^download_pdf_zip_(.+)$/, async (ctx) => {
     await ctx.answerCbQuery('📄 Preparando descarga de PDFs...');
-    
+
     const batchId = ctx.match[1];
     await downloadZipFile(ctx, batchId, 'pdf');
   });
@@ -893,7 +909,7 @@ export function registerBatchHandlers(bot) {
   // Handler para descargar ZIP de XMLs
   bot.action(/^download_xml_zip_(.+)$/, async (ctx) => {
     await ctx.answerCbQuery('🗂️ Preparando descarga de XMLs...');
-    
+
     const batchId = ctx.match[1];
     await downloadZipFile(ctx, batchId, 'xml');
   });
@@ -906,21 +922,21 @@ async function downloadZipFile(ctx, batchId, type) {
   try {
     // CRÍTICO: Buscar primero en userState, luego en session (Redis)
     let batchProcessing = ctx.userState?.batchProcessing;
-    
+
     if (!batchProcessing || batchProcessing.batchId !== batchId) {
       batchProcessing = ctx.session?.batchProcessing;
-      
+
       if (!batchProcessing || batchProcessing.batchId !== batchId) {
         return ctx.reply('❌ Archivos ZIP no disponibles. El lote puede haber expirado.');
       }
-      
+
       // Restaurar en userState
       if (!ctx.userState) ctx.userState = {};
       ctx.userState.batchProcessing = batchProcessing;
     }
-    
+
     const zipInfo = batchProcessing.zipInfo;
-    
+
     if (!zipInfo) {
       return ctx.reply('❌ Archivos ZIP no disponibles. El lote puede haber expirado.');
     }
@@ -929,7 +945,9 @@ async function downloadZipFile(ctx, batchId, type) {
     const filePath = zipData.filePath;
 
     if (!fs.existsSync(filePath)) {
-      return ctx.reply('❌ El archivo ZIP ya no está disponible. Los archivos se eliminan automáticamente después de 30 minutos.');
+      return ctx.reply(
+        '❌ El archivo ZIP ya no está disponible. Los archivos se eliminan automáticamente después de 30 minutos.'
+      );
     }
 
     console.log(`📤 Enviando ${type.toUpperCase()} ZIP: ${zipData.fileName}`);
@@ -938,22 +956,22 @@ async function downloadZipFile(ctx, batchId, type) {
     await ctx.replyWithDocument(
       { source: fs.createReadStream(filePath), filename: zipData.fileName },
       {
-        caption: `📦 **${type.toUpperCase()} ZIP - Lote: \`${batchId}\`**\n\n` +
-                `📄 **Archivos:** ${zipData.fileCount}\n` +
-                `💾 **Tamaño:** ${zipData.fileSizeMB}MB\n` +
-                `⏰ **Generado:** ${new Date(zipInfo.createdAt).toLocaleString('es-MX')}`,
-        parse_mode: 'Markdown'
+        caption:
+          `📦 **${type.toUpperCase()} ZIP - Lote: \`${batchId}\`**\n\n` +
+          `📄 **Archivos:** ${zipData.fileCount}\n` +
+          `💾 **Tamaño:** ${zipData.fileSizeMB}MB\n` +
+          `⏰ **Generado:** ${new Date(zipInfo.createdAt).toLocaleString('es-MX')}`,
+        parse_mode: 'Markdown',
       }
     );
 
     console.log(`✅ ${type.toUpperCase()} ZIP enviado exitosamente: ${zipData.fileName}`);
-
   } catch (error) {
     console.error(`❌ Error enviando ${type} ZIP:`, error.message);
     ctx.reply(
       `❌ **Error enviando archivo ZIP**\n\n` +
-      `💬 ${error.message}\n\n` +
-      `🔄 Por favor, intente nuevamente.`
+        `💬 ${error.message}\n\n` +
+        `🔄 Por favor, intente nuevamente.`
     );
   }
 }

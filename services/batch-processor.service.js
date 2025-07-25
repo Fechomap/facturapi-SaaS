@@ -44,9 +44,11 @@ class BatchProcessorService {
     }
 
     // Validar que todos sean PDFs
-    const nonPdfFiles = documents.filter(doc => !doc.file_name?.match(/\.pdf$/i));
+    const nonPdfFiles = documents.filter((doc) => !doc.file_name?.match(/\.pdf$/i));
     if (nonPdfFiles.length > 0) {
-      throw new Error(`Todos los archivos deben ser PDF. Archivos inválidos: ${nonPdfFiles.length}`);
+      throw new Error(
+        `Todos los archivos deben ser PDF. Archivos inválidos: ${nonPdfFiles.length}`
+      );
     }
 
     // Validar tamaño total
@@ -101,15 +103,15 @@ class BatchProcessorService {
    */
   static async analyzeSinglePDF(pdfInfo, tenantId) {
     const startTime = Date.now();
-    
+
     try {
       console.log(`🔍 Analizando: ${pdfInfo.originalName}`);
-      
+
       const analysis = await Promise.race([
         PDFAnalysisService.analyzePDF(pdfInfo.filePath),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Timeout de análisis')), 30000)
-        )
+        ),
       ]);
 
       const processingTime = Date.now() - startTime;
@@ -120,7 +122,7 @@ class BatchProcessorService {
         fileName: pdfInfo.originalName,
         filePath: pdfInfo.filePath,
         analysis,
-        processingTime
+        processingTime,
       };
     } catch (error) {
       const processingTime = Date.now() - startTime;
@@ -131,7 +133,7 @@ class BatchProcessorService {
         fileName: pdfInfo.originalName,
         filePath: pdfInfo.filePath,
         error: error.message,
-        processingTime
+        processingTime,
       };
     }
   }
@@ -143,7 +145,7 @@ class BatchProcessorService {
     // Usar el mediaGroupId pasado como parámetro o intentar obtenerlo del contexto
     const groupId = mediaGroupId || ctx.message?.media_group_id;
     const batchId = this.generateBatchId(groupId, ctx.from.id);
-    
+
     console.log(`🚀 Iniciando procesamiento de lote: ${batchId}`);
     console.log(`📊 PDFs a procesar: ${documents.length}`);
 
@@ -153,18 +155,18 @@ class BatchProcessorService {
 
       // Fase 1: Descarga paralela
       console.log('📥 Fase 1: Descargando PDFs...');
-      const downloadPromises = documents.map(doc => 
-        this.downloadPDF(ctx, doc, batchId).catch(error => ({
+      const downloadPromises = documents.map((doc) =>
+        this.downloadPDF(ctx, doc, batchId).catch((error) => ({
           success: false,
           fileName: doc.file_name || 'unknown',
-          error: error.message
+          error: error.message,
         }))
       );
 
       const downloadResults = await Promise.allSettled(downloadPromises);
       const successfulDownloads = downloadResults
-        .filter(result => result.status === 'fulfilled' && result.value.filePath)
-        .map(result => result.value);
+        .filter((result) => result.status === 'fulfilled' && result.value.filePath)
+        .map((result) => result.value);
 
       if (successfulDownloads.length === 0) {
         throw new Error('No se pudo descargar ningún PDF');
@@ -174,20 +176,20 @@ class BatchProcessorService {
 
       // Fase 2: Análisis paralelo
       console.log('🔍 Fase 2: Analizando PDFs...');
-      const analysisPromises = successfulDownloads.map(pdfInfo => 
+      const analysisPromises = successfulDownloads.map((pdfInfo) =>
         this.analyzeSinglePDF(pdfInfo, tenantId)
       );
 
       const analysisResults = await Promise.allSettled(analysisPromises);
       const processedResults = analysisResults
-        .filter(result => result.status === 'fulfilled')
-        .map(result => result.value);
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value);
 
       // Limpiar archivos temporales
       this.cleanupTempFiles(successfulDownloads);
 
-      const successCount = processedResults.filter(r => r.success).length;
-      const failureCount = processedResults.filter(r => !r.success).length;
+      const successCount = processedResults.filter((r) => r.success).length;
+      const failureCount = processedResults.filter((r) => !r.success).length;
 
       console.log(`📊 Resultados del lote ${batchId}:`);
       console.log(`✅ Exitosos: ${successCount}`);
@@ -199,9 +201,8 @@ class BatchProcessorService {
         successful: successCount,
         failed: failureCount,
         results: processedResults,
-        tenantId
+        tenantId,
       };
-
     } catch (error) {
       console.error(`❌ Error en procesamiento de lote ${batchId}:`, error.message);
       throw error;
@@ -213,7 +214,7 @@ class BatchProcessorService {
    */
   static async generateBatchInvoices(batchResults, ctx) {
     const { batchId, results, tenantId } = batchResults;
-    const successfulAnalyses = results.filter(r => r.success && r.analysis);
+    const successfulAnalyses = results.filter((r) => r.success && r.analysis);
 
     if (successfulAnalyses.length === 0) {
       throw new Error('No hay análisis exitosos para generar facturas');
@@ -224,37 +225,40 @@ class BatchProcessorService {
     const invoicePromises = successfulAnalyses.map(async (result, index) => {
       try {
         const analysis = result.analysis;
-        
+
         // Buscar cliente en BD local
         const cliente = await this.findClientInDatabase(analysis.clientName, tenantId);
-        
+
         if (!cliente) {
           return {
             fileName: result.fileName,
             success: false,
-            error: `Cliente no encontrado: ${analysis.clientName}`
+            error: `Cliente no encontrado: ${analysis.clientName}`,
           };
         }
 
         // Usar el queue service existente para generar la factura
         const invoice = await facturapiQueueService.enqueue(
           async () => {
-            return await InvoiceService.generateInvoice({
-              clienteId: cliente.facturapiCustomerId,
-              localCustomerDbId: cliente.id,
-              clienteNombre: cliente.legalName,
-              numeroPedido: analysis.orderNumber,
-              claveProducto: '78101803', // Código genérico de servicios
-              monto: analysis.totalAmount,
-              userId: ctx.from.id
-            }, tenantId);
+            return await InvoiceService.generateInvoice(
+              {
+                clienteId: cliente.facturapiCustomerId,
+                localCustomerDbId: cliente.id,
+                clienteNombre: cliente.legalName,
+                numeroPedido: analysis.orderNumber,
+                claveProducto: '78101803', // Código genérico de servicios
+                monto: analysis.totalAmount,
+                userId: ctx.from.id,
+              },
+              tenantId
+            );
           },
           'batch-processing',
-          { 
-            batchId, 
+          {
+            batchId,
             fileName: result.fileName,
             clientName: analysis.clientName,
-            orderNumber: analysis.orderNumber
+            orderNumber: analysis.orderNumber,
           },
           2 // Prioridad media para lotes
         );
@@ -266,26 +270,25 @@ class BatchProcessorService {
           success: true,
           invoice,
           client: cliente,
-          analysis
+          analysis,
         };
-
       } catch (error) {
         console.error(`❌ Error generando factura para ${result.fileName}:`, error.message);
         return {
           fileName: result.fileName,
           success: false,
-          error: error.message
+          error: error.message,
         };
       }
     });
 
     const invoiceResults = await Promise.allSettled(invoicePromises);
     const processedInvoices = invoiceResults
-      .filter(result => result.status === 'fulfilled')
-      .map(result => result.value);
+      .filter((result) => result.status === 'fulfilled')
+      .map((result) => result.value);
 
-    const successfulInvoices = processedInvoices.filter(r => r.success);
-    const failedInvoices = processedInvoices.filter(r => !r.success);
+    const successfulInvoices = processedInvoices.filter((r) => r.success);
+    const failedInvoices = processedInvoices.filter((r) => !r.success);
 
     console.log(`📊 Facturas generadas para lote ${batchId}:`);
     console.log(`✅ Exitosas: ${successfulInvoices.length}`);
@@ -295,7 +298,7 @@ class BatchProcessorService {
       batchId,
       successful: successfulInvoices,
       failed: failedInvoices,
-      total: processedInvoices.length
+      total: processedInvoices.length,
     };
   }
 
@@ -306,16 +309,16 @@ class BatchProcessorService {
     try {
       // Importar prisma aquí para evitar dependencias circulares
       const { default: prisma } = await import('../lib/prisma.js');
-      
+
       // Buscar por nombre exacto primero
-      let cliente = await prisma.tenantCustomer.findFirst({
+      const cliente = await prisma.tenantCustomer.findFirst({
         where: {
           tenantId,
           OR: [
             { legalName: { equals: clientName, mode: 'insensitive' } },
-            { legalName: { contains: clientName, mode: 'insensitive' } }
-          ]
-        }
+            { legalName: { contains: clientName, mode: 'insensitive' } },
+          ],
+        },
       });
 
       return cliente;
@@ -329,7 +332,7 @@ class BatchProcessorService {
    * Limpia archivos temporales
    */
   static cleanupTempFiles(downloadedFiles) {
-    downloadedFiles.forEach(fileInfo => {
+    downloadedFiles.forEach((fileInfo) => {
       try {
         if (fileInfo.filePath && fs.existsSync(fileInfo.filePath)) {
           fs.unlinkSync(fileInfo.filePath);
@@ -356,12 +359,12 @@ class BatchProcessorService {
       batchId: batchResults.batchId,
       results: batchResults,
       timestamp: Date.now(),
-      status: 'completed'
+      status: 'completed',
     };
 
     // Guardar en userState (memoria local)
     ctx.userState.batchProcessing = batchData;
-    
+
     // CRÍTICO: Guardar también en session (Redis persistente)
     ctx.session.batchProcessing = batchData;
 

@@ -45,7 +45,7 @@ const ZipGeneratorService = await import('../../services/zip-generator.service.j
 describe('ZipGeneratorService', () => {
   const mockTenantId = 'test-tenant-123';
   const mockBatchId = 'batch-test-456';
-  
+
   const mockInvoiceResults = {
     batchId: mockBatchId,
     successful: [
@@ -173,10 +173,9 @@ describe('ZipGeneratorService', () => {
 
       await ZipGeneratorService.default.createInvoiceZips(mockInvoiceResults, mockTenantId);
 
-      expect(mockFs.mkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining('temp'),
-        { recursive: true }
-      );
+      expect(mockFs.mkdirSync).toHaveBeenCalledWith(expect.stringContaining('temp'), {
+        recursive: true,
+      });
     });
 
     test('debe limpiar archivos en caso de error', async () => {
@@ -378,11 +377,7 @@ describe('ZipGeneratorService', () => {
         series: 'A',
       };
 
-      const fileName = ZipGeneratorService.default.generateFileName(
-        invoiceResult,
-        invoice,
-        'pdf'
-      );
+      const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'pdf');
 
       expect(fileName).toBe('A123_ORD_001_Empresa_Test_SA.pdf');
     });
@@ -395,11 +390,7 @@ describe('ZipGeneratorService', () => {
 
       const invoice = {};
 
-      const fileName = ZipGeneratorService.default.generateFileName(
-        invoiceResult,
-        invoice,
-        'xml'
-      );
+      const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'xml');
 
       expect(fileName).toBe('ASIN_FOLIO_SIN_ORDEN_CLIENTE.xml');
     });
@@ -415,11 +406,7 @@ describe('ZipGeneratorService', () => {
         series: 'B',
       };
 
-      const fileName = ZipGeneratorService.default.generateFileName(
-        invoiceResult,
-        invoice,
-        'pdf'
-      );
+      const fileName = ZipGeneratorService.default.generateFileName(invoiceResult, invoice, 'pdf');
 
       expect(fileName).toBe('B456_ORD_001_TEST_2024_Empresa_Cia_SA_.pdf');
     });

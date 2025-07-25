@@ -16,7 +16,9 @@ jest.unstable_mockModule('telegraf', () => ({
 }));
 
 // Importar utilidades a testear
-const { createBatchProgressTracker, cleanupBatchProcessing } = await import('../../../core/utils/batch-progress.utils.js');
+const { createBatchProgressTracker, cleanupBatchProcessing } = await import(
+  '../../../core/utils/batch-progress.utils.js'
+);
 
 describe('BatchProgressTracker', () => {
   let mockCtx;
@@ -118,9 +120,7 @@ describe('BatchProgressTracker', () => {
       mockCtx.telegram.editMessageText.mockRejectedValue(error);
 
       // No debería lanzar error
-      await expect(
-        progressTracker.updatePhase('analysis', 1, 3)
-      ).resolves.not.toThrow();
+      await expect(progressTracker.updatePhase('analysis', 1, 3)).resolves.not.toThrow();
     });
 
     test('debe manejar otros errores de edición', async () => {
@@ -129,10 +129,7 @@ describe('BatchProgressTracker', () => {
 
       await progressTracker.updatePhase('analysis', 1, 3);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error actualizando progreso:',
-        'Network error'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Error actualizando progreso:', 'Network error');
 
       consoleSpy.mockRestore();
     });
@@ -179,7 +176,7 @@ describe('BatchProgressTracker', () => {
           analysis: {
             clientName: 'Cliente Test 1',
             orderNumber: 'ORD-001',
-            totalAmount: 100.50,
+            totalAmount: 100.5,
           },
         },
         {
@@ -384,12 +381,14 @@ describe('BatchProgressTracker', () => {
         expect.stringContaining('❌ **Error en Procesamiento por Lotes**'),
         {
           parse_mode: 'Markdown',
-          inline_keyboard: [[
-            expect.objectContaining({
-              text: '🏠 Menú Principal',
-              callback_data: 'menu_principal',
-            }),
-          ]],
+          inline_keyboard: [
+            [
+              expect.objectContaining({
+                text: '🏠 Menú Principal',
+                callback_data: 'menu_principal',
+              }),
+            ],
+          ],
         }
       );
     });
@@ -410,10 +409,7 @@ describe('BatchProgressTracker', () => {
 
       await progressTracker.showError(testError);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error mostrando mensaje de error:',
-        'Edit error'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Error mostrando mensaje de error:', 'Edit error');
 
       consoleSpy.mockRestore();
     });
@@ -449,7 +445,7 @@ describe('BatchProgressTracker', () => {
 describe('cleanupBatchProcessing', () => {
   test('debe limpiar estado de batch processing', () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    
+
     const mockCtx = {
       from: { id: 12345 },
       userState: {
@@ -465,7 +461,7 @@ describe('cleanupBatchProcessing', () => {
 
     expect(mockCtx.userState.batchProcessing).toBeUndefined();
     expect(mockCtx.userState.otherData).toBe('should remain');
-    
+
     expect(consoleSpy).toHaveBeenCalledWith(
       expect.stringContaining('🧹 Estado de batch processing limpiado para usuario 12345')
     );

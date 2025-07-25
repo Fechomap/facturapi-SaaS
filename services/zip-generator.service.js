@@ -38,7 +38,7 @@ class ZipGeneratorService {
       // Crear ZIPs en paralelo
       const [pdfZipInfo, xmlZipInfo] = await Promise.all([
         this.createPDFZip(successfulInvoices, pdfZipPath, tenantId),
-        this.createXMLZip(successfulInvoices, xmlZipPath, tenantId)
+        this.createXMLZip(successfulInvoices, xmlZipPath, tenantId),
       ]);
 
       console.log(`✅ ZIPs generados para lote ${batchId}:`);
@@ -50,9 +50,8 @@ class ZipGeneratorService {
         pdfZip: pdfZipInfo,
         xmlZip: xmlZipInfo,
         invoiceCount: successfulInvoices.length,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
-
     } catch (error) {
       // Limpiar archivos parciales en caso de error
       this.cleanupZipFiles([pdfZipPath, xmlZipPath]);
@@ -67,7 +66,7 @@ class ZipGeneratorService {
     console.log(`📄 Creando ZIP de PDFs: ${path.basename(zipPath)}`);
 
     const archive = archiver('zip', {
-      zlib: { level: 6 } // Compresión media para balance entre tamaño y velocidad
+      zlib: { level: 6 }, // Compresión media para balance entre tamaño y velocidad
     });
 
     const output = fs.createWriteStream(zipPath);
@@ -80,7 +79,7 @@ class ZipGeneratorService {
       try {
         const invoice = invoiceResult.invoice;
         const facturaId = invoice.facturaId || invoice.id;
-        
+
         if (!facturaId) {
           console.warn(`⚠️ ID de factura no encontrado para ${invoiceResult.fileName}`);
           continue;
@@ -91,20 +90,19 @@ class ZipGeneratorService {
         // Descargar PDF de FacturAPI con timeout
         const pdfBuffer = await Promise.race([
           this.downloadInvoicePDF(facturapi, facturaId),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout descargando PDF')), 30000)
-          )
+          ),
         ]);
 
         // Generar nombre de archivo único
         const fileName = this.generateFileName(invoiceResult, invoice, 'pdf');
-        
+
         // Agregar al ZIP
         archive.append(pdfBuffer, { name: fileName });
         addedFiles++;
 
         console.log(`✅ PDF agregado al ZIP: ${fileName}`);
-
       } catch (error) {
         console.error(`❌ Error procesando PDF para ${invoiceResult.fileName}:`, error.message);
         // Continuar con otros archivos aunque uno falle
@@ -121,13 +119,13 @@ class ZipGeneratorService {
     });
 
     const stats = fs.statSync(zipPath);
-    
+
     return {
       filePath: zipPath,
       fileName: path.basename(zipPath),
       fileCount: addedFiles,
       fileSizeBytes: stats.size,
-      fileSizeMB: Math.round(stats.size / (1024 * 1024) * 100) / 100
+      fileSizeMB: Math.round((stats.size / (1024 * 1024)) * 100) / 100,
     };
   }
 
@@ -138,7 +136,7 @@ class ZipGeneratorService {
     console.log(`🗂️ Creando ZIP de XMLs: ${path.basename(zipPath)}`);
 
     const archive = archiver('zip', {
-      zlib: { level: 6 }
+      zlib: { level: 6 },
     });
 
     const output = fs.createWriteStream(zipPath);
@@ -151,7 +149,7 @@ class ZipGeneratorService {
       try {
         const invoice = invoiceResult.invoice;
         const facturaId = invoice.facturaId || invoice.id;
-        
+
         if (!facturaId) {
           console.warn(`⚠️ ID de factura no encontrado para ${invoiceResult.fileName}`);
           continue;
@@ -162,20 +160,19 @@ class ZipGeneratorService {
         // Descargar XML de FacturAPI con timeout
         const xmlBuffer = await Promise.race([
           this.downloadInvoiceXML(facturapi, facturaId),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout descargando XML')), 30000)
-          )
+          ),
         ]);
 
         // Generar nombre de archivo único
         const fileName = this.generateFileName(invoiceResult, invoice, 'xml');
-        
+
         // Agregar al ZIP
         archive.append(xmlBuffer, { name: fileName });
         addedFiles++;
 
         console.log(`✅ XML agregado al ZIP: ${fileName}`);
-
       } catch (error) {
         console.error(`❌ Error procesando XML para ${invoiceResult.fileName}:`, error.message);
         // Continuar con otros archivos aunque uno falle
@@ -192,13 +189,13 @@ class ZipGeneratorService {
     });
 
     const stats = fs.statSync(zipPath);
-    
+
     return {
       filePath: zipPath,
       fileName: path.basename(zipPath),
       fileCount: addedFiles,
       fileSizeBytes: stats.size,
-      fileSizeMB: Math.round(stats.size / (1024 * 1024) * 100) / 100
+      fileSizeMB: Math.round((stats.size / (1024 * 1024)) * 100) / 100,
     };
   }
 
@@ -210,20 +207,20 @@ class ZipGeneratorService {
       // Usar axios directamente ya que facturapi.invoices.pdf no existe
       const axios = (await import('axios')).default;
       const apiUrl = `https://www.facturapi.io/v2/invoices/${facturaId}/pdf`;
-      
+
       // Obtener el API key del cliente facturapi
       const apiKey = facturapi.apiKey || facturapi._apiKey;
-      
+
       const response = await axios({
         method: 'GET',
         url: apiUrl,
         responseType: 'arraybuffer',
         headers: {
-          Authorization: `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`,
         },
-        timeout: 30000
+        timeout: 30000,
       });
-      
+
       return Buffer.from(response.data);
     } catch (error) {
       console.error(`Error descargando PDF ${facturaId}:`, error.message);
@@ -243,20 +240,20 @@ class ZipGeneratorService {
       // Usar axios directamente ya que facturapi.invoices.xml no existe
       const axios = (await import('axios')).default;
       const apiUrl = `https://www.facturapi.io/v2/invoices/${facturaId}/xml`;
-      
+
       // Obtener el API key del cliente facturapi
       const apiKey = facturapi.apiKey || facturapi._apiKey;
-      
+
       const response = await axios({
         method: 'GET',
         url: apiUrl,
         responseType: 'arraybuffer',
         headers: {
-          Authorization: `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`,
         },
-        timeout: 30000
+        timeout: 30000,
       });
-      
+
       return Buffer.from(response.data);
     } catch (error) {
       console.error(`Error descargando XML ${facturaId}:`, error.message);
@@ -274,13 +271,16 @@ class ZipGeneratorService {
   static generateFileName(invoiceResult, invoice, extension) {
     const orderNumber = invoiceResult.analysis?.orderNumber || 'SIN_ORDEN';
     const folio = invoice.folio || invoice.folioNumber || 'SIN_FOLIO';
-    const serie = invoice.series || 'A';
+    const serie = invoice.series || invoice.serie || 'A'; // Soportar ambos campos por compatibilidad
     const clientName = invoiceResult.client?.legalName || 'CLIENTE';
-    
+
     // Limpiar caracteres especiales
     const cleanOrderNumber = orderNumber.toString().replace(/[^a-zA-Z0-9]/g, '_');
-    const cleanClientName = clientName.substring(0, 20).replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-    
+    const cleanClientName = clientName
+      .substring(0, 20)
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .replace(/\s+/g, '_');
+
     return `${serie}${folio}_${cleanOrderNumber}_${cleanClientName}.${extension}`;
   }
 
@@ -288,7 +288,7 @@ class ZipGeneratorService {
    * Limpia archivos ZIP temporales
    */
   static cleanupZipFiles(zipPaths) {
-    zipPaths.forEach(zipPath => {
+    zipPaths.forEach((zipPath) => {
       try {
         if (fs.existsSync(zipPath)) {
           fs.unlinkSync(zipPath);
@@ -305,11 +305,14 @@ class ZipGeneratorService {
    */
   static scheduleCleanup(zipInfo, delayMinutes = 30) {
     const { pdfZip, xmlZip } = zipInfo;
-    
-    setTimeout(() => {
-      this.cleanupZipFiles([pdfZip.filePath, xmlZip.filePath]);
-      console.log(`🧹 Limpieza automática ejecutada para lote ${zipInfo.batchId}`);
-    }, delayMinutes * 60 * 1000);
+
+    setTimeout(
+      () => {
+        this.cleanupZipFiles([pdfZip.filePath, xmlZip.filePath]);
+        console.log(`🧹 Limpieza automática ejecutada para lote ${zipInfo.batchId}`);
+      },
+      delayMinutes * 60 * 1000
+    );
 
     console.log(`⏰ Limpieza programada en ${delayMinutes} minutos para lote ${zipInfo.batchId}`);
   }
@@ -328,9 +331,9 @@ class ZipGeneratorService {
         filePath: zipPath,
         fileName: path.basename(zipPath),
         fileSizeBytes: stats.size,
-        fileSizeMB: Math.round(stats.size / (1024 * 1024) * 100) / 100,
+        fileSizeMB: Math.round((stats.size / (1024 * 1024)) * 100) / 100,
         createdAt: stats.birthtime,
-        modifiedAt: stats.mtime
+        modifiedAt: stats.mtime,
       };
     } catch (error) {
       console.error(`Error obteniendo info del ZIP ${zipPath}:`, error.message);

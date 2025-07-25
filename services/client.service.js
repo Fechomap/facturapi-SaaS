@@ -172,16 +172,22 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
 
         // Si forceAll = true Y existe cliente, recrearlo en FacturAPI
         if (existingCustomer && forceAll) {
-          console.log(`🔄 Recreando cliente ${clientData.legal_name} en FacturAPI (forceAll=true)...`);
-          
+          console.log(
+            `🔄 Recreando cliente ${clientData.legal_name} en FacturAPI (forceAll=true)...`
+          );
+
           // Intentar eliminar cliente existente en FacturAPI (si existe)
           try {
             if (existingCustomer.facturapiCustomerId) {
               await facturapi.customers.del(existingCustomer.facturapiCustomerId);
-              console.log(`🗑️ Cliente eliminado de FacturAPI: ${existingCustomer.facturapiCustomerId}`);
+              console.log(
+                `🗑️ Cliente eliminado de FacturAPI: ${existingCustomer.facturapiCustomerId}`
+              );
             }
           } catch (deleteError) {
-            console.log(`⚠️ Cliente no existía en FacturAPI o error al eliminar: ${deleteError.message}`);
+            console.log(
+              `⚠️ Cliente no existía en FacturAPI o error al eliminar: ${deleteError.message}`
+            );
           }
         }
 
@@ -201,7 +207,9 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
               isActive: true,
             },
           });
-          console.log(`✅ Cliente actualizado: ${nuevoCliente.legal_name} (nuevo ID: ${nuevoCliente.id})`);
+          console.log(
+            `✅ Cliente actualizado: ${nuevoCliente.legal_name} (nuevo ID: ${nuevoCliente.id})`
+          );
         } else {
           // Crear nuevo cliente
           await prisma.tenantCustomer.create({
@@ -222,7 +230,8 @@ async function setupPredefinedClients(tenantId, forceAll = false) {
           legalName: clientData.legal_name,
           success: true,
           id: nuevoCliente.id,
-          message: existingCustomer && forceAll ? 'Cliente recreado en FacturAPI' : 'Cliente creado',
+          message:
+            existingCustomer && forceAll ? 'Cliente recreado en FacturAPI' : 'Cliente creado',
         });
 
         await new Promise((resolve) => setTimeout(resolve, 2000));

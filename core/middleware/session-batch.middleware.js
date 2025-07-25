@@ -48,7 +48,7 @@ export function sessionBatchMiddleware(ctx, next) {
     // Combinar userState y session para batch processing
     const combinedState = {
       ...ctx.userState,
-      ...ctx.session
+      ...ctx.session,
     };
 
     // Agregar a la cola de actualizaciones
