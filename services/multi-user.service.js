@@ -1,9 +1,9 @@
 // feature-multiuser/services/multi-user.service.js
 // Servicio para gestión de múltiples usuarios por tenant
 
-import prisma from '../../lib/prisma.js';
-import logger from '../../core/utils/logger.js';
-import { USER_ROLES } from '../middleware/multi-auth.middleware.js';
+import prisma from '../lib/prisma.js';
+import logger from '../core/utils/logger.js';
+import { USER_ROLES } from '../bot/middlewares/multi-auth.middleware.js';
 
 // Logger específico
 const multiUserLogger = logger.child({ module: 'multi-user-service' });

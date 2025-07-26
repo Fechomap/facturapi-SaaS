@@ -75,10 +75,33 @@ export default async function multiUserAuthMiddleware(ctx, next) {
     }
 
     // 3. Buscar usuario en BD con su tenant y rol
-    const userAccess = await findUserAccess(telegramId);
+    // Obtener tenantId del contexto si está disponible (para usuarios existentes)
+    const existingTenantId = ctx.getTenantId ? ctx.getTenantId() : null;
+    let userAccess = await findUserAccess(telegramId, existingTenantId);
+
     if (!userAccess) {
       multiAuthLogger.warn({ telegramId }, 'Usuario no autorizado');
       return ctx.reply('⛔ No estás registrado en el sistema. Usa /registro para comenzar.');
+    }
+
+    // Manejar caso de múltiples empresas
+    if (userAccess.multipleAccess) {
+      multiAuthLogger.info({ telegramId }, 'Usuario con acceso a múltiples empresas');
+      // Por ahora usar la primera empresa autorizada
+      const authorizedAccess = userAccess.availableAccess.find((a) => a.isAuthorized);
+      if (!authorizedAccess) {
+        return ctx.reply('⏳ Tus accesos están pendientes de autorización en todas las empresas.');
+      }
+      // Recursivamente buscar con tenantId específico
+      const specificAccess = await findUserAccess(telegramId, authorizedAccess.tenantId);
+      if (specificAccess) {
+        userAccess = specificAccess;
+      }
+    }
+
+    if (!userAccess || userAccess.multipleAccess) {
+      multiAuthLogger.warn({ telegramId }, 'No se pudo resolver acceso del usuario');
+      return ctx.reply('❌ Error al procesar tu acceso. Contacta al administrador.');
     }
 
     // 4. Verificar que el usuario esté activo y autorizado
@@ -128,22 +151,60 @@ export default async function multiUserAuthMiddleware(ctx, next) {
  * Busca acceso del usuario en la BD
  * Compatible con schema actual Y futuro multiusuario
  */
-async function findUserAccess(telegramId) {
+async function findUserAccess(telegramId, tenantId = null) {
   try {
-    // NOTA: Por ahora usa el schema actual (telegramId único)
-    // Después de la migración, esto cambiará para soportar múltiples usuarios por tenant
-    const user = await prisma.tenantUser.findUnique({
-      where: { telegramId: BigInt(telegramId) },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            businessName: true,
-            isActive: true,
+    let user;
+
+    if (tenantId) {
+      // Si tenemos tenantId, usar constraint compuesto
+      user = await prisma.tenantUser.findUnique({
+        where: {
+          tenantId_telegramId: {
+            tenantId: tenantId,
+            telegramId: BigInt(telegramId),
           },
         },
-      },
-    });
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              businessName: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+    } else {
+      // Sin tenantId, buscar todos los accesos de este usuario
+      const users = await prisma.tenantUser.findMany({
+        where: { telegramId: BigInt(telegramId) },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              businessName: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      if (users.length === 0) return null;
+      if (users.length === 1) {
+        user = users[0];
+      } else {
+        // Múltiples empresas - devolver info especial
+        return {
+          multipleAccess: true,
+          availableAccess: users.map((u) => ({
+            tenantId: u.tenantId,
+            businessName: u.tenant.businessName,
+            role: u.role,
+            isAuthorized: u.isAuthorized,
+          })),
+        };
+      }
+    }
 
     if (!user) return null;
 

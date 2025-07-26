@@ -2,8 +2,8 @@
 // Comandos de Telegram para gestión de usuarios multiusuario
 
 import { Markup } from 'telegraf';
-import MultiUserService from '../services/multi-user.service.js';
-import { USER_ROLES, checkPermission } from './multi-auth.middleware.js';
+import MultiUserService from '../../services/multi-user.service.js';
+import { USER_ROLES, checkPermission } from '../middlewares/multi-auth.middleware.js';
 import logger from '../../core/utils/logger.js';
 
 const userMgmtLogger = logger.child({ module: 'user-management-commands' });
@@ -69,8 +69,8 @@ export function registerUserManagementCommands(bot) {
         'Envía el ID de Telegram del usuario que quieres invitar.\n\n' +
         '💡 *¿Cómo obtener el ID?*\n' +
         '• Pide al usuario que le escriba a @userinfobot\n' +
-        '• O usa @username_to_id_bot\n\n' +
-        'Ejemplo: `123456789`',
+        '• O usa @username\\_to\\_id\\_bot\n\n' +
+        'Ejemplo: 123456789',
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', 'cancel_invite')]]),
@@ -124,7 +124,7 @@ export function registerUserManagementCommands(bot) {
 
       // Validar que sea un número
       if (!/^\d+$/.test(telegramId)) {
-        return ctx.reply('❌ ID inválido. Debe ser solo números.\n\n' + 'Ejemplo: `123456789`', {
+        return ctx.reply('❌ ID inválido. Debe ser solo números.\n\n' + 'Ejemplo: 123456789', {
           parse_mode: 'Markdown',
         });
       }

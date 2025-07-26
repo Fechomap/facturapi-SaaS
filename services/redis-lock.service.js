@@ -1,7 +1,7 @@
 // feature-multiuser/services/redis-lock.service.js
 // Servicio de locks distribuidos con Redis para control de concurrencia
 
-import logger from '../../core/utils/logger.js';
+import logger from '../core/utils/logger.js';
 
 const lockLogger = logger.child({ module: 'redis-lock-service' });
 

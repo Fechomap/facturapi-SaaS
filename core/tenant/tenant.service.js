@@ -231,12 +231,24 @@ class TenantService {
     );
 
     try {
-      return await prisma.tenantUser.findUnique({
+      // DESPUÉS DE MIGRACIÓN: Usar findMany porque telegramId ya no es único
+      // Un usuario puede estar en múltiples tenants
+      const users = await prisma.tenantUser.findMany({
         where: { telegramId: telegramIdBigInt },
         include: {
           tenant: true,
         },
+        orderBy: { createdAt: 'desc' },
       });
+
+      if (users.length === 0) return null;
+      
+      // Si hay múltiples usuarios, prioritizar el autorizado más reciente
+      const authorizedUser = users.find(user => user.isAuthorized && user.tenant.isActive);
+      if (authorizedUser) return authorizedUser;
+      
+      // Si no hay autorizado, devolver el más reciente
+      return users[0];
     } catch (error) {
       tenantLogger.error(
         { error, telegramId: telegramIdBigInt.toString() },

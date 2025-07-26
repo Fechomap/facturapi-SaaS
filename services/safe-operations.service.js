@@ -1,10 +1,10 @@
 // feature-multiuser/services/safe-operations.service.js
 // Wrapper para operaciones críticas con control de concurrencia
 
-import TenantService from '../../services/tenant.service.js';
-import InvoiceService from '../../services/invoice.service.js';
+import TenantService from './tenant.service.js';
+import InvoiceService from './invoice.service.js';
 import redisLockService from './redis-lock.service.js';
-import logger from '../../core/utils/logger.js';
+import logger from '../core/utils/logger.js';
 
 const safeOpsLogger = logger.child({ module: 'safe-operations' });
 
