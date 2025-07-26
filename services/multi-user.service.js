@@ -3,7 +3,8 @@
 
 import prisma from '../lib/prisma.js';
 import logger from '../core/utils/logger.js';
-import { USER_ROLES } from '../bot/middlewares/multi-auth.middleware.js';
+import { USER_ROLES, invalidateUserCache } from '../bot/middlewares/multi-auth.middleware.js';
+import redisSessionService from './redis-session.service.js';
 
 // Logger específico
 const multiUserLogger = logger.child({ module: 'multi-user-service' });
@@ -308,7 +309,7 @@ class MultiUserService {
         }
       }
 
-      // Remover usuario
+      // Remover usuario de tenantUser
       const deletedUser = await prisma.tenantUser.deleteMany({
         where: {
           tenantId,
@@ -320,13 +321,28 @@ class MultiUserService {
         throw new Error('Usuario no encontrado');
       }
 
+      // CRÍTICO: También eliminar de userSession para evitar recreación automática de sesión
+      await prisma.userSession.deleteMany({
+        where: {
+          telegramId: BigInt(telegramId),
+        },
+      });
+
+      // Invalidar TODOS los cachés del usuario eliminado para forzar re-autenticación inmediata
+      const authCacheInvalidated = invalidateUserCache(telegramId);
+      
+      // Invalidar sesión Redis del usuario eliminado
+      const redisResult = await redisSessionService.deleteSession(telegramId);
+      
       multiUserLogger.info(
         {
           tenantId,
           telegramId,
           removedBy,
+          authCacheInvalidated,
+          redisCacheInvalidated: redisResult.success,
         },
-        'Usuario removido del tenant'
+        'Usuario removido del tenant y TODOS los cachés invalidados'
       );
 
       return true;

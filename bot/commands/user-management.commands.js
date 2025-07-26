@@ -3,7 +3,7 @@
 
 import { Markup } from 'telegraf';
 import MultiUserService from '../../services/multi-user.service.js';
-import { USER_ROLES, checkPermission } from '../middlewares/multi-auth.middleware.js';
+import { USER_ROLES, checkPermission, invalidateUserCache } from '../middlewares/multi-auth.middleware.js';
 import logger from '../../core/utils/logger.js';
 
 const userMgmtLogger = logger.child({ module: 'user-management-commands' });
@@ -190,19 +190,12 @@ export function registerUserManagementCommands(bot) {
 
       const keyboard = [];
 
-      // Autorizar/Desautorizar
-      if (user.isAuthorized) {
-        keyboard.push([
-          Markup.button.callback('⏸️ Desautorizar', `unauthorize_${targetTelegramId}`),
-        ]);
-      } else {
+      // Autorizar (solo si el usuario no está autorizado)
+      if (!user.isAuthorized) {
         keyboard.push([Markup.button.callback('✅ Autorizar', `authorize_${targetTelegramId}`)]);
       }
 
-      // Cambiar rol
-      keyboard.push([Markup.button.callback('🔄 Cambiar rol', `change_role_${targetTelegramId}`)]);
-
-      // Remover (peligroso)
+      // Remover usuario
       keyboard.push([
         Markup.button.callback('🗑️ Remover usuario', `remove_user_${targetTelegramId}`),
       ]);
@@ -245,6 +238,9 @@ export function registerUserManagementCommands(bot) {
     try {
       await MultiUserService.authorizeUser(ctx.getTenantId(), targetTelegramId, true, ctx.from.id);
 
+      // CRÍTICO: Invalidar caché inmediatamente después de autorizar
+      invalidateUserCache(targetTelegramId);
+
       ctx.reply('✅ Usuario autorizado exitosamente.');
 
       // Simular click para volver a mostrar el usuario
@@ -260,17 +256,96 @@ export function registerUserManagementCommands(bot) {
     }
   });
 
-  // Desautorizar usuario
-  bot.action(/unauthorize_(\d+)/, checkPermission('user:manage'), async (ctx) => {
+  // Remover usuario
+  bot.action(/remove_user_(\d+)/, checkPermission('user:manage'), async (ctx) => {
     await ctx.answerCbQuery();
     const targetTelegramId = ctx.match[1];
 
     try {
-      await MultiUserService.authorizeUser(ctx.getTenantId(), targetTelegramId, false, ctx.from.id);
+      const user = await MultiUserService.findUser(ctx.getTenantId(), targetTelegramId);
+      if (!user) {
+        return ctx.reply('❌ Usuario no encontrado.');
+      }
 
-      ctx.reply('⏸️ Usuario desautorizado.');
+      // Mostrar confirmación
+      ctx.reply(
+        `⚠️ *Confirmar eliminación*\n\n` +
+        `¿Estás seguro de que quieres remover a este usuario?\n\n` +
+        `👤 Usuario: ${user.displayName}\n` +
+        `🆔 ID: ${user.telegramId}\n` +
+        `👑 Rol: ${getRoleEmoji(user.role)} ${user.role}\n\n` +
+        `⚠️ *Esta acción no se puede deshacer*`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [
+              Markup.button.callback('✅ Sí, remover', `confirm_remove_${targetTelegramId}`),
+              Markup.button.callback('❌ Cancelar', `manage_user_${targetTelegramId}`)
+            ]
+          ])
+        }
+      );
     } catch (error) {
-      ctx.reply(`❌ Error: ${error.message}`);
+      userMgmtLogger.error(
+        {
+          tenantId: ctx.getTenantId(),
+          targetTelegramId,
+          error: error.message,
+        },
+        'Error al mostrar confirmación de eliminación'
+      );
+      ctx.reply('❌ Error al cargar usuario para eliminar.');
+    }
+  });
+
+  // Confirmar eliminación de usuario
+  bot.action(/confirm_remove_(\d+)/, checkPermission('user:manage'), async (ctx) => {
+    await ctx.answerCbQuery();
+    const targetTelegramId = ctx.match[1];
+
+    try {
+      const user = await MultiUserService.findUser(ctx.getTenantId(), targetTelegramId);
+      if (!user) {
+        return ctx.reply('❌ Usuario no encontrado.');
+      }
+
+      // Eliminar usuario
+      await MultiUserService.removeUser(ctx.getTenantId(), targetTelegramId, ctx.from.id);
+
+      // CRÍTICO: Invalidar caché inmediatamente después de remover
+      invalidateUserCache(targetTelegramId);
+
+      ctx.reply(
+        `✅ *Usuario removido exitosamente*\n\n` +
+        `👤 ${user.displayName} ha sido eliminado del sistema.\n\n` +
+        `🔔 Este usuario ya no podrá acceder al bot.`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('👥 Ver usuarios', 'menu_usuarios')],
+            [Markup.button.callback('🔙 Menú principal', 'menu_principal')]
+          ])
+        }
+      );
+
+      userMgmtLogger.info(
+        {
+          tenantId: ctx.getTenantId(),
+          removedUserId: targetTelegramId,
+          removedBy: ctx.from.id,
+        },
+        'Usuario removido exitosamente'
+      );
+    } catch (error) {
+      userMgmtLogger.error(
+        {
+          tenantId: ctx.getTenantId(),
+          targetTelegramId,
+          error: error.message,
+        },
+        'Error al remover usuario'
+      );
+      ctx.reply(`❌ Error al remover usuario: ${error.message}`);
     }
   });
 

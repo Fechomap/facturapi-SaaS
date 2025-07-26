@@ -262,12 +262,14 @@ function isPublicCommand(ctx) {
  * Obtiene permisos desde cache si están vigentes
  */
 function getCachedPermissions(telegramId) {
-  const cached = permissionsCache.get(telegramId);
+  // Asegurar que siempre usamos string como clave para consistencia
+  const key = telegramId.toString();
+  const cached = permissionsCache.get(key);
   if (!cached) return null;
 
   const now = Date.now();
   if (now - cached.lastUpdated > CACHE_DURATION) {
-    permissionsCache.delete(telegramId);
+    permissionsCache.delete(key);
     return null;
   }
 
@@ -278,7 +280,9 @@ function getCachedPermissions(telegramId) {
  * Cachea permisos de usuario
  */
 function cachePermissions(telegramId, data) {
-  permissionsCache.set(telegramId, {
+  // Asegurar que siempre usamos string como clave para consistencia
+  const key = telegramId.toString();
+  permissionsCache.set(key, {
     ...data,
     lastUpdated: Date.now(),
   });
@@ -321,6 +325,44 @@ export function checkPermission(requiredPermission) {
     }
     return next();
   };
+}
+
+/**
+ * Invalida el caché de permisos para un usuario específico
+ * @param {string|number} telegramId - ID de Telegram del usuario
+ */
+export function invalidateUserCache(telegramId) {
+  const stringKey = telegramId.toString();
+  const numberKey = Number(telegramId);
+  
+  // Intentar eliminar tanto la clave string como number para asegurar limpieza completa
+  const hadStringCache = permissionsCache.has(stringKey);
+  const hadNumberCache = permissionsCache.has(numberKey);
+  
+  permissionsCache.delete(stringKey);
+  permissionsCache.delete(numberKey);
+  
+  // También limpiar cualquier clave que pueda coincidir
+  for (const [key, value] of permissionsCache.entries()) {
+    if (key == telegramId || key === stringKey || key === numberKey) {
+      permissionsCache.delete(key);
+    }
+  }
+  
+  const hadCache = hadStringCache || hadNumberCache;
+  
+  multiAuthLogger.info(
+    { 
+      telegramId, 
+      hadStringCache, 
+      hadNumberCache, 
+      hadCache,
+      cacheSize: permissionsCache.size 
+    },
+    'Cache de permisos invalidado completamente'
+  );
+  
+  return hadCache;
 }
 
 /**
