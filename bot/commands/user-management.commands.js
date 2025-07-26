@@ -149,7 +149,7 @@ export function registerUserManagementCommands(bot) {
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('👥 Ver usuarios', 'menu_usuarios')],
+              [Markup.button.callback('⚙️ Gestionar usuarios', 'manage_users')],
               [Markup.button.callback('🔙 Menú principal', 'menu_principal')],
             ]),
           }
@@ -322,7 +322,6 @@ export function registerUserManagementCommands(bot) {
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('👥 Ver usuarios', 'menu_usuarios')],
             [Markup.button.callback('🔙 Menú principal', 'menu_principal')]
           ])
         }
