@@ -242,11 +242,11 @@ class TenantService {
       });
 
       if (users.length === 0) return null;
-      
+
       // Si hay múltiples usuarios, prioritizar el autorizado más reciente
-      const authorizedUser = users.find(user => user.isAuthorized && user.tenant.isActive);
+      const authorizedUser = users.find((user) => user.isAuthorized && user.tenant.isActive);
       if (authorizedUser) return authorizedUser;
-      
+
       // Si no hay autorizado, devolver el más reciente
       return users[0];
     } catch (error) {

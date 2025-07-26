@@ -334,34 +334,34 @@ export function checkPermission(requiredPermission) {
 export function invalidateUserCache(telegramId) {
   const stringKey = telegramId.toString();
   const numberKey = Number(telegramId);
-  
+
   // Intentar eliminar tanto la clave string como number para asegurar limpieza completa
   const hadStringCache = permissionsCache.has(stringKey);
   const hadNumberCache = permissionsCache.has(numberKey);
-  
+
   permissionsCache.delete(stringKey);
   permissionsCache.delete(numberKey);
-  
+
   // También limpiar cualquier clave que pueda coincidir
   for (const [key, value] of permissionsCache.entries()) {
     if (key == telegramId || key === stringKey || key === numberKey) {
       permissionsCache.delete(key);
     }
   }
-  
+
   const hadCache = hadStringCache || hadNumberCache;
-  
+
   multiAuthLogger.info(
-    { 
-      telegramId, 
-      hadStringCache, 
-      hadNumberCache, 
+    {
+      telegramId,
+      hadStringCache,
+      hadNumberCache,
       hadCache,
-      cacheSize: permissionsCache.size 
+      cacheSize: permissionsCache.size,
     },
     'Cache de permisos invalidado completamente'
   );
-  
+
   return hadCache;
 }
 

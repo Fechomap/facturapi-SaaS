@@ -3,7 +3,11 @@
 
 import { Markup } from 'telegraf';
 import MultiUserService from '../../services/multi-user.service.js';
-import { USER_ROLES, checkPermission, invalidateUserCache } from '../middlewares/multi-auth.middleware.js';
+import {
+  USER_ROLES,
+  checkPermission,
+  invalidateUserCache,
+} from '../middlewares/multi-auth.middleware.js';
 import logger from '../../core/utils/logger.js';
 
 const userMgmtLogger = logger.child({ module: 'user-management-commands' });
@@ -270,19 +274,19 @@ export function registerUserManagementCommands(bot) {
       // Mostrar confirmación
       ctx.reply(
         `⚠️ *Confirmar eliminación*\n\n` +
-        `¿Estás seguro de que quieres remover a este usuario?\n\n` +
-        `👤 Usuario: ${user.displayName}\n` +
-        `🆔 ID: ${user.telegramId}\n` +
-        `👑 Rol: ${getRoleEmoji(user.role)} ${user.role}\n\n` +
-        `⚠️ *Esta acción no se puede deshacer*`,
+          `¿Estás seguro de que quieres remover a este usuario?\n\n` +
+          `👤 Usuario: ${user.displayName}\n` +
+          `🆔 ID: ${user.telegramId}\n` +
+          `👑 Rol: ${getRoleEmoji(user.role)} ${user.role}\n\n` +
+          `⚠️ *Esta acción no se puede deshacer*`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [
               Markup.button.callback('✅ Sí, remover', `confirm_remove_${targetTelegramId}`),
-              Markup.button.callback('❌ Cancelar', `manage_user_${targetTelegramId}`)
-            ]
-          ])
+              Markup.button.callback('❌ Cancelar', `manage_user_${targetTelegramId}`),
+            ],
+          ]),
         }
       );
     } catch (error) {
@@ -317,13 +321,13 @@ export function registerUserManagementCommands(bot) {
 
       ctx.reply(
         `✅ *Usuario removido exitosamente*\n\n` +
-        `👤 ${user.displayName} ha sido eliminado del sistema.\n\n` +
-        `🔔 Este usuario ya no podrá acceder al bot.`,
+          `👤 ${user.displayName} ha sido eliminado del sistema.\n\n` +
+          `🔔 Este usuario ya no podrá acceder al bot.`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Menú principal', 'menu_principal')]
-          ])
+            [Markup.button.callback('🔙 Menú principal', 'menu_principal')],
+          ]),
         }
       );
 

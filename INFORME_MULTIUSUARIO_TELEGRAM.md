@@ -38,6 +38,7 @@ Este informe documenta el análisis técnico profundo realizado sobre el sistema
 ### 🔄 **RESOLUCIÓN DE PROBLEMA CRÍTICO**:
 
 **2025-07-26**: ✅ **PROBLEMA CRÍTICO RESUELTO**
+
 - **Issue**: Nuevos usuarios autorizados no podían usar `/start` debido a middleware tenant conflictivo
 - **Causa**: Función `findUserByTelegramId` aún usaba constraint único obsoleto
 - **Solución**: Migrada a `findMany` con lógica de priorización de usuarios autorizados

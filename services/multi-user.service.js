@@ -330,10 +330,10 @@ class MultiUserService {
 
       // Invalidar TODOS los cachés del usuario eliminado para forzar re-autenticación inmediata
       const authCacheInvalidated = invalidateUserCache(telegramId);
-      
+
       // Invalidar sesión Redis del usuario eliminado
       const redisResult = await redisSessionService.deleteSession(telegramId);
-      
+
       multiUserLogger.info(
         {
           tenantId,
