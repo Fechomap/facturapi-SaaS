@@ -16,7 +16,7 @@ export function persistentKeyboard() {
 export function mainMenu() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('📝 Generar Factura', 'menu_generar')],
-    [Markup.button.callback('📂 Subir PDF de Pedido', 'menu_subir_pdf')],
+    [Markup.button.callback('👥 Usuarios', 'menu_usuarios')],
     [Markup.button.callback('🔍 Consultar Factura', 'menu_consultar')],
     [Markup.button.callback('📊 Reportes', 'menu_reportes')],
     [Markup.button.callback('💳 Mi Suscripción', 'menu_suscripcion')],

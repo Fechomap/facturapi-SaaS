@@ -4,6 +4,7 @@ import { mainMenu, reportsMenu } from '../views/menu.view.js';
 
 // Importar utilidades de limpieza de estado
 import { cleanupFlowChange } from '../../core/utils/state-cleanup.utils.js';
+import { USER_ROLES } from '../middlewares/multi-auth.middleware.js';
 
 /**
  * Registra el comando menu (/menu) y acciones relacionadas
@@ -106,26 +107,68 @@ export function registerMenuCommand(bot) {
     await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_suscripcion');
   });
 
-  // Acción para subir PDF de pedido
-  bot.action('menu_subir_pdf', async (ctx) => {
+  // Acción para gestión de usuarios
+  bot.action('menu_usuarios', async (ctx) => {
     await ctx.answerCbQuery();
 
     if (!ctx.hasTenant()) {
       return ctx.reply(
-        'Para subir un PDF de pedido, primero debes registrar tu empresa.',
+        'Para gestionar usuarios, primero debes registrar tu empresa.',
         Markup.inlineKeyboard([
           [Markup.button.callback('📝 Registrar empresa', 'start_registration')],
         ])
       );
     }
 
-    await ctx.reply(
-      '📂 *Subir PDF de Pedido*\n\n' +
-        'Envíame el PDF del pedido de compra para analizarlo automáticamente y generar la factura.\n\n' +
-        '✅ Funcionará con pedidos de *ARSA*, *INFOASIST* y *SOS*.\n' +
-        '📌 La clave SAT (`78101803`) se asignará automáticamente.\n\n' +
-        'Por favor, adjunta ahora el archivo PDF:',
-      { parse_mode: 'Markdown' }
-    );
+    // Ejecutar la misma lógica que el comando /usuarios
+    try {
+      const tenantId = ctx.getTenantId();
+      const MultiUserService = (await import('../../services/multi-user.service.js')).default;
+      const users = await MultiUserService.getTenantUsers(tenantId);
+      const stats = await MultiUserService.getTenantStats(tenantId);
+
+      if (users.length === 0) {
+        return ctx.reply('👥 No hay usuarios registrados en tu empresa.');
+      }
+
+      let message = `👥 *Usuarios de tu empresa* (${stats.total})\n\n`;
+      message += `📊 *Estadísticas:*\n`;
+      message += `• Autorizados: ${stats.authorized}\n`;
+      message += `• Pendientes: ${stats.pending}\n`;
+      message += `• Admins: ${stats.byRole.admin || 0}\n`;
+      message += `• Operadores: ${stats.byRole.operator || 0}\n`;
+      message += `• Viewers: ${stats.byRole.viewer || 0}\n\n`;
+
+      message += `👤 *Lista de usuarios:*\n`;
+      users.forEach((user, index) => {
+        const status = user.isAuthorized ? '✅' : '⏳';
+        const roleEmoji = getRoleEmoji(user.role);
+        message += `${index + 1}. ${status} ${roleEmoji} ${user.displayName}\n`;
+        message += `   ID: ${user.telegramId} | Rol: ${user.role}\n`;
+      });
+
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback('➕ Invitar Usuario', 'invite_user')],
+        [Markup.button.callback('⚙️ Gestionar', 'manage_users')],
+        [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
+      ]);
+
+      ctx.reply(message, { parse_mode: 'Markdown', ...keyboard });
+    } catch (error) {
+      console.error('Error al mostrar usuarios desde menú:', error);
+      ctx.reply('❌ Error al obtener la lista de usuarios.');
+    }
   });
+}
+
+/**
+ * Obtiene emoji para el rol
+ */
+function getRoleEmoji(role) {
+  const emojis = {
+    [USER_ROLES.ADMIN]: '👑',
+    [USER_ROLES.OPERATOR]: '👤',
+    [USER_ROLES.VIEWER]: '👁️',
+  };
+  return emojis[role] || '❓';
 }
