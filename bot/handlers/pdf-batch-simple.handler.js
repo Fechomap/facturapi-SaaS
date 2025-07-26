@@ -374,10 +374,24 @@ export function handleBatchGenerateInvoices(bot) {
               Markup.button.callback('📄 Descargar PDFs', 'batch_download_pdfs'),
               Markup.button.callback('📋 Descargar XMLs', 'batch_download_xmls'),
             ],
-            [Markup.button.callback('✅ Finalizar', 'batch_finish')],
           ]),
         }
       );
+      
+      // Limpiar botones del mensaje anterior (resumen de análisis)
+      // Buscar el mensaje con los botones "Generar Facturas" y "Cancelar" para limpiarlos
+      try {
+        // El mensaje anterior debería estar en el historial del chat
+        // Como no tenemos el messageId específico, limpiamos el estado para evitar reutilización
+        if (ctx.session) {
+          delete ctx.session.batchAnalysis;
+        }
+        if (ctx.userState) {
+          delete ctx.userState.batchAnalysis;
+        }
+      } catch (error) {
+        console.log('Info: No se pudieron limpiar los botones anteriores:', error.message);
+      }
     } catch (error) {
       await ctx.telegram.editMessageText(
         ctx.chat.id,
