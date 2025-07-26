@@ -271,7 +271,7 @@ class ZipGeneratorService {
   static generateFileName(invoiceResult, invoice, extension) {
     const folio = invoice.folio || invoice.folioNumber || 'SIN_FOLIO';
     const serie = invoice.series || invoice.serie || 'A'; // Soportar ambos campos por compatibilidad
-    
+
     // Usar el mismo formato que el procesamiento individual: serie + folio
     return `${serie}${folio}.${extension}`;
   }

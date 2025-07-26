@@ -3,6 +3,7 @@
 ## 📋 RESUMEN EJECUTIVO
 
 ### Objetivos Principales
+
 1. ✅ Eliminar completamente Stripe del proyecto
 2. ✅ Migrar 100% del código JavaScript a TypeScript
 3. ✅ Eliminar todo código muerto y duplicado
@@ -10,14 +11,16 @@
 5. ✅ Mantener funcionalidad sin interrupciones
 
 ### Duración Estimada
+
 - **Total**: 5-7 semanas (25-35 días laborables)
 - **Equipo**: 2-3 desarrolladores senior
 - **Modalidad**: Sprints de 1 semana
 
 ### Métricas de Éxito
+
 - 0 referencias a Stripe en el código
 - 100% archivos .ts (excepto configs especiales)
-- >95% type coverage
+- > 95% type coverage
 - 0 'any' types (salvo justificados)
 - Tests pasando 100%
 - Sin degradación de performance
@@ -56,11 +59,13 @@ gantt
 ## 📅 FASE 0: PREPARACIÓN Y LIMPIEZA (Días 1-3)
 
 ### 🎯 Objetivo
+
 Limpiar el proyecto de Stripe y código innecesario antes de comenzar la migración.
 
 ### 📋 Tareas Detalladas
 
 #### Día 1: Eliminación de Stripe
+
 - [ ] Crear branch `feature/remove-stripe`
 - [ ] Eliminar archivos completos (7 archivos):
   ```bash
@@ -72,25 +77,27 @@ Limpiar el proyecto de Stripe y código innecesario antes de comenzar la migraci
   rm -rf docs/analysis/STRIPE_*.md
   ```
 - [ ] Crear migración de base de datos:
+
   ```sql
   -- migrations/remove_stripe_fields.sql
-  ALTER TABLE subscription_plans 
+  ALTER TABLE subscription_plans
     DROP COLUMN stripe_product_id,
     DROP COLUMN stripe_price_id;
-  
-  ALTER TABLE tenants 
+
+  ALTER TABLE tenants
     DROP COLUMN stripe_customer_id;
-  
-  ALTER TABLE tenant_subscriptions 
+
+  ALTER TABLE tenant_subscriptions
     DROP COLUMN stripe_customer_id,
     DROP COLUMN stripe_subscription_id;
-  
-  ALTER TABLE tenant_payments 
+
+  ALTER TABLE tenant_payments
     DROP COLUMN stripe_payment_id,
     DROP COLUMN stripe_invoice_id;
   ```
 
 #### Día 2: Refactorización de archivos afectados
+
 - [ ] **webhook.controller.js**: Eliminar función `handleStripeWebhook` (líneas 22-104)
 - [ ] **webhook.routes.js**: Eliminar línea 8
 - [ ] **subscription.job.js**: Refactorizar para eliminar lógica Stripe (líneas 139-287)
@@ -102,6 +109,7 @@ Limpiar el proyecto de Stripe y código innecesario antes de comenzar la migraci
 - [ ] Ejecutar `npm install` para actualizar lock file
 
 #### Día 3: Limpieza de código duplicado y validación
+
 - [ ] Consolidar `tenant.service.js` y `tenant.service.optimized.js`
 - [ ] Añadir `/frontend/node_modules/.cache` a .gitignore
 - [ ] Eliminar tests sin assertions o incompletos
@@ -113,6 +121,7 @@ Limpiar el proyecto de Stripe y código innecesario antes de comenzar la migraci
 - [ ] Commit y PR de revisión
 
 ### ✅ Criterios de Aceptación Fase 0
+
 - No existen referencias a Stripe en el código
 - Todos los tests pasan
 - La aplicación funciona correctamente sin pagos
@@ -123,12 +132,15 @@ Limpiar el proyecto de Stripe y código innecesario antes de comenzar la migraci
 ## 📅 FASE 1: CONFIGURACIÓN TYPESCRIPT (Día 4)
 
 ### 🎯 Objetivo
+
 Establecer la configuración base de TypeScript para permitir migración incremental.
 
 ### 📋 Tareas Detalladas
 
 #### Configuración Inicial
+
 - [ ] Instalar dependencias:
+
   ```bash
   npm install --save-dev typescript @types/node ts-node ts-node-dev
   npm install --save-dev @types/express @types/jest @types/pino
@@ -136,6 +148,7 @@ Establecer la configuración base de TypeScript para permitir migración increme
   ```
 
 - [ ] Crear `tsconfig.json`:
+
   ```json
   {
     "compilerOptions": {
@@ -173,34 +186,22 @@ Establecer la configuración base de TypeScript para permitir migración increme
       "experimentalDecorators": true,
       "emitDecoratorMetadata": true
     },
-    "include": [
-      "**/*.ts",
-      "**/*.js"
-    ],
-    "exclude": [
-      "node_modules",
-      "dist",
-      "frontend",
-      "**/*.test.ts",
-      "**/*.test.js"
-    ]
+    "include": ["**/*.ts", "**/*.js"],
+    "exclude": ["node_modules", "dist", "frontend", "**/*.test.ts", "**/*.test.js"]
   }
   ```
 
 - [ ] Crear `tsconfig.build.json`:
+
   ```json
   {
     "extends": "./tsconfig.json",
-    "exclude": [
-      "**/*.test.ts",
-      "**/*.test.js",
-      "tests",
-      "scripts"
-    ]
+    "exclude": ["**/*.test.ts", "**/*.test.js", "tests", "scripts"]
   }
   ```
 
 - [ ] Actualizar scripts en `package.json`:
+
   ```json
   {
     "scripts": {
@@ -223,6 +224,7 @@ Establecer la configuración base de TypeScript para permitir migración increme
   ```
 
 ### ✅ Criterios de Aceptación Fase 1
+
 - El proyecto compila con `npm run build`
 - Los tests siguen pasando
 - ESLint funciona con archivos .ts
@@ -233,12 +235,15 @@ Establecer la configuración base de TypeScript para permitir migración increme
 ## 📅 FASE 2: TIPOS Y UTILIDADES BASE (Días 5-8)
 
 ### 🎯 Objetivo
+
 Crear sistema de tipos fundamental y migrar utilidades core.
 
 ### 📋 Tareas Detalladas
 
 #### Día 5: Tipos Globales y de Dominio
+
 - [ ] Crear `/types/global.d.ts`:
+
   ```typescript
   declare global {
     namespace NodeJS {
@@ -257,6 +262,7 @@ Crear sistema de tipos fundamental y migrar utilidades core.
   ```
 
 - [ ] Crear `/types/domain.ts`:
+
   ```typescript
   // Tipos de negocio fundamentales
   export interface Tenant {
@@ -294,7 +300,9 @@ Crear sistema de tipos fundamental y migrar utilidades core.
   ```
 
 #### Día 6: Tipos de API y Bot
+
 - [ ] Crear `/types/api/index.ts`:
+
   ```typescript
   import { Request, Response } from 'express';
   import { Tenant, TenantUser } from '../domain';
@@ -323,6 +331,7 @@ Crear sistema de tipos fundamental y migrar utilidades core.
   ```
 
 - [ ] Crear `/types/bot/index.ts`:
+
   ```typescript
   import { Context } from 'telegraf';
   import { Tenant, TenantUser } from '../domain';
@@ -345,21 +354,23 @@ Crear sistema de tipos fundamental y migrar utilidades core.
   ```
 
 #### Día 7: Migración de Utilidades Core
+
 - [ ] Migrar `/core/utils/logger.js` → `.ts`:
+
   ```typescript
   import pino from 'pino';
-  
+
   export interface LoggerOptions {
     module?: string;
     tenantId?: string;
     userId?: string;
   }
-  
+
   const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
     // ... configuración
   });
-  
+
   export default logger;
   ```
 
@@ -369,10 +380,12 @@ Crear sistema de tipos fundamental y migrar utilidades core.
 - [ ] Migrar `/core/utils/batch-progress.utils.js` → `.ts`
 
 #### Día 8: Configuración y Validación
+
 - [ ] Migrar `/config/index.js` → `.ts` con validación Zod:
+
   ```typescript
   import { z } from 'zod';
-  
+
   const configSchema = z.object({
     app: z.object({
       name: z.string(),
@@ -385,7 +398,7 @@ Crear sistema de tipos fundamental y migrar utilidades core.
     }),
     // ... resto de config
   });
-  
+
   export type Config = z.infer<typeof configSchema>;
   ```
 
@@ -395,6 +408,7 @@ Crear sistema de tipos fundamental y migrar utilidades core.
 - [ ] Actualizar imports en archivos que usen estas utilidades
 
 ### ✅ Criterios de Aceptación Fase 2
+
 - Sistema de tipos base establecido
 - Todas las utilidades core migradas a TS
 - Configuración tipada y validada
@@ -406,12 +420,15 @@ Crear sistema de tipos fundamental y migrar utilidades core.
 ## 📅 FASE 3: SERVICIOS CORE (Días 9-15)
 
 ### 🎯 Objetivo
+
 Migrar todos los servicios críticos del negocio a TypeScript con tipos estrictos.
 
 ### 📋 Tareas Detalladas
 
 #### Día 9: Servicio de FacturAPI
+
 - [ ] Crear tipos para FacturAPI:
+
   ```typescript
   // types/services/facturapi.types.ts
   export interface FacturApiCustomer {
@@ -440,6 +457,7 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
 - [ ] Actualizar todos los imports
 
 #### Día 10: Servicio de Tenant
+
 - [ ] Consolidar y migrar `services/tenant.service.js` → `.ts`
 - [ ] Eliminar `tenant.service.optimized.js`
 - [ ] Implementar interfaces para métodos:
@@ -453,6 +471,7 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
   ```
 
 #### Día 11: Servicio de Redis/Sesiones
+
 - [ ] Migrar `services/redis-session.service.js` → `.ts`
 - [ ] Crear tipos para sesiones:
   ```typescript
@@ -466,6 +485,7 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
 - [ ] Migrar `core/auth/session.service.js` → `.ts`
 
 #### Día 12: Servicios de Notificación y Folios
+
 - [ ] Migrar `services/notification.service.js` → `.ts`
 - [ ] Migrar `services/folio.service.js` → `.ts`
 - [ ] Crear tipos para notificaciones:
@@ -479,17 +499,20 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
   ```
 
 #### Día 13: Servicios de Procesamiento
+
 - [ ] Migrar `services/pdf-analysis.service.js` → `.ts`
 - [ ] Migrar `services/batch-processor.service.js` → `.ts`
 - [ ] Migrar `services/retry.service.js` → `.ts`
 - [ ] Crear decoradores TypeScript para retry
 
 #### Día 14: Servicios de Cliente y Factura
+
 - [ ] Migrar `services/client.service.js` → `.ts`
 - [ ] Migrar `services/invoice.service.js` → `.ts`
 - [ ] Migrar `services/zip-generator.service.js` → `.ts`
 
 #### Día 15: Servicios Restantes y Validación
+
 - [ ] Migrar `services/reports.service.js` → `.ts`
 - [ ] Migrar `services/customer-setup.service.js` → `.ts`
 - [ ] Migrar servicios faltantes
@@ -500,6 +523,7 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
   ```
 
 ### ✅ Criterios de Aceptación Fase 3
+
 - Todos los servicios migrados a TypeScript
 - Interfaces claras para cada servicio
 - Sin uso de `any` en servicios críticos
@@ -511,21 +535,20 @@ Migrar todos los servicios críticos del negocio a TypeScript con tipos estricto
 ## 📅 FASE 4: API REST (Días 16-19)
 
 ### 🎯 Objetivo
+
 Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
 
 ### 📋 Tareas Detalladas
 
 #### Día 16: Middlewares
+
 - [ ] Crear tipos base para middlewares:
+
   ```typescript
   // types/api/middleware.types.ts
   import { Request, Response, NextFunction } from 'express';
-  
-  export type AsyncMiddleware = (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => Promise<void>;
+
+  export type AsyncMiddleware = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 
   export interface ErrorMiddleware {
     (err: Error, req: Request, res: Response, next: NextFunction): void;
@@ -541,7 +564,9 @@ Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
   - [ ] `api/middlewares/session.middleware.js` → `.ts`
 
 #### Día 17: Controladores - Parte 1
+
 - [ ] Crear tipos para DTOs:
+
   ```typescript
   // types/api/dto/index.ts
   export interface CreateInvoiceDTO {
@@ -566,6 +591,7 @@ Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
   - [ ] `api/controllers/client.controller.js` → `.ts`
 
 #### Día 18: Controladores - Parte 2
+
 - [ ] Migrar controladores restantes:
   - [ ] `api/controllers/invoice.controller.js` → `.ts`
   - [ ] `api/controllers/product.controller.js` → `.ts`
@@ -573,6 +599,7 @@ Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
 - [ ] Implementar validación con Zod en controladores
 
 #### Día 19: Rutas y API Index
+
 - [ ] Migrar todas las rutas:
   - [ ] `api/routes/auth.routes.js` → `.ts`
   - [ ] `api/routes/client.routes.js` → `.ts`
@@ -585,6 +612,7 @@ Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
 - [ ] Agregar tipos para respuestas API
 
 ### ✅ Criterios de Aceptación Fase 4
+
 - API completamente migrada a TypeScript
 - Tipos seguros en request/response
 - Validación de DTOs con tipos
@@ -596,21 +624,25 @@ Migrar toda la capa API a TypeScript con tipos seguros end-to-end.
 ## 📅 FASE 5: BOT DE TELEGRAM (Días 20-26)
 
 ### 🎯 Objetivo
+
 Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
 
 ### 📋 Tareas Detalladas
 
 #### Día 20: Setup y Tipos del Bot
+
 - [ ] Instalar tipos de Telegraf:
+
   ```bash
   npm install --save-dev @types/telegraf
   ```
 
 - [ ] Crear tipos extendidos para el bot:
+
   ```typescript
   // types/bot/context.types.ts
   import { Context, Scenes } from 'telegraf';
-  
+
   interface SessionData {
     currentFlow?: string;
     tenantId?: string;
@@ -631,7 +663,9 @@ Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
   ```
 
 #### Día 21: Middlewares y Comandos Base
+
 - [ ] Migrar middlewares del bot:
+
   - [ ] `bot/middlewares/auth.middleware.js` → `.ts`
   - [ ] `bot/middlewares/error.middleware.js` → `.ts`
   - [ ] `bot/middlewares/tenant.middleware.js` → `.ts`
@@ -642,6 +676,7 @@ Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
   - [ ] `bot/commands/menu.command.js` → `.ts`
 
 #### Día 22: Comandos Complejos
+
 - [ ] Migrar comandos de negocio:
   - [ ] `bot/commands/admin.command.js` → `.ts`
   - [ ] `bot/commands/onboarding.command.js` → `.ts`
@@ -650,19 +685,23 @@ Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
   - [ ] `bot/commands/index.js` → `.ts`
 
 #### Día 23: Handlers - Parte 1
+
 - [ ] Migrar handlers de análisis:
   - [ ] `bot/handlers/axa.handler.js` → `.ts`
   - [ ] `bot/handlers/chubb.handler.js` → `.ts`
 - [ ] Crear tipos para resultados de análisis
 
 #### Día 24: Handlers - Parte 2
+
 - [ ] Migrar handlers de procesamiento:
   - [ ] `bot/handlers/pdf-invoice.handler.js` → `.ts`
   - [ ] `bot/handlers/pdf-batch-simple.handler.js` → `.ts`
   - [ ] `bot/handlers/invoice.handler.js` → `.ts`
 
 #### Día 25: Handlers Restantes y Vistas
+
 - [ ] Migrar handlers finales:
+
   - [ ] `bot/handlers/client.handler.js` → `.ts`
   - [ ] `bot/handlers/onboarding.handler.js` → `.ts`
   - [ ] `bot/handlers/production-setup.handler.js` → `.ts`
@@ -676,12 +715,14 @@ Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
   - [ ] `bot/views/onboarding.view.js` → `.ts`
 
 #### Día 26: Bot Index y Validación
+
 - [ ] Migrar `bot/index.js` → `.ts`
 - [ ] Migrar `bot.js` → `.ts`
 - [ ] Validar funcionamiento completo del bot
 - [ ] Probar todos los flujos principales
 
 ### ✅ Criterios de Aceptación Fase 5
+
 - Bot completamente en TypeScript
 - Contexto tipado en todos los handlers
 - Comandos funcionando correctamente
@@ -693,12 +734,15 @@ Migrar todo el bot de Telegram a TypeScript con contexto extendido tipado.
 ## 📅 FASE 6: JOBS Y SCRIPTS (Días 27-29)
 
 ### 🎯 Objetivo
+
 Migrar tareas programadas y scripts administrativos.
 
 ### 📋 Tareas Detalladas
 
 #### Día 27: Jobs Principales
+
 - [ ] Crear tipos para jobs:
+
   ```typescript
   // types/jobs/index.ts
   export interface JobConfig {
@@ -715,6 +759,7 @@ Migrar tareas programadas y scripts administrativos.
   - [ ] `jobs/index.js` → `.ts`
 
 #### Día 28: Scripts Administrativos
+
 - [ ] Migrar scripts de admin:
   - [ ] `scripts/admin/create-subscription-plan.js` → `.ts`
   - [ ] `scripts/admin/check-plans.js` → `.ts`
@@ -722,6 +767,7 @@ Migrar tareas programadas y scripts administrativos.
   - [ ] Scripts de monitoreo
 
 #### Día 29: Scripts de Utilidad y Server
+
 - [ ] Migrar scripts restantes
 - [ ] Migrar archivos principales:
   - [ ] `server.js` → `.ts`
@@ -730,6 +776,7 @@ Migrar tareas programadas y scripts administrativos.
 - [ ] Actualizar scripts de npm
 
 ### ✅ Criterios de Aceptación Fase 6
+
 - Todos los jobs migrados y funcionando
 - Scripts administrativos en TypeScript
 - Server principal en TypeScript
@@ -740,12 +787,15 @@ Migrar tareas programadas y scripts administrativos.
 ## 📅 FASE 7: TESTS Y VALIDACIÓN (Días 30-33)
 
 ### 🎯 Objetivo
+
 Migrar tests a TypeScript y asegurar cobertura completa.
 
 ### 📋 Tareas Detalladas
 
 #### Día 30: Configuración de Jest para TypeScript
+
 - [ ] Instalar dependencias:
+
   ```bash
   npm install --save-dev @types/jest ts-jest
   ```
@@ -769,24 +819,28 @@ Migrar tests a TypeScript y asegurar cobertura completa.
   ```
 
 #### Día 31: Migración de Tests Unitarios
+
 - [ ] Migrar tests de servicios
 - [ ] Migrar tests de utilidades
 - [ ] Migrar tests de handlers
 - [ ] Agregar tests de tipos
 
 #### Día 32: Tests de Integración
+
 - [ ] Migrar tests de API
 - [ ] Migrar tests del bot
 - [ ] Crear tests E2E básicos
 - [ ] Validar cobertura
 
 #### Día 33: Validación Final
+
 - [ ] Ejecutar suite completa de tests
 - [ ] Verificar cobertura >80%
 - [ ] Performance benchmarks
 - [ ] Smoke tests en staging
 
 ### ✅ Criterios de Aceptación Fase 7
+
 - Todos los tests migrados a TypeScript
 - Cobertura de código >80%
 - Tests de tipos implementados
@@ -798,25 +852,31 @@ Migrar tests a TypeScript y asegurar cobertura completa.
 ## 📅 FASE 8: OPTIMIZACIÓN Y STRICT MODE (Días 34-35)
 
 ### 🎯 Objetivo
+
 Activar modo estricto de TypeScript y optimizar el código.
 
 ### 📋 Tareas Detalladas
 
 #### Día 34: Activación Gradual de Strict Mode
+
 - [ ] Activar `noImplicitAny: true`
+
   - [ ] Resolver todos los `any` implícitos
   - [ ] Documentar `any` justificados
 
 - [ ] Activar `strictNullChecks: true`
+
   - [ ] Manejar todos los null/undefined
   - [ ] Agregar guards donde sea necesario
 
 - [ ] Activar `strictFunctionTypes: true`
+
   - [ ] Ajustar tipos de funciones
 
 - [ ] Activar `strict: true` completo
 
 #### Día 35: Optimización Final
+
 - [ ] Eliminar código muerto con `ts-prune`
 - [ ] Resolver dependencias circulares
 - [ ] Optimizar imports
@@ -825,6 +885,7 @@ Activar modo estricto de TypeScript y optimizar el código.
 - [ ] Crear guía de contribución TypeScript
 
 ### ✅ Criterios de Aceptación Fase 8
+
 - Modo estricto activado
 - 0 errores de TypeScript
 - <5% de uso de `any` (justificado)
@@ -837,38 +898,43 @@ Activar modo estricto de TypeScript y optimizar el código.
 
 ### KPIs del Proyecto
 
-| Métrica | Baseline | Target | Herramienta |
-|---------|----------|--------|-------------|
-| Archivos JS | 165 | 0 | `find . -name "*.js"` |
-| Archivos TS | 0 | 165+ | `find . -name "*.ts"` |
-| Type Coverage | 0% | >95% | `type-coverage` |
-| Any Usage | N/A | <5% | ESLint rule |
-| Test Coverage | ~60% | >80% | Jest |
-| Build Time | N/A | <30s | CI metrics |
-| Bundle Size | Baseline | +10% max | Webpack |
-| Memory Usage | Baseline | No incremento | PM2 metrics |
-| Response Time | <2s | <2s | APM |
+| Métrica       | Baseline | Target        | Herramienta           |
+| ------------- | -------- | ------------- | --------------------- |
+| Archivos JS   | 165      | 0             | `find . -name "*.js"` |
+| Archivos TS   | 0        | 165+          | `find . -name "*.ts"` |
+| Type Coverage | 0%       | >95%          | `type-coverage`       |
+| Any Usage     | N/A      | <5%           | ESLint rule           |
+| Test Coverage | ~60%     | >80%          | Jest                  |
+| Build Time    | N/A      | <30s          | CI metrics            |
+| Bundle Size   | Baseline | +10% max      | Webpack               |
+| Memory Usage  | Baseline | No incremento | PM2 metrics           |
+| Response Time | <2s      | <2s           | APM                   |
 
 ### Checkpoints Semanales
 
 **Semana 1** (Fases 0-2):
+
 - [ ] Stripe eliminado
 - [ ] TypeScript configurado
 - [ ] Tipos base creados
 
 **Semana 2** (Fase 3):
+
 - [ ] 50% servicios migrados
 - [ ] Sin breaking changes
 
 **Semana 3** (Fases 4-5):
+
 - [ ] API en TypeScript
 - [ ] Bot 50% migrado
 
 **Semana 4** (Fases 5-6):
+
 - [ ] Bot completo
 - [ ] Jobs migrados
 
 **Semana 5** (Fases 7-8):
+
 - [ ] Tests migrados
 - [ ] Strict mode activo
 - [ ] Proyecto optimizado
@@ -934,6 +1000,7 @@ main (producción)
 ## ✅ CRITERIOS DE ÉXITO GLOBAL
 
 ### Must Have (P0)
+
 - ✅ 0 referencias a Stripe
 - ✅ 100% código en TypeScript
 - ✅ Tests pasando 100%
@@ -941,12 +1008,14 @@ main (producción)
 - ✅ Sin downtime en producción
 
 ### Should Have (P1)
+
 - ✅ Type coverage >95%
 - ✅ Strict mode activado
 - ✅ Documentación completa
 - ✅ <5% uso de any
 
 ### Nice to Have (P2)
+
 - ✅ 0 any types
 - ✅ Tests de tipos
 - ✅ Optimizaciones de bundle
@@ -957,18 +1026,21 @@ main (producción)
 ## 🎯 PRÓXIMOS PASOS
 
 ### Acciones Inmediatas (Hoy)
+
 1. Aprobar roadmap con el equipo
 2. Asignar recursos (2-3 devs)
 3. Crear branch `feature/remove-stripe`
 4. Comenzar Fase 0
 
 ### Esta Semana
+
 1. Completar Fases 0-2
 2. Daily standups de 15min
 3. Code reviews continuos
 4. Actualizar documentación
 
 ### Seguimiento
+
 - Daily standups
 - Weekly demos
 - Retrospectivas por fase
@@ -979,12 +1051,14 @@ main (producción)
 ## 📞 CONTACTOS Y RECURSOS
 
 ### Equipo Core
+
 - **Tech Lead**: Responsable de arquitectura
 - **Senior Dev 1**: Fases 1-4
 - **Senior Dev 2**: Fases 5-8
 - **QA Engineer**: Testing continuo
 
 ### Recursos
+
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)
 - [Migration Guide](https://github.com/Microsoft/TypeScript/wiki/Type-Checking-JavaScript-Files)
 - Canal Slack: #typescript-migration
@@ -994,5 +1068,5 @@ main (producción)
 
 **¡El proyecto está listo para iniciar la migración! 🚀**
 
-*Última actualización: [Fecha]*
-*Versión: 1.0*
+_Última actualización: [Fecha]_
+_Versión: 1.0_

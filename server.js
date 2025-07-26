@@ -15,6 +15,7 @@ import {
 } from './api/middlewares/rate-limit.middleware.js';
 import { sessionMiddleware } from './api/middlewares/session.middleware.js';
 import redisSessionService from './services/redis-session.service.js';
+import SafeOperationsService from './services/safe-operations.service.js';
 import { startJobs } from './jobs/index.js';
 import NotificationService from './services/notification.service.js';
 import { createBot } from './bot/index.js';
@@ -108,6 +109,10 @@ async function initializeApp() {
   // === INICIALIZAR REDIS PARA CLUSTERING ===
   await redisSessionService.initialize();
   serverLogger.info('📦 Servicio de sesiones inicializado para clustering');
+
+  // === INICIALIZAR REDIS LOCKS PARA MULTIUSUARIO ===
+  await SafeOperationsService.initialize();
+  serverLogger.info('🔒 Servicio de operaciones seguras inicializado para multiusuario');
 
   // === SESIONES COMPARTIDAS PARA CLUSTERING ===
   app.use(

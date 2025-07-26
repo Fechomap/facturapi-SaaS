@@ -5,6 +5,8 @@ import { sessionMiddleware } from '../core/auth/session.service.js';
 import tenantContextMiddleware from '../core/tenant/tenant.middleware.js';
 import { registerAllCommands } from './commands/index.js';
 import authMiddleware from './middlewares/auth.middleware.js';
+import multiUserAuthMiddleware from './middlewares/multi-auth.middleware.js';
+import { registerUserManagementCommands } from './commands/user-management.commands.js';
 
 // Importación directa de handlers
 import { registerPDFInvoiceHandler } from './handlers/pdf-invoice.handler.js'; // Handler para PDFs
@@ -53,8 +55,8 @@ export function createBot(logger) {
     return next();
   });
 
-  // Middleware para autorización (después del filtro de comandos admin)
-  bot.use(authMiddleware);
+  // Middleware para autorización multiusuario (reemplaza authMiddleware)
+  bot.use(multiUserAuthMiddleware);
 
   // Middleware para manejo global de errores
   bot.catch((err, ctx) => {
@@ -76,6 +78,9 @@ export function createBot(logger) {
 
   // Registrar todos los comandos (incluyendo los de admin a través de registerAllCommands)
   registerAllCommands(bot);
+
+  // Registrar comandos de gestión multiusuario
+  registerUserManagementCommands(bot);
 
   // Registrar handlers en orden: IMPORTANTE - el handler de PDF debe ir PRIMERO
   registerPDFInvoiceHandler(bot); // 1. PDF (PRIMERO)

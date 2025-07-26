@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import TenantService from '../../services/tenant.service.js';
 import InvoiceService from '../../services/invoice.service.js';
+import SafeOperationsService from '../../services/safe-operations.service.js';
 import {
   invoiceSummaryView,
   invoiceCreatedView,
@@ -425,14 +426,15 @@ export function registerInvoiceHandler(bot) {
               userId: ctx.from.id,
             });
 
-            // Generar la factura con el tenant actual
-            factura = await InvoiceService.generateInvoice(
+            // Generar la factura de manera thread-safe con el nuevo servicio
+            factura = await SafeOperationsService.generateInvoiceSafe(
               {
                 ...ctx.userState,
                 userId: ctx.from.id, // Añadir ID del usuario para auditoría
               },
-              ctx.getTenantId()
-            ); // Pasar el ID del tenant
+              ctx.getTenantId(),
+              ctx.from.id
+            );
 
             // Si llegamos aquí, la factura se generó exitosamente
             invoiceHandlerLogger.info(`Factura generada exitosamente en intento ${attempt}`, {

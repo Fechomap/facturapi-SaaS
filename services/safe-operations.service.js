@@ -253,7 +253,7 @@ class SafeOperationsService {
    * @param {number} windowMs - Ventana de tiempo en ms
    * @returns {Promise<boolean>} - True si permitido, false si rate limited
    */
-  static async checkRateLimit(userId, operation, maxRequests = 10, windowMs = 60000) {
+  static async checkRateLimit(userId, operation, _maxRequests = 10, _windowMs = 60000) {
     const lockKey = `rate_limit:${userId}:${operation}`;
 
     try {

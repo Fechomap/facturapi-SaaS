@@ -77,27 +77,27 @@ FacturAPI SaaS es una plataforma completa de facturación electrónica que permi
 graph TB
     A[Telegram Users] -->|Webhook| B[Bot Handler]
     C[API Clients] -->|REST| D[API Gateway]
-    
+
     B --> E[Session Manager<br/>Redis]
     D --> E
-    
+
     E --> F[Business Logic<br/>Services]
-    
+
     F --> G[(PostgreSQL<br/>Multitenant DB)]
     F --> H[FacturAPI<br/>External Service]
-    
+
     I[Stripe] --> D
-    
+
     subgraph "Core Services"
         F
         E
     end
-    
+
     subgraph "External Services"
         H
         I
     end
-    
+
     subgraph "Data Layer"
         G
     end
@@ -345,24 +345,28 @@ const response = await fetch('https://api.example.com/api/invoices', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIs...'
+    Authorization: 'Bearer eyJhbGciOiJIUzI1NiIs...',
   },
   body: JSON.stringify({
-    customer: "cus_xxxxxx",
-    items: [{
-      product: {
-        description: "Servicio de consultoría",
-        price: 1000,
-        taxes: [{
-          type: "IVA",
-          rate: 0.16
-        }]
+    customer: 'cus_xxxxxx',
+    items: [
+      {
+        product: {
+          description: 'Servicio de consultoría',
+          price: 1000,
+          taxes: [
+            {
+              type: 'IVA',
+              rate: 0.16,
+            },
+          ],
+        },
+        quantity: 1,
       },
-      quantity: 1
-    }],
-    payment_form: "03",
-    payment_method: "PUE"
-  })
+    ],
+    payment_form: '03',
+    payment_method: 'PUE',
+  }),
 });
 ```
 
@@ -370,16 +374,16 @@ const response = await fetch('https://api.example.com/api/invoices', {
 
 ### Comandos Disponibles
 
-| Comando | Descripción | Permisos |
-|---------|-------------|----------|
-| `/start` | Iniciar bot y registro | Todos |
-| `/menu` | Menú principal | Usuarios registrados |
-| `/facturar` | Crear nueva factura | Usuarios activos |
-| `/consultar` | Buscar facturas | Usuarios activos |
-| `/clientes` | Gestionar clientes | Usuarios activos |
-| `/reportes` | Ver estadísticas | Usuarios activos |
-| `/ayuda` | Mostrar ayuda | Todos |
-| `/admin` | Panel administrativo | Solo admins |
+| Comando      | Descripción            | Permisos             |
+| ------------ | ---------------------- | -------------------- |
+| `/start`     | Iniciar bot y registro | Todos                |
+| `/menu`      | Menú principal         | Usuarios registrados |
+| `/facturar`  | Crear nueva factura    | Usuarios activos     |
+| `/consultar` | Buscar facturas        | Usuarios activos     |
+| `/clientes`  | Gestionar clientes     | Usuarios activos     |
+| `/reportes`  | Ver estadísticas       | Usuarios activos     |
+| `/ayuda`     | Mostrar ayuda          | Todos                |
+| `/admin`     | Panel administrativo   | Solo admins          |
 
 ### Flujo de Facturación
 
@@ -437,11 +441,11 @@ describe('InvoiceService', () => {
   it('should create invoice with correct data', async () => {
     const invoiceData = {
       customer: 'cus_test',
-      items: [{ product: { description: 'Test', price: 100 } }]
+      items: [{ product: { description: 'Test', price: 100 } }],
     };
-    
+
     const invoice = await InvoiceService.create(invoiceData);
-    
+
     expect(invoice).toHaveProperty('id');
     expect(invoice.total).toBe(116); // 100 + 16% IVA
   });

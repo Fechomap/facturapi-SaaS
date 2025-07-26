@@ -86,7 +86,7 @@ class RedisLockService {
    * @param {number} retryDelayMs - Delay entre reintentos
    * @returns {Promise<Object>} - { acquired: boolean, lockId?: string }
    */
-  async acquireLock(key, ttlMs = this.defaultTTL, retryDelayMs = 100) {
+  async acquireLock(key, ttlMs = this.defaultTTL, _retryDelayMs = 100) {
     const lockKey = `${this.lockPrefix}${key}`;
     const lockId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
