@@ -107,6 +107,141 @@ export function registerMenuCommand(bot) {
     await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_suscripcion');
   });
 
+  // Acción para generar reporte Excel de facturas
+  bot.action('reporte_excel_action', async (ctx) => {
+    await ctx.answerCbQuery();
+
+    if (!ctx.hasTenant()) {
+      return ctx.reply(
+        'Para generar un reporte Excel de facturas, primero debes registrar tu empresa.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📝 Registrar empresa', 'start_registration')],
+        ])
+      );
+    }
+
+    try {
+      const tenantId = ctx.getTenantId();
+      
+      // Mensaje inicial
+      const progressMsg = await ctx.reply(
+        '📊 *Generando Reporte Excel de Facturas*\n\n' +
+        '🔄 Obteniendo facturas de la base de datos...\n' +
+        '⏱️ Esto puede tomar unos momentos...',
+        { parse_mode: 'Markdown' }
+      );
+
+      // Importar servicio dinámicamente
+      const ExcelReportService = (await import('../../services/excel-report.service.js')).default;
+      
+      // Configuración del reporte MVP
+      const reportConfig = {
+        limit: 100, // MVP: límite de 100 facturas
+        includeDetails: true,
+        format: 'xlsx'
+      };
+
+      // Actualizar progreso
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        progressMsg.message_id,
+        null,
+        '📊 *Generando Reporte Excel de Facturas*\n\n' +
+        '🔄 Consultando datos de FacturAPI...\n' +
+        '📋 Esto incluirá UUID, IVA, retención y todos los campos fiscales...',
+        { parse_mode: 'Markdown' }
+      );
+
+      // Generar reporte
+      const result = await ExcelReportService.generateInvoiceReport(tenantId, reportConfig);
+
+      if (result.success) {
+        // Actualizar con éxito
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          progressMsg.message_id,
+          null,
+          '✅ *Reporte Excel Generado Exitosamente*\n\n' +
+          `📊 Facturas incluidas: ${result.stats.totalInvoices}\n` +
+          `⏱️ Tiempo de generación: ${Math.round(result.stats.duration / 1000)}s\n` +
+          `📄 Tamaño del archivo: ${result.stats.fileSize}\n\n` +
+          '📎 Enviando archivo...',
+          { parse_mode: 'Markdown' }
+        );
+
+        // Enviar archivo Excel
+        await ctx.replyWithDocument({
+          source: result.filePath,
+          filename: `reporte_facturas_${new Date().toISOString().split('T')[0]}.xlsx`
+        });
+
+        // Mensaje final
+        await ctx.reply(
+          '🎉 *¡Reporte Excel enviado exitosamente!*\n\n' +
+          '📋 *El archivo incluye:*\n' +
+          '• Folio completo de cada factura\n' +
+          '• UUID/Folio Fiscal del SAT\n' +
+          '• Datos completos del cliente (nombre y RFC)\n' +
+          '• Fechas de facturación\n' +
+          '• Subtotal, IVA y retenciones\n' +
+          '• Total y estado de cada factura\n' +
+          '• URL de verificación del SAT\n\n' +
+          '💡 *Tip:* Puedes abrir el archivo en Excel, Google Sheets o LibreOffice.',
+          { 
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')]
+            ])
+          }
+        );
+
+        // Limpiar archivo temporal después de 5 minutos
+        setTimeout(async () => {
+          try {
+            const fs = await import('fs');
+            fs.unlinkSync(result.filePath);
+            console.log(`🗑️ Archivo temporal limpiado: ${result.filePath}`);
+          } catch (error) {
+            console.log(`ℹ️ No se pudo limpiar archivo temporal: ${error.message}`);
+          }
+        }, 5 * 60 * 1000);
+
+      } else {
+        // Error en la generación
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          progressMsg.message_id,
+          null,
+          '❌ *Error Generando Reporte*\n\n' +
+          `💬 ${result.error}\n\n` +
+          '🔄 Por favor, intenta nuevamente en unos momentos.',
+          { 
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔄 Reintentar', 'reporte_excel_action')],
+              [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')]
+            ])
+          }
+        );
+      }
+
+    } catch (error) {
+      console.error('❌ Error en acción reporte_excel_action:', error);
+      
+      await ctx.reply(
+        '❌ *Error Inesperado*\n\n' +
+        'Ocurrió un error al generar el reporte Excel. ' +
+        'Por favor, contacta al soporte técnico si el problema persiste.',
+        { 
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')]
+          ])
+        }
+      );
+    }
+  });
+
   // Acción para gestión de usuarios
   bot.action('menu_usuarios', async (ctx) => {
     await ctx.answerCbQuery();

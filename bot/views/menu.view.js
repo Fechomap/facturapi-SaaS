@@ -30,6 +30,7 @@ export function mainMenu() {
 export function reportsMenu() {
   return Markup.inlineKeyboard([
     [Markup.button.callback('📈 Reporte de Facturación', 'reporte_facturas_action')],
+    [Markup.button.callback('📊 Reporte Excel', 'reporte_excel_action')],
     [Markup.button.callback('💰 Reporte de Suscripción', 'reporte_suscripcion_action')],
     [Markup.button.callback('🔄 Estado de Progreso', 'view_onboarding_progress')],
     [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
