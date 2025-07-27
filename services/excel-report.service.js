@@ -384,13 +384,24 @@ class ExcelReportService {
     // Agregar encabezados
     worksheet.addRow(headers);
 
-    // Formatear encabezados
+    // Formatear encabezados (solo columnas A-K)
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: '366092' },
+    
+    // Aplicar formato solo a las 11 columnas utilizadas (A-K)
+    for (let col = 1; col <= 11; col++) {
+      const cell = headerRow.getCell(col);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '366092' },
+      };
+    }
+
+    // AGREGAR FILTROS AUTOMÁTICOS EN LOS ENCABEZADOS
+    worksheet.autoFilter = {
+      from: 'A1',
+      to: 'K1' // Solo hasta la columna K (columna 11)
     };
 
     // Configurar ancho de columnas
@@ -426,13 +437,16 @@ class ExcelReportService {
         invoice.verificationUrl || 'No disponible',
       ]);
 
-      // Alternar colores de filas
+      // Alternar colores de filas (solo columnas A-K)
       if (index % 2 === 0) {
-        row.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'F2F2F2' },
-        };
+        for (let col = 1; col <= 11; col++) {
+          const cell = row.getCell(col);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'F2F2F2' },
+          };
+        }
       }
     });
 
@@ -453,14 +467,19 @@ class ExcelReportService {
       ]);
 
       totalRow.font = { bold: true };
-      totalRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'D9EAD3' },
-      };
+      
+      // Aplicar formato verde solo a las columnas A-K
+      for (let col = 1; col <= 11; col++) {
+        const cell = totalRow.getCell(col);
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'D9EAD3' },
+        };
+      }
     }
 
-    // Aplicar bordes
+    // Aplicar bordes solo a las columnas A-K (1-11)
     const borderStyle = { style: 'thin', color: { argb: '000000' } };
     const border = {
       top: borderStyle,
@@ -470,9 +489,11 @@ class ExcelReportService {
     };
 
     worksheet.eachRow((row) => {
-      row.eachCell((cell) => {
+      // Solo aplicar bordes a las columnas 1-11 (A-K)
+      for (let col = 1; col <= 11; col++) {
+        const cell = row.getCell(col);
         cell.border = border;
-      });
+      }
     });
 
     // GUARDAR ARCHIVO
