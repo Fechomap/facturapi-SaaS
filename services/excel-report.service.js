@@ -410,7 +410,7 @@ class ExcelReportService {
       { width: 40 }, // UUID
       { width: 35 }, // Cliente
       { width: 15 }, // RFC Cliente
-      { width: 12 }, // Fecha
+      { width: 12, numFmt: 'dd/mm/yyyy' }, // Fecha - FORMATO FECHA DD/MM/YYYY
       { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // Subtotal - FORMATO PESOS MEXICANOS 2 DECIMALES
       { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // IVA - FORMATO PESOS MEXICANOS 2 DECIMALES
       { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // Retención - FORMATO PESOS MEXICANOS 2 DECIMALES
@@ -427,8 +427,8 @@ class ExcelReportService {
         invoice.customer?.legalName || 'Cliente no especificado',
         invoice.customer?.rfc || 'RFC no disponible',
         invoice.invoiceDate
-          ? new Date(invoice.invoiceDate).toLocaleDateString('es-MX')
-          : 'Sin fecha',
+          ? new Date(invoice.invoiceDate) // OBJETO DATE REAL para filtros de Excel
+          : null, // null para fechas vacías (Excel lo maneja mejor que texto)
         this.truncateToTwoDecimals(invoice.subtotal || 0), // Columna 6 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.ivaAmount || 0), // Columna 7 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.retencionAmount || 0), // Columna 8 - TRUNCADO A 2 DECIMALES
