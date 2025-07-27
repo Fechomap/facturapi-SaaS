@@ -24,18 +24,18 @@ class MigrationDataCollector {
    */
   async collectAllTenantData() {
     console.log('🚀 Iniciando recolección de datos de FacturAPI...');
-    
+
     // 1. Obtener todos los tenants activos
     const tenants = await prisma.tenant.findMany({
-      where: { 
+      where: {
         isActive: true,
-        facturapiApiKey: { not: null }
+        facturapiApiKey: { not: null },
       },
       select: {
         id: true,
         businessName: true,
-        _count: { invoices: true }
-      }
+        _count: { invoices: true },
+      },
     });
 
     console.log(`📊 Tenants encontrados: ${tenants.length}`);
@@ -47,10 +47,10 @@ class MigrationDataCollector {
     const results = [];
     for (const tenant of tenants) {
       console.log(`\n🏢 Procesando: ${tenant.businessName} (${tenant._count.invoices} facturas)`);
-      
+
       const tenantResult = await this.collectTenantData(tenant);
       results.push(tenantResult);
-      
+
       // Pausa entre tenants para no sobrecargar FacturAPI
       await this.sleep(2000);
     }
@@ -69,23 +69,25 @@ class MigrationDataCollector {
       const invoices = await prisma.tenantInvoice.findMany({
         where: { tenantId: tenant.id },
         include: { customer: true },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       console.log(`📝 Facturas en BD: ${invoices.length}`);
 
       const enrichedData = [];
       const errors = [];
-      
+
       // Procesar en lotes
       for (let i = 0; i < invoices.length; i += this.batchSize) {
         const batch = invoices.slice(i, i + this.batchSize);
-        console.log(`🔄 Procesando lote ${Math.floor(i/this.batchSize) + 1}/${Math.ceil(invoices.length/this.batchSize)}`);
-        
+        console.log(
+          `🔄 Procesando lote ${Math.floor(i / this.batchSize) + 1}/${Math.ceil(invoices.length / this.batchSize)}`
+        );
+
         const batchResult = await this.processBatch(tenant.id, batch);
         enrichedData.push(...batchResult.success);
         errors.push(...batchResult.errors);
-        
+
         // Pausa entre lotes
         await this.sleep(1000);
       }
@@ -99,11 +101,11 @@ class MigrationDataCollector {
         errors: errors.length,
         timestamp: new Date().toISOString(),
         data: enrichedData,
-        errorDetails: errors
+        errorDetails: errors,
       };
 
       await this.saveTenantData(tenant.id, tenantData);
-      
+
       return {
         tenantId: tenant.id,
         businessName: tenant.businessName,
@@ -111,17 +113,16 @@ class MigrationDataCollector {
         stats: {
           total: invoices.length,
           enriched: enrichedData.length,
-          errors: errors.length
-        }
+          errors: errors.length,
+        },
       };
-
     } catch (error) {
       console.error(`❌ Error procesando tenant ${tenant.id}:`, error.message);
       return {
         tenantId: tenant.id,
         businessName: tenant.businessName,
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -140,7 +141,7 @@ class MigrationDataCollector {
         try {
           // Consultar FacturAPI
           const facturapiData = await facturapiClient.invoices.retrieve(invoice.facturapiInvoiceId);
-          
+
           // Estructura de datos enriquecidos
           const enrichedInvoice = {
             // Datos de BD
@@ -149,7 +150,7 @@ class MigrationDataCollector {
             series: invoice.series,
             folioNumber: invoice.folioNumber,
             total: parseFloat(invoice.total),
-            
+
             // Datos de FacturAPI para persistir
             uuid: facturapiData.uuid,
             subtotal: facturapiData.subtotal || this.calculateSubtotal(facturapiData),
@@ -157,20 +158,19 @@ class MigrationDataCollector {
             retencionAmount: this.extractRetencion(facturapiData),
             currency: facturapiData.currency,
             verificationUrl: facturapiData.verification_url,
-            
+
             // Metadatos
             lastSynced: new Date().toISOString(),
-            facturapiStatus: facturapiData.status
+            facturapiStatus: facturapiData.status,
           };
 
           success.push(enrichedInvoice);
-          
         } catch (error) {
           errors.push({
             invoiceId: invoice.id,
             facturapiInvoiceId: invoice.facturapiInvoiceId,
             error: error.message,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           });
         }
       }
@@ -184,43 +184,41 @@ class MigrationDataCollector {
   // Utilidades para cálculos
   calculateSubtotal(facturapiData) {
     if (facturapiData.subtotal) return facturapiData.subtotal;
-    
+
     // Calcular desde items si no está disponible
-    return facturapiData.items?.reduce((sum, item) => {
-      return sum + (item.quantity * item.product.price);
-    }, 0) || 0;
+    return (
+      facturapiData.items?.reduce((sum, item) => {
+        return sum + item.quantity * item.product.price;
+      }, 0) || 0
+    );
   }
 
   extractIVA(facturapiData) {
     if (!facturapiData.items) return 0;
-    
+
     return facturapiData.items.reduce((total, item) => {
-      const ivaTax = item.product.taxes?.find(tax => 
-        tax.type === 'IVA' && !tax.withholding
-      );
-      
+      const ivaTax = item.product.taxes?.find((tax) => tax.type === 'IVA' && !tax.withholding);
+
       if (ivaTax) {
         const base = item.quantity * item.product.price;
-        return total + (base * (ivaTax.rate || 0));
+        return total + base * (ivaTax.rate || 0);
       }
-      
+
       return total;
     }, 0);
   }
 
   extractRetencion(facturapiData) {
     if (!facturapiData.items) return 0;
-    
+
     return facturapiData.items.reduce((total, item) => {
-      const retencionTax = item.product.taxes?.find(tax => 
-        tax.withholding === true
-      );
-      
+      const retencionTax = item.product.taxes?.find((tax) => tax.withholding === true);
+
       if (retencionTax) {
         const base = item.quantity * item.product.price;
-        return total + (base * (retencionTax.rate || 0));
+        return total + base * (retencionTax.rate || 0);
       }
-      
+
       return total;
     }, 0);
   }
@@ -245,34 +243,37 @@ class MigrationDataCollector {
       timestamp: new Date().toISOString(),
       summary: {
         totalTenants: results.length,
-        successfulTenants: results.filter(r => r.success).length,
-        failedTenants: results.filter(r => !r.success).length,
+        successfulTenants: results.filter((r) => r.success).length,
+        failedTenants: results.filter((r) => !r.success).length,
         totalInvoicesEnriched: results
-          .filter(r => r.success)
-          .reduce((sum, r) => sum + (r.stats?.enriched || 0), 0)
+          .filter((r) => r.success)
+          .reduce((sum, r) => sum + (r.stats?.enriched || 0), 0),
       },
-      details: results
+      details: results,
     };
 
     const reportPath = path.join(this.dataDir, 'collection_report.json');
     await fs.writeFile(reportPath, JSON.stringify(report, null, 2));
-    
+
     console.log(`\n📊 REPORTE FINAL:`);
-    console.log(`✅ Tenants procesados: ${report.summary.successfulTenants}/${report.summary.totalTenants}`);
+    console.log(
+      `✅ Tenants procesados: ${report.summary.successfulTenants}/${report.summary.totalTenants}`
+    );
     console.log(`📝 Facturas enriquecidas: ${report.summary.totalInvoicesEnriched}`);
     console.log(`📄 Reporte guardado: ${reportPath}`);
   }
 
   sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 // Script ejecutable
 if (process.argv[2] === 'run') {
   const collector = new MigrationDataCollector();
-  
-  collector.collectAllTenantData()
+
+  collector
+    .collectAllTenantData()
     .then((results) => {
       console.log('\n🎉 RECOLECCIÓN COMPLETADA');
       process.exit(0);

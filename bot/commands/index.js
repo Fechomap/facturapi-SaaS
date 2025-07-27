@@ -11,10 +11,10 @@ import { registerReportCommands } from './report.command.js'; // Nueva importaci
  * Registra todos los comandos en el bot
  * @param {Object} bot - Instancia del bot de Telegram
  */
-export function registerAllCommands(bot) {
+export async function registerAllCommands(bot) {
   registerStartCommand(bot);
   registerHelpCommand(bot);
-  registerMenuCommand(bot);
+  await registerMenuCommand(bot);
   registerSubscriptionCommand(bot);
   registerAdminCommands(bot);
   registerOnboardingCommands(bot);

@@ -42,7 +42,7 @@ async function initializeTelegramBot() {
     }
 
     const botLogger = logger.child({ module: 'telegram-bot' });
-    telegramBot = createBot(botLogger);
+    telegramBot = await createBot(botLogger);
 
     if (config.env === 'production' && config.isRailway) {
       // En producción usar webhook

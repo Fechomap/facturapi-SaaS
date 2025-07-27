@@ -19,7 +19,7 @@ import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
 
-export function createBot(logger) {
+export async function createBot(logger) {
   // Verificar que el token está configurado
   if (!config.telegram.token) {
     logger.error('Token de Telegram no configurado');
@@ -77,7 +77,7 @@ export function createBot(logger) {
   registerTestHandlers(bot);
 
   // Registrar todos los comandos (incluyendo los de admin a través de registerAllCommands)
-  registerAllCommands(bot);
+  await registerAllCommands(bot);
 
   // Registrar comandos de gestión multiusuario
   registerUserManagementCommands(bot);

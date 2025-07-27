@@ -15,26 +15,26 @@ class InvoiceReportDemo {
   static async getDemoInvoiceData(tenantId, limit = 5) {
     console.log(`\n🔍 DEMO: Obteniendo datos de facturas para tenant ${tenantId}`);
     console.log(`📊 Límite de facturas para demo: ${limit}`);
-    
+
     const startTime = Date.now();
-    
+
     try {
       // 1. Datos disponibles en BD
       const invoicesFromDB = await prisma.tenantInvoice.findMany({
         where: { tenantId },
         include: {
           customer: true,
-          tenant: true
+          tenant: true,
         },
         take: limit,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       console.log(`📝 Facturas encontradas en BD: ${invoicesFromDB.length}`);
 
       if (invoicesFromDB.length === 0) {
-        console.log("❌ No hay facturas para analizar");
-        return { success: false, message: "Sin facturas disponibles" };
+        console.log('❌ No hay facturas para analizar');
+        return { success: false, message: 'Sin facturas disponibles' };
       }
 
       // 2. Obtener datos adicionales de FacturAPI
@@ -43,11 +43,13 @@ class InvoiceReportDemo {
 
       for (const invoice of invoicesFromDB) {
         try {
-          console.log(`🔄 Obteniendo datos de FacturAPI para factura ${invoice.facturapiInvoiceId}`);
-          
+          console.log(
+            `🔄 Obteniendo datos de FacturAPI para factura ${invoice.facturapiInvoiceId}`
+          );
+
           // Datos de FacturAPI
           const facturapiData = await facturapiClient.invoices.retrieve(invoice.facturapiInvoiceId);
-          
+
           // Combinar datos de BD + FacturAPI
           const enrichedInvoice = {
             // DATOS DE BD
@@ -63,10 +65,10 @@ class InvoiceReportDemo {
               customer: {
                 legalName: invoice.customer?.legalName,
                 rfc: invoice.customer?.rfc,
-                email: invoice.customer?.email
-              }
+                email: invoice.customer?.email,
+              },
             },
-            
+
             // DATOS DE FACTURAPI
             facturapiData: {
               uuid: facturapiData.uuid,
@@ -79,31 +81,35 @@ class InvoiceReportDemo {
               customer: {
                 legalName: facturapiData.customer?.legal_name,
                 taxId: facturapiData.customer?.tax_id, // RFC
-                taxSystem: facturapiData.customer?.tax_system
+                taxSystem: facturapiData.customer?.tax_system,
               },
               taxes: facturapiData.taxes,
-              items: facturapiData.items
+              items: facturapiData.items,
             },
-            
+
             // DATOS CALCULADOS
             calculatedData: {
               folio: `${invoice.series}${invoice.folioNumber}`,
               ivaAmount: this.calculateIVA(facturapiData),
               retencionAmount: this.calculateRetencion(facturapiData),
-              discrepancies: this.findDiscrepancies(invoice, facturapiData)
-            }
+              discrepancies: this.findDiscrepancies(invoice, facturapiData),
+            },
           };
 
           enrichedInvoices.push(enrichedInvoice);
-          
         } catch (error) {
-          console.error(`❌ Error obteniendo datos de FacturAPI para ${invoice.facturapiInvoiceId}:`, error.message);
-          
+          console.error(
+            `❌ Error obteniendo datos de FacturAPI para ${invoice.facturapiInvoiceId}:`,
+            error.message
+          );
+
           // Incluir solo datos de BD si falla FacturAPI
           enrichedInvoices.push({
-            bdData: { /* datos de BD */ },
+            bdData: {
+              /* datos de BD */
+            },
             facturapiData: null,
-            error: error.message
+            error: error.message,
           });
         }
       }
@@ -121,11 +127,10 @@ class InvoiceReportDemo {
         stats: {
           totalInvoices: enrichedInvoices.length,
           duration,
-          averagePerInvoice: Math.round(duration / enrichedInvoices.length)
+          averagePerInvoice: Math.round(duration / enrichedInvoices.length),
         },
-        data: enrichedInvoices
+        data: enrichedInvoices,
       };
-
     } catch (error) {
       console.error(`❌ Error en demo:`, error);
       return { success: false, error: error.message };
@@ -137,37 +142,37 @@ class InvoiceReportDemo {
    */
   static async analyzeCostsByVolume(tenantId) {
     console.log(`\n📈 ANÁLISIS DE COSTOS POR VOLUMEN`);
-    
+
     // Primero verificar cuántas facturas tiene el tenant
     const totalInvoices = await prisma.tenantInvoice.count({
-      where: { tenantId }
+      where: { tenantId },
     });
 
     console.log(`📊 Total de facturas del tenant: ${totalInvoices}`);
 
     const scenarios = [
-      { name: "Pequeño", invoices: Math.min(10, totalInvoices) },
-      { name: "Mediano", invoices: Math.min(100, totalInvoices) },
-      { name: "Grande", invoices: Math.min(500, totalInvoices) },
-      { name: "Muy Grande", invoices: Math.min(1000, totalInvoices) },
-      { name: "Extremo", invoices: totalInvoices }
+      { name: 'Pequeño', invoices: Math.min(10, totalInvoices) },
+      { name: 'Mediano', invoices: Math.min(100, totalInvoices) },
+      { name: 'Grande', invoices: Math.min(500, totalInvoices) },
+      { name: 'Muy Grande', invoices: Math.min(1000, totalInvoices) },
+      { name: 'Extremo', invoices: totalInvoices },
     ];
 
     const results = [];
 
     for (const scenario of scenarios) {
       if (scenario.invoices === 0) continue;
-      
+
       console.log(`\n🔄 Analizando escenario: ${scenario.name} (${scenario.invoices} facturas)`);
-      
+
       const startTime = Date.now();
-      
+
       try {
         // Solo consulta a BD (sin FacturAPI para esta prueba)
         const invoices = await prisma.tenantInvoice.findMany({
           where: { tenantId },
           include: { customer: true },
-          take: scenario.invoices
+          take: scenario.invoices,
         });
 
         const endTime = Date.now();
@@ -178,14 +183,15 @@ class InvoiceReportDemo {
           invoiceCount: scenario.invoices,
           dbQueryTime: duration,
           estimatedFacturapiTime: duration * 3, // Estimación: FacturAPI es ~3x más lento
-          totalEstimatedTime: duration + (duration * 3),
-          memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024 // MB
+          totalEstimatedTime: duration + duration * 3,
+          memoryUsage: process.memoryUsage().heapUsed / 1024 / 1024, // MB
         };
 
         results.push(result);
-        
-        console.log(`✅ ${scenario.name}: ${duration}ms BD + ~${duration * 3}ms FacturAPI = ~${duration * 4}ms total`);
-        
+
+        console.log(
+          `✅ ${scenario.name}: ${duration}ms BD + ~${duration * 3}ms FacturAPI = ~${duration * 4}ms total`
+        );
       } catch (error) {
         console.error(`❌ Error en escenario ${scenario.name}:`, error.message);
       }
@@ -194,12 +200,12 @@ class InvoiceReportDemo {
     // Análisis de concurrencia
     console.log(`\n🚦 ANÁLISIS DE CONCURRENCIA`);
     console.log(`📊 Si 15 usuarios solicitan reportes simultáneamente:`);
-    
-    results.forEach(result => {
+
+    results.forEach((result) => {
       const concurrent15 = result.totalEstimatedTime * 15;
-      const serverLoad = concurrent15 > 30000 ? "🔴 CRÍTICO" : 
-                        concurrent15 > 15000 ? "🟡 ALTO" : "🟢 ACEPTABLE";
-      
+      const serverLoad =
+        concurrent15 > 30000 ? '🔴 CRÍTICO' : concurrent15 > 15000 ? '🟡 ALTO' : '🟢 ACEPTABLE';
+
       console.log(`   ${result.scenario}: ${concurrent15}ms total (${serverLoad})`);
     });
 
@@ -211,9 +217,9 @@ class InvoiceReportDemo {
    */
   static calculateIVA(facturapiData) {
     if (!facturapiData.taxes) return 0;
-    
+
     return facturapiData.taxes
-      .filter(tax => tax.type === 'IVA')
+      .filter((tax) => tax.type === 'IVA')
       .reduce((sum, tax) => sum + (tax.amount || 0), 0);
   }
 
@@ -222,9 +228,9 @@ class InvoiceReportDemo {
    */
   static calculateRetencion(facturapiData) {
     if (!facturapiData.taxes) return 0;
-    
+
     return facturapiData.taxes
-      .filter(tax => tax.type === 'ISR' || tax.type === 'IVA_RET')
+      .filter((tax) => tax.type === 'ISR' || tax.type === 'IVA_RET')
       .reduce((sum, tax) => sum + (tax.amount || 0), 0);
   }
 
@@ -233,11 +239,13 @@ class InvoiceReportDemo {
    */
   static findDiscrepancies(dbInvoice, facturapiData) {
     const discrepancies = [];
-    
+
     if (Math.abs(dbInvoice.total - facturapiData.total) > 0.01) {
-      discrepancies.push(`Total difiere: BD=${dbInvoice.total} vs FacturAPI=${facturapiData.total}`);
+      discrepancies.push(
+        `Total difiere: BD=${dbInvoice.total} vs FacturAPI=${facturapiData.total}`
+      );
     }
-    
+
     return discrepancies;
   }
 }
@@ -245,29 +253,29 @@ class InvoiceReportDemo {
 // Ejecutar demo si el script se llama directamente
 if (process.argv[2] === 'run') {
   const tenantId = process.argv[3];
-  
+
   if (!tenantId) {
-    console.log("❌ Uso: node demo-invoice-report.js run <tenantId>");
+    console.log('❌ Uso: node demo-invoice-report.js run <tenantId>');
     process.exit(1);
   }
-  
+
   console.log(`🚀 Iniciando análisis para tenant: ${tenantId}`);
-  
+
   InvoiceReportDemo.getDemoInvoiceData(tenantId, 3)
-    .then(result => {
+    .then((result) => {
       console.log(`\n📋 RESULTADO DEMO:`);
       console.log(JSON.stringify(result, null, 2));
-      
+
       return InvoiceReportDemo.analyzeCostsByVolume(tenantId);
     })
-    .then(costAnalysis => {
+    .then((costAnalysis) => {
       console.log(`\n💰 ANÁLISIS DE COSTOS:`);
       console.table(costAnalysis);
-      
+
       process.exit(0);
     })
-    .catch(error => {
-      console.error("❌ Error en demo:", error);
+    .catch((error) => {
+      console.error('❌ Error en demo:', error);
       process.exit(1);
     });
 }

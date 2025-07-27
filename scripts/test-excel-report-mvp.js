@@ -22,14 +22,14 @@ async function testExcelReportMVP() {
     const testConfig = {
       limit: 10, // Solo 10 para test rápido
       includeDetails: true,
-      format: 'xlsx'
+      format: 'xlsx',
     };
 
     console.log('🔄 Generando reporte de prueba...');
-    
+
     // Generar reporte
     const result = await ExcelReportService.generateInvoiceReport(tenantId, testConfig);
-    
+
     const duration = Date.now() - startTime;
 
     if (result.success) {
@@ -39,34 +39,31 @@ async function testExcelReportMVP() {
       console.log(`⏱️ Tiempo total: ${duration}ms`);
       console.log(`📄 Tamaño archivo: ${result.stats.fileSize}`);
       console.log(`📁 Archivo generado: ${result.filePath}`);
-      
+
       // Verificar que el archivo existe
       const fs = await import('fs');
       if (fs.existsSync(result.filePath)) {
         console.log('✅ Archivo Excel creado correctamente');
-        
+
         // Mostrar estadísticas del archivo
         const stats = fs.statSync(result.filePath);
         console.log(`📏 Tamaño real: ${(stats.size / 1024).toFixed(2)} KB`);
-        
+
         console.log('\n🎯 VALIDACIONES:');
         console.log('✅ ExcelJS funciona correctamente');
         console.log('✅ Consulta a FacturAPI exitosa');
         console.log('✅ Generación de archivo Excel exitosa');
         console.log('✅ Todos los campos incluidos');
         console.log('✅ Formato y estructura correctos');
-        
       } else {
         console.log('❌ Error: Archivo no encontrado');
       }
-      
     } else {
       console.log('\n❌ TEST FALLIDO!');
       console.log('================');
       console.log(`💬 Error: ${result.error}`);
       console.log(`⏱️ Tiempo hasta fallo: ${duration}ms`);
     }
-
   } catch (error) {
     console.log('\n💥 ERROR CRÍTICO EN TEST!');
     console.log('==========================');

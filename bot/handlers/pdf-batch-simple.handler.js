@@ -377,7 +377,7 @@ export function handleBatchGenerateInvoices(bot) {
           ]),
         }
       );
-      
+
       // Limpiar botones del mensaje anterior (resumen de análisis)
       // Buscar el mensaje con los botones "Generar Facturas" y "Cancelar" para limpiarlos
       try {
