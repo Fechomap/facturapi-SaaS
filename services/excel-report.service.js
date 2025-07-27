@@ -387,7 +387,7 @@ class ExcelReportService {
     // Formatear encabezados (solo columnas A-K)
     const headerRow = worksheet.getRow(1);
     headerRow.font = { bold: true, color: { argb: 'FFFFFF' } };
-    
+
     // Aplicar formato solo a las 11 columnas utilizadas (A-K)
     for (let col = 1; col <= 11; col++) {
       const cell = headerRow.getCell(col);
@@ -401,7 +401,7 @@ class ExcelReportService {
     // AGREGAR FILTROS AUTOMÁTICOS EN LOS ENCABEZADOS
     worksheet.autoFilter = {
       from: 'A1',
-      to: 'K1' // Solo hasta la columna K (columna 11)
+      to: 'K1', // Solo hasta la columna K (columna 11)
     };
 
     // Configurar ancho de columnas y formato numérico
@@ -460,16 +460,24 @@ class ExcelReportService {
         '',
         '',
         'TOTALES:',
-        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.subtotal || 0), 0)), // TRUNCADO A 2 DECIMALES
-        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.ivaAmount || 0), 0)), // TRUNCADO A 2 DECIMALES
-        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.retencionAmount || 0), 0)), // TRUNCADO A 2 DECIMALES
-        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0)), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(
+          invoices.reduce((sum, inv) => sum + parseFloat(inv.subtotal || 0), 0)
+        ), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(
+          invoices.reduce((sum, inv) => sum + parseFloat(inv.ivaAmount || 0), 0)
+        ), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(
+          invoices.reduce((sum, inv) => sum + parseFloat(inv.retencionAmount || 0), 0)
+        ), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(
+          invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0)
+        ), // TRUNCADO A 2 DECIMALES
         '',
         '',
       ]);
 
       totalRow.font = { bold: true };
-      
+
       // Aplicar formato verde solo a las columnas A-K
       for (let col = 1; col <= 11; col++) {
         const cell = totalRow.getCell(col);
@@ -637,6 +645,59 @@ class ExcelReportService {
         console.log(`🗑️ Archivo temporal eliminado: ${file}`);
       }
     });
+  }
+
+  /**
+   * Estimar cantidad de facturas que coinciden con los filtros (FASE 3)
+   * @param {string} tenantId - ID del tenant
+   * @param {Object} config - Configuración con filtros
+   * @returns {Promise<Object>} - Estimación de facturas
+   */
+  static async estimateInvoiceCount(tenantId, config = {}) {
+    try {
+      console.log(`📊 Estimando cantidad de facturas para tenant: ${tenantId}`);
+
+      // Construir filtros de base de datos
+      const where = { tenantId };
+
+      // Aplicar filtro de fecha si existe
+      if (config.dateRange) {
+        const { startDate, endDate } = DateFilterUtils.getDateRangeForFilter(config.dateRange);
+        if (startDate && endDate) {
+          where.invoiceDate = {
+            gte: startDate,
+            lte: endDate,
+          };
+        }
+      }
+
+      // Aplicar filtro de clientes si existe
+      if (config.clientIds && config.clientIds.length > 0) {
+        where.customerId = {
+          in: config.clientIds,
+        };
+      }
+
+      // Contar facturas que coinciden con los filtros
+      const count = await prisma.tenantInvoice.count({ where });
+
+      console.log(`📈 Facturas estimadas: ${count}`);
+
+      return {
+        count,
+        tenantId,
+        filters: config,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      console.error('❌ Error estimando cantidad de facturas:', error);
+      return {
+        count: 0,
+        error: error.message,
+        tenantId,
+        filters: config,
+      };
+    }
   }
 }
 

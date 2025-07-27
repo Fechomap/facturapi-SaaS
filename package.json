@@ -54,6 +54,8 @@
     "@prisma/client": "^6.6.0",
     "archiver": "^7.0.1",
     "axios": "^1.8.4",
+    "bull": "^4.16.5",
+    "bull-board": "^1.7.2",
     "concurrently": "^8.2.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",

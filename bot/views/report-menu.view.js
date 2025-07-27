@@ -74,7 +74,11 @@ export function clientSelectionMenu(clients, selectedIds = []) {
     if (words.length >= 2) {
       // Tomar las primeras letras de cada palabra significativa
       const siglas = words
-        .filter((word) => word.length > 2 && !['DE', 'LA', 'EL', 'Y', 'SA', 'CV', 'LAS', 'DEL', 'DIA'].includes(word))
+        .filter(
+          (word) =>
+            word.length > 2 &&
+            !['DE', 'LA', 'EL', 'Y', 'SA', 'CV', 'LAS', 'DEL', 'DIA'].includes(word)
+        )
         .slice(0, 3) // Máximo 3 palabras para evitar siglas muy largas
         .map((word) => word.substring(0, 1))
         .join('');

@@ -238,4 +238,70 @@ class NotificationService {
   }
 }
 
+/**
+ * Notificar al usuario que su reporte Excel está listo
+ */
+export async function notifyUserReportReady({
+  chatId,
+  tenantId,
+  userId,
+  filePath,
+  fileName,
+  invoiceCount,
+  fileSizeMB,
+  requestId,
+  jobId,
+}) {
+  try {
+    const message =
+      `✅ **¡Tu Reporte Excel está listo!**\n\n` +
+      `📊 **Facturas incluidas:** ${invoiceCount.toLocaleString()}\n` +
+      `📁 **Tamaño:** ${fileSizeMB} MB\n` +
+      `⏱️ **Generado:** ${new Date().toLocaleString('es-MX')}\n\n` +
+      `🔗 Descargando automáticamente...\n\n` +
+      `📋 **ID:** \`${requestId}\`\n` +
+      `🗑️ *El archivo se eliminará automáticamente en 24 horas*`;
+
+    // Enviar mensaje de notificación
+    await NotificationService.sendTelegramNotification(chatId, message);
+
+    // Enviar el archivo Excel
+    const bot = NotificationService.getBot();
+    await bot.telegram.sendDocument(
+      chatId,
+      {
+        source: filePath,
+        filename: fileName,
+      },
+      {
+        caption: `📊 **${fileName}**\n${invoiceCount} facturas | ${fileSizeMB} MB`,
+        parse_mode: 'Markdown',
+      }
+    );
+
+    notificationLogger.info('Report ready notification sent successfully', {
+      chatId,
+      tenantId,
+      userId,
+      fileName,
+      invoiceCount,
+      fileSizeMB,
+      requestId,
+      jobId,
+    });
+
+    return { success: true };
+  } catch (error) {
+    notificationLogger.error('Error sending report ready notification', {
+      chatId,
+      tenantId,
+      userId,
+      error: error.message,
+      requestId,
+      jobId,
+    });
+    throw error;
+  }
+}
+
 export default NotificationService;

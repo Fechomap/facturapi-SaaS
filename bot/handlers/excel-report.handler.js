@@ -475,7 +475,7 @@ async function applyDateFilter(ctx, dateRange) {
 }
 
 /**
- * Generar reporte con filtros aplicados
+ * Generar reporte con filtros aplicados - FASE 3: Con soporte para jobs asíncronos
  */
 async function generateFilteredReport(ctx) {
   try {
@@ -484,7 +484,7 @@ async function generateFilteredReport(ctx) {
 
     // Preparar configuración del reporte
     const reportConfig = {
-      limit: 500, // FASE 2: límite aumentado
+      limit: 5000, // FASE 3: límite aumentado para jobs asíncronos
       includeDetails: true,
       format: 'xlsx',
       useCache: true,
@@ -494,109 +494,174 @@ async function generateFilteredReport(ctx) {
 
     // Mensaje inicial de progreso
     const progressMsg = await ctx.reply(
-      '📊 **Generando Reporte Excel**\n\n' +
-        '🔄 Iniciando generación...\n' +
-        '⏱️ Esto puede tomar unos momentos...',
+      '📊 **Iniciando Reporte Excel**\n\n' +
+        '🔄 Estimando tamaño del reporte...\n' +
+        '⏱️ Un momento por favor...',
       { parse_mode: 'Markdown' }
     );
 
-    // Actualizar progreso
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      progressMsg.message_id,
-      null,
-      '📊 **Generando Reporte Excel**\n\n' +
-        '🔄 Consultando datos con filtros aplicados...\n' +
-        '📋 Obteniendo información de FacturAPI...',
-      { parse_mode: 'Markdown' }
-    );
+    // Estimar cantidad de facturas que coinciden con los filtros
+    const estimation = await ExcelReportService.estimateInvoiceCount(tenantId, reportConfig);
 
-    // Generar reporte
-    const result = await ExcelReportService.generateInvoiceReport(tenantId, reportConfig);
+    // DECISIÓN: ¿Reporte síncrono o asíncrono?
+    if (estimation.count > 500) {
+      // ============================================
+      // REPORTE ASÍNCRONO (>500 facturas)
+      // ============================================
 
-    if (result.success) {
-      // Construir mensaje de éxito
-      let successMessage = '✅ **Reporte Excel Generado**\n\n';
-      successMessage += `📊 Facturas incluidas: ${result.stats.totalInvoices}\n`;
-      successMessage += `⏱️ Tiempo de generación: ${Math.round(result.stats.duration / 1000)}s\n`;
+      const { addExcelReportJob, estimateProcessingTime } = await import(
+        '../../services/queue.service.js'
+      );
 
-      if (result.fromCache) {
-        successMessage += `🚀 Obtenido desde cache (súper rápido)\n`;
-      }
-
-      successMessage += `📄 Tamaño: ${result.stats.fileSize}\n\n`;
-
-      // Agregar información de filtros aplicados
-      if (filters.dateRange) {
-        successMessage += `📅 Período: ${filters.dateRange.display}\n`;
-      }
-      if (filters.selectedClientIds && filters.selectedClientIds.length > 0) {
-        successMessage += `👥 Clientes: ${filters.selectedClientIds.length} seleccionados\n`;
-      }
-
-      successMessage += '\n📎 Enviando archivo...';
+      const estimatedTime = estimateProcessingTime(estimation.count);
+      const requestId = `RPT-${Date.now()}-${tenantId.slice(-6)}`;
 
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         progressMsg.message_id,
         null,
-        successMessage,
+        `📊 **Reporte Grande Detectado**\n\n` +
+          `📈 **Facturas encontradas:** ${estimation.count.toLocaleString()}\n` +
+          `⏱️ **Tiempo estimado:** ${estimatedTime}\n\n` +
+          `🔄 **Procesamiento asíncrono iniciado**\n` +
+          `Te notificaremos cuando esté listo.\n\n` +
+          `📋 **ID de solicitud:** \`${requestId}\`\n\n` +
+          `💡 *Puedes cerrar el chat, te avisaremos por aquí cuando termine.*`,
         { parse_mode: 'Markdown' }
       );
 
-      // Enviar archivo Excel
-      const filename = generateExcelFileName(filters);
-      await ctx.replyWithDocument({
-        source: result.filePath,
-        filename,
-      });
+      // Crear job asíncrono
+      const jobData = {
+        tenantId,
+        userId: ctx.from.id,
+        chatId: ctx.chat.id,
+        filters,
+        estimatedInvoices: estimation.count,
+        requestId,
+        timestamp: Date.now(),
+      };
 
-      // Mensaje final con opciones
+      const job = await addExcelReportJob(jobData);
+
+      // Mensaje de confirmación
       await ctx.reply(
-        '🎉 **¡Reporte Excel enviado!**\n\n' +
-          '📋 El archivo incluye todos los campos fiscales:\n' +
-          '• Folio y UUID/Folio Fiscal\n' +
-          '• Datos completos del cliente\n' +
-          '• Subtotal, IVA, retención y total\n' +
-          '• Estado y URL de verificación SAT\n\n' +
-          '💡 Compatible con Excel, Google Sheets y LibreOffice.',
+        `✅ **Job Asíncrono Creado**\n\n` +
+          `🆔 **Job ID:** \`${job.id}\`\n` +
+          `📋 **Solicitud:** \`${requestId}\`\n` +
+          `⏱️ **Estimado:** ${estimatedTime}\n\n` +
+          `🔔 **Te notificaremos automáticamente cuando esté listo**\n\n` +
+          `📊 Mientras tanto, puedes seguir usando el bot normalmente.`,
         {
           parse_mode: 'Markdown',
-          ...postGenerationMenu(result),
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('📊 Otro reporte', 'excel_report_options')],
+            [Markup.button.callback('🔙 Menú principal', 'menu_principal')],
+          ]),
         }
       );
-
-      // Limpiar archivo temporal
-      setTimeout(
-        async () => {
-          try {
-            const fs = await import('fs');
-            fs.unlinkSync(result.filePath);
-            console.log(`🗑️ Archivo temporal limpiado: ${result.filePath}`);
-          } catch (error) {
-            console.log(`ℹ️ No se pudo limpiar archivo temporal: ${error.message}`);
-          }
-        },
-        5 * 60 * 1000
-      );
     } else {
-      // Error en la generación
+      // ============================================
+      // REPORTE SÍNCRONO (≤500 facturas)
+      // ============================================
+
       await ctx.telegram.editMessageText(
         ctx.chat.id,
         progressMsg.message_id,
         null,
-        '❌ **Error Generando Reporte**\n\n' +
-          `💬 ${result.error}\n\n` +
-          '🔄 Puedes intentar nuevamente o cambiar los filtros.',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Reintentar', 'excel_generate_filtered')],
-            [Markup.button.callback('⚙️ Cambiar filtros', 'excel_report_options')],
-            [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')],
-          ]),
-        }
+        '📊 **Generando Reporte Excel**\n\n' +
+          `📈 Facturas encontradas: ${estimation.count}\n` +
+          '🔄 Consultando datos con filtros aplicados...\n' +
+          '📋 Obteniendo información de FacturAPI...',
+        { parse_mode: 'Markdown' }
       );
+
+      // Generar reporte síncrono (como antes)
+      const result = await ExcelReportService.generateInvoiceReport(tenantId, reportConfig);
+
+      if (result.success) {
+        // Construir mensaje de éxito
+        let successMessage = '✅ **Reporte Excel Generado**\n\n';
+        successMessage += `📊 Facturas incluidas: ${result.stats.totalInvoices}\n`;
+        successMessage += `⏱️ Tiempo de generación: ${Math.round(result.stats.duration / 1000)}s\n`;
+
+        if (result.fromCache) {
+          successMessage += `🚀 Obtenido desde cache (súper rápido)\n`;
+        }
+
+        successMessage += `📄 Tamaño: ${result.stats.fileSize}\n\n`;
+
+        // Agregar información de filtros aplicados
+        if (filters.dateRange) {
+          successMessage += `📅 Período: ${filters.dateRange.display}\n`;
+        }
+        if (filters.selectedClientIds && filters.selectedClientIds.length > 0) {
+          successMessage += `👥 Clientes: ${filters.selectedClientIds.length} seleccionados\n`;
+        }
+
+        successMessage += '\n📎 Enviando archivo...';
+
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          progressMsg.message_id,
+          null,
+          successMessage,
+          { parse_mode: 'Markdown' }
+        );
+
+        // Enviar archivo Excel
+        const filename = generateExcelFileName(filters);
+        await ctx.replyWithDocument({
+          source: result.filePath,
+          filename,
+        });
+
+        // Mensaje final con opciones
+        await ctx.reply(
+          '🎉 **¡Reporte Excel enviado!**\n\n' +
+            '📋 El archivo incluye todos los campos fiscales:\n' +
+            '• Folio y UUID/Folio Fiscal\n' +
+            '• Datos completos del cliente\n' +
+            '• Subtotal, IVA, retención y total\n' +
+            '• Estado y URL de verificación SAT\n\n' +
+            '💡 Compatible con Excel, Google Sheets y LibreOffice.',
+          {
+            parse_mode: 'Markdown',
+            ...postGenerationMenu(result),
+          }
+        );
+
+        // Limpiar archivo temporal (solo para reportes síncronos)
+        setTimeout(
+          async () => {
+            try {
+              const fs = await import('fs');
+              fs.unlinkSync(result.filePath);
+              console.log(`🗑️ Archivo temporal limpiado: ${result.filePath}`);
+            } catch (error) {
+              console.log(`ℹ️ No se pudo limpiar archivo temporal: ${error.message}`);
+            }
+          },
+          5 * 60 * 1000
+        );
+      } else {
+        // Error en la generación síncrona
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          progressMsg.message_id,
+          null,
+          '❌ **Error Generando Reporte**\n\n' +
+            `💬 ${result.error}\n\n` +
+            '🔄 Puedes intentar nuevamente o cambiar los filtros.',
+          {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('🔄 Reintentar', 'excel_generate_filtered')],
+              [Markup.button.callback('⚙️ Cambiar filtros', 'excel_report_options')],
+              [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')],
+            ]),
+          }
+        );
+      }
     }
   } catch (error) {
     console.error('❌ Error generando reporte filtrado:', error);

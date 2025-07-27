@@ -1,10 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(echo:*)",
-      "Bash(ls:*)",
-      "Bash(git add:*)"
-    ],
+    "allow": ["Bash(echo:*)", "Bash(ls:*)", "Bash(git add:*)"],
     "deny": []
   }
 }

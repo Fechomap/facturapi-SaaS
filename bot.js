@@ -25,6 +25,20 @@ async function startBot() {
     await redisSessionService.initialize();
     botLogger.info('Servicio de Redis inicializado');
 
+    // FASE 3: Inicializar sistema de colas Bull para jobs asíncronos
+    try {
+      const { cleanOldJobs } = await import('./services/queue.service.js');
+
+      // Limpiar jobs antiguos al inicio
+      await cleanOldJobs();
+
+      botLogger.info('Sistema de colas Bull inicializado', {
+        queues: ['excel-report', 'file-cleanup'],
+      });
+    } catch (error) {
+      botLogger.warn('No se pudo inicializar sistema de colas Bull', { error: error.message });
+    }
+
     // Crear e inicializar el bot usando el módulo modular
     const bot = createBot(botLogger);
 
@@ -32,6 +46,18 @@ async function startBot() {
     cron.schedule('0 * * * *', async () => {
       botLogger.info('Ejecutando limpieza automática de sesiones...');
       await cleanupExpiredSessions();
+    });
+
+    // 🗑️ FASE 3: Job automático de limpieza de colas Bull cada hora
+    cron.schedule('0 * * * *', async () => {
+      try {
+        botLogger.info('Ejecutando limpieza automática de jobs Bull...');
+        const { cleanOldJobs } = await import('./services/queue.service.js');
+        await cleanOldJobs();
+        botLogger.info('Limpieza de jobs Bull completada');
+      } catch (error) {
+        botLogger.warn('Error en limpieza de jobs Bull', { error: error.message });
+      }
     });
 
     // Iniciar el bot según el entorno
