@@ -46,29 +46,36 @@ export function dateFilterMenu() {
 export function clientSelectionMenu(clients, selectedIds = []) {
   const buttons = [];
 
-  // Función para simplificar nombres de clientes - CORREGIDO
+  // Función para simplificar nombres de clientes - MAPEO COMPLETO
   const simplifyClientName = (fullName) => {
     const nameMap = {
       'INFOASIST INFORMACION Y ASISTENCIA': 'INFOASIST',
       'AXA ASSISTANCE MEXICO': 'AXA',
       'CHUBB DIGITAL SERVICES': 'CHUBB',
-      'PROTECCION S.O.S. JURIDICO': 'SOS',
-      'ARSA ASESORIA INTEGRAL': 'ARSA',
-      'ASESORIA INTEGRAL Y PROFESIONAL': 'ARSA',
+      'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA': 'SOS',
+      'ARSA ASESORIA INTEGRAL PROFESIONAL': 'ARSA',
       'FACTURAPI SA DE CV': 'FACTURAPI',
     };
 
-    // Si no está en el mapeo, usar las primeras letras significativas
+    // Verificar mapeo directo primero
     if (nameMap[fullName]) {
       return nameMap[fullName];
     }
 
-    // Extraer las siglas o nombre corto
+    // Verificar coincidencias parciales para casos donde el nombre puede variar ligeramente
+    for (const [key, value] of Object.entries(nameMap)) {
+      if (fullName.includes(key.split(' ')[0]) || key.includes(fullName.split(' ')[0])) {
+        return value;
+      }
+    }
+
+    // Como último recurso, extraer las primeras letras significativas
     const words = fullName.split(' ');
     if (words.length >= 2) {
       // Tomar las primeras letras de cada palabra significativa
       const siglas = words
-        .filter((word) => word.length > 2 && !['DE', 'LA', 'EL', 'Y', 'SA', 'CV'].includes(word))
+        .filter((word) => word.length > 2 && !['DE', 'LA', 'EL', 'Y', 'SA', 'CV', 'LAS', 'DEL', 'DIA'].includes(word))
+        .slice(0, 3) // Máximo 3 palabras para evitar siglas muy largas
         .map((word) => word.substring(0, 1))
         .join('');
       return siglas || words[0];
