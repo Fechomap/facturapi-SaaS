@@ -4,68 +4,108 @@
 import { Markup } from 'telegraf';
 
 /**
- * Menú principal de opciones de reporte Excel
+ * Menú principal de opciones de reporte Excel - MEJORADO UX
  */
 export function excelReportOptionsMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('📅 Filtrar por fecha', 'excel_filter_date')],
-    [Markup.button.callback('👥 Seleccionar clientes', 'excel_filter_clients')],
-    [Markup.button.callback('📊 Todas las facturas', 'excel_generate_all')],
+    [
+      Markup.button.callback('📅 Filtrar por Fecha', 'excel_filter_date'),
+      Markup.button.callback('👥 Filtrar Clientes', 'excel_filter_clients'),
+    ],
+    [Markup.button.callback('📊 Todas las Facturas', 'excel_generate_all')],
     [Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')],
   ]);
 }
 
 /**
- * Menú de filtros de fecha
+ * Menú de filtros de fecha - MEJORADO UX
  */
 export function dateFilterMenu() {
   return Markup.inlineKeyboard([
-    [Markup.button.callback('📅 Últimos 7 días', 'excel_date_last7')],
-    [Markup.button.callback('📅 Últimos 30 días', 'excel_date_last30')],
-    [Markup.button.callback('📅 Mes actual', 'excel_date_current_month')],
-    [Markup.button.callback('📅 Mes anterior', 'excel_date_previous_month')],
-    [Markup.button.callback('📅 Año actual', 'excel_date_current_year')],
-    [Markup.button.callback('📅 Rango personalizado', 'excel_date_custom')],
+    [
+      Markup.button.callback('📊 Últimos 7 días', 'excel_date_last7'),
+      Markup.button.callback('📊 Últimos 30 días', 'excel_date_last30'),
+    ],
+    [
+      Markup.button.callback('📅 Mes actual', 'excel_date_current_month'),
+      Markup.button.callback('📅 Mes anterior', 'excel_date_previous_month'),
+    ],
+    [
+      Markup.button.callback('📊 Año actual', 'excel_date_current_year'),
+      Markup.button.callback('⚙️ Rango personalizado', 'excel_date_custom'),
+    ],
     [Markup.button.callback('🔙 Volver', 'excel_report_options')],
   ]);
 }
 
 /**
- * Menú de selección de clientes
+ * Menú de selección de clientes - MEJORADO UX
  * @param {Array} clients - Lista de clientes con información
  * @param {Array} selectedIds - IDs de clientes ya seleccionados
  */
 export function clientSelectionMenu(clients, selectedIds = []) {
   const buttons = [];
 
-  // Agregar botones de clientes
+  // Función para simplificar nombres de clientes - CORREGIDO
+  const simplifyClientName = (fullName) => {
+    const nameMap = {
+      'INFOASIST INFORMACION Y ASISTENCIA': 'INFOASIST',
+      'AXA ASSISTANCE MEXICO': 'AXA',
+      'CHUBB DIGITAL SERVICES': 'CHUBB',
+      'PROTECCION S.O.S. JURIDICO': 'SOS',
+      'ARSA ASESORIA INTEGRAL': 'ARSA',
+      'ASESORIA INTEGRAL Y PROFESIONAL': 'ARSA',
+      'FACTURAPI SA DE CV': 'FACTURAPI',
+    };
+
+    // Si no está en el mapeo, usar las primeras letras significativas
+    if (nameMap[fullName]) {
+      return nameMap[fullName];
+    }
+
+    // Extraer las siglas o nombre corto
+    const words = fullName.split(' ');
+    if (words.length >= 2) {
+      // Tomar las primeras letras de cada palabra significativa
+      const siglas = words
+        .filter((word) => word.length > 2 && !['DE', 'LA', 'EL', 'Y', 'SA', 'CV'].includes(word))
+        .map((word) => word.substring(0, 1))
+        .join('');
+      return siglas || words[0];
+    }
+
+    return words[0] || fullName;
+  };
+
+  // Agregar botones de clientes con checkmarks alineados a la izquierda
   clients.forEach((client) => {
     const isSelected = selectedIds.includes(client.id.toString());
-    const icon = isSelected ? '☑️' : '☐';
+    const icon = isSelected ? '✅' : '⬜'; // Iconos más visuales
+    const simplifiedName = simplifyClientName(client.legalName);
     const invoiceCount = client._count?.invoices || 0;
 
     buttons.push([
       Markup.button.callback(
-        `${icon} ${client.legalName} (${invoiceCount} facturas)`,
+        `${icon} ${simplifiedName} (${invoiceCount})`,
         `excel_toggle_client_${client.id}`
       ),
     ]);
   });
 
-  // Botones de control
+  // Botones de control con mejor diseño visual
   if (selectedIds.length > 0) {
     const totalSelected = selectedIds.length;
     buttons.push([
       Markup.button.callback(
-        `✅ Generar reporte (${totalSelected} clientes)`,
+        `📊 Generar reporte (${totalSelected} cliente${totalSelected > 1 ? 's' : ''})`,
         'excel_generate_filtered'
       ),
     ]);
   }
 
   buttons.push([
-    Markup.button.callback('🔄 Seleccionar todos', 'excel_select_all_clients'),
-    Markup.button.callback('❌ Limpiar selección', 'excel_clear_selection'),
+    Markup.button.callback('✅ Todos', 'excel_select_all_clients'),
+    Markup.button.callback('❌ Ninguno', 'excel_clear_selection'),
   ]);
 
   buttons.push([Markup.button.callback('🔙 Volver', 'excel_report_options')]);
@@ -144,39 +184,49 @@ export function postGenerationMenu(result) {
 }
 
 /**
- * Menú para filtros combinados (fecha + clientes)
+ * Menú para filtros combinados - MEJORADO UX
  * @param {Object} filters - Filtros actuales aplicados
  */
 export function combinedFiltersMenu(filters = {}) {
   const buttons = [];
 
-  // Mostrar filtros activos
-  if (filters.dateRange) {
-    buttons.push([
-      Markup.button.callback(`📅 Período: ${filters.dateRange.display} ✏️`, 'excel_filter_date'),
-    ]);
-  }
+  // Estado visual de filtros activos
+  const hasDateFilter = filters.dateRange;
+  const hasClientFilter = filters.selectedClientIds && filters.selectedClientIds.length > 0;
 
-  if (filters.selectedClients && filters.selectedClients.length > 0) {
+  // Botones para modificar filtros con indicadores visuales
+  const dateButton = hasDateFilter
+    ? Markup.button.callback(`✅ ${filters.dateRange.display}`, 'excel_filter_date')
+    : Markup.button.callback('📅 Filtrar por fecha', 'excel_filter_date');
+
+  const clientButton = hasClientFilter
+    ? Markup.button.callback(
+        `✅ ${filters.selectedClientIds.length} cliente${filters.selectedClientIds.length > 1 ? 's' : ''}`,
+        'excel_filter_clients'
+      )
+    : Markup.button.callback('👥 Filtrar clientes', 'excel_filter_clients');
+
+  buttons.push([dateButton, clientButton]);
+
+  // Botón principal de generación
+  if (filters.estimatedInvoices && filters.estimatedInvoices > 0) {
+    const timeEmoji =
+      filters.estimatedTimeSeconds < 10 ? '⚡' : filters.estimatedTimeSeconds < 30 ? '⏱️' : '🕐';
     buttons.push([
       Markup.button.callback(
-        `👥 Clientes: ${filters.selectedClients.length} seleccionados ✏️`,
-        'excel_filter_clients'
+        `${timeEmoji} Generar ${filters.estimatedInvoices} facturas`,
+        'excel_confirm_generation'
       ),
     ]);
+  } else {
+    buttons.push([Markup.button.callback('📊 Generar reporte', 'excel_confirm_generation')]);
   }
 
-  // Botones de acción
-  if (filters.dateRange || (filters.selectedClients && filters.selectedClients.length > 0)) {
-    buttons.push([Markup.button.callback('📊 Generar con filtros', 'excel_generate_filtered')]);
-    buttons.push([Markup.button.callback('🗑️ Limpiar filtros', 'excel_clear_all_filters')]);
-  }
-
-  buttons.push([Markup.button.callback('📅 Filtrar por fecha', 'excel_filter_date')]);
-
-  buttons.push([Markup.button.callback('👥 Seleccionar clientes', 'excel_filter_clients')]);
-
-  buttons.push([Markup.button.callback('🔙 Volver a Reportes', 'menu_reportes')]);
+  // Botones de control
+  buttons.push([
+    Markup.button.callback('🔄 Limpiar todo', 'excel_clear_all_filters'),
+    Markup.button.callback('🔙 Volver', 'menu_reportes'),
+  ]);
 
   return Markup.inlineKeyboard(buttons);
 }
@@ -213,27 +263,19 @@ export function quickStatsMenu(stats) {
 }
 
 /**
- * Generar texto de resumen de filtros
+ * Generar texto de resumen de filtros - MEJORADO UX
  * @param {Object} filters - Filtros aplicados
  */
 export function generateFilterSummaryText(filters) {
-  let summary = '🔍 **Filtros aplicados:**\n\n';
+  let summary = '';
 
   if (filters.dateRange) {
-    summary += `📅 **Período:** ${filters.dateRange.display}\n`;
-    if (filters.dateRange.start && filters.dateRange.end) {
-      summary += `   Del ${filters.dateRange.start} al ${filters.dateRange.end}\n`;
-    }
+    summary += `📅 **Fecha seleccionada:** ${filters.dateRange.display}\n`;
   }
 
-  if (filters.selectedClients && filters.selectedClients.length > 0) {
-    summary += `👥 **Clientes:** ${filters.selectedClients.length} seleccionados\n`;
-    if (filters.selectedClients.length <= 3) {
-      // Mostrar nombres si son pocos
-      filters.selectedClients.forEach((client) => {
-        summary += `   • ${client.name}\n`;
-      });
-    }
+  if (filters.selectedClientIds && filters.selectedClientIds.length > 0) {
+    const clientCount = filters.selectedClientIds.length;
+    summary += `👥 **Clientes:** ${clientCount} cliente${clientCount > 1 ? 's' : ''}\n`;
   }
 
   if (filters.estimatedInvoices) {

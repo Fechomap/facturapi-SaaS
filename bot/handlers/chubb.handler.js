@@ -25,6 +25,25 @@ if (!prisma) {
   console.error('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
 }
 
+// Función helper para obtener customerId del cliente CHUBB desde BD
+async function getChubbCustomerIdFromDB(tenantId, facturapiCustomerId) {
+  try {
+    const customer = await prisma.tenantCustomer.findFirst({
+      where: {
+        tenantId,
+        facturapiCustomerId,
+        legalName: { contains: 'CHUBB', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    return customer?.id || null;
+  } catch (error) {
+    console.error('Error obteniendo customerId CHUBB:', error);
+    return null;
+  }
+}
+
 // Constantes para las claves SAT
 const CLAVE_SAT_GRUA_CON_RETENCION = '78101803';
 const CLAVE_SAT_SERVICIOS_SIN_RETENCION = '90121800';
@@ -975,14 +994,17 @@ async function generarFacturaParaGrupo(
 
     // Registrar la factura en la base de datos con el folio devuelto por FacturAPI
     try {
+      // Obtener el customerId del cliente CHUBB desde userState
+      const chubbCustomerId = await getChubbCustomerIdFromDB(tenantId, ctx.userState.chubbClientId);
+
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
         factura.series || 'A',
         factura.folio_number, // Usamos el folio que FacturAPI asignó
-        null, // customerId, podríamos buscar el ID del cliente en la base de datos si es necesario
+        chubbCustomerId, // ✅ Ahora sí vinculamos al cliente CHUBB
         factura.total,
-        ctx.from?.id ? BigInt(ctx.from.id) : null // ID del usuario que creó la factura
+        ctx.from?.id && parseInt(ctx.from.id) <= 2147483647 ? parseInt(ctx.from.id) : null // ✅ INT4 safe
       );
 
       console.log('Factura registrada en la base de datos:', registeredInvoice);

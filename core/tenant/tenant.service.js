@@ -557,8 +557,9 @@ class TenantService {
 
     return withTransaction(
       async (tx) => {
-        // Convertir createdById a BigInt si existe
-        const createdByIdBigInt = createdById ? BigInt(createdById) : null;
+        // Convertir createdById a Int si existe y cabe en INT4, sino NULL
+        const createdByIdInt =
+          createdById && parseInt(createdById) <= 2147483647 ? parseInt(createdById) : null;
 
         // Registrar la factura
         const invoice = await tx.tenantInvoice.create({
@@ -570,7 +571,7 @@ class TenantService {
             customerId,
             total,
             status: 'valid',
-            createdById: createdByIdBigInt,
+            createdById: createdByIdInt,
             invoiceDate: new Date(),
           },
         });

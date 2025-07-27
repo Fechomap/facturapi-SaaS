@@ -25,6 +25,25 @@ if (!prisma) {
   console.error('ERROR CRÍTICO: No se pudo inicializar Prisma, ambas fuentes fallaron');
 }
 
+// Función helper para obtener customerId del cliente AXA desde BD
+async function getAxaCustomerIdFromDB(tenantId, facturapiCustomerId) {
+  try {
+    const customer = await prisma.tenantCustomer.findFirst({
+      where: {
+        tenantId,
+        facturapiCustomerId,
+        legalName: { contains: 'AXA', mode: 'insensitive' },
+      },
+      select: { id: true },
+    });
+
+    return customer?.id || null;
+  } catch (error) {
+    console.error('Error obteniendo customerId AXA:', error);
+    return null;
+  }
+}
+
 // Constante para la clave SAT de servicios de grúa
 const CLAVE_SAT_SERVICIOS_GRUA = '78101803';
 
@@ -1099,15 +1118,19 @@ async function enviarFacturaDirectaAxa(facturaData, ctx, progressMessageId = nul
 
     // Registrar factura en BD
     console.log('🚀 FASE 3: Registrando factura en BD...');
+
+    // Obtener el customerId del cliente AXA desde userState
+    const axaCustomerId = await getAxaCustomerIdFromDB(tenantId, ctx.userState.axaClientId);
+
     const TenantService = await import('../../services/tenant.service.js').then((m) => m.default);
     await TenantService.registerInvoice(
       tenantId,
       factura.id,
       factura.series,
       factura.folio_number,
-      null,
+      axaCustomerId, // ✅ Ahora sí vinculamos al cliente AXA
       factura.total,
-      ctx.from.id
+      parseInt(ctx.from.id) <= 2147483647 ? parseInt(ctx.from.id) : null // ✅ INT4 safe
     );
     console.log('🚀 FASE 3: Factura registrada en BD exitosamente');
 
@@ -1299,14 +1322,17 @@ async function generarFacturaAxa(
 
     // Registrar la factura en la base de datos con el folio devuelto por FacturAPI
     try {
+      // Obtener el customerId del cliente AXA desde userState
+      const axaCustomerId = await getAxaCustomerIdFromDB(tenantId, ctx.userState.axaClientId);
+
       const registeredInvoice = await TenantService.registerInvoice(
         tenantId,
         factura.id,
         factura.series || 'A',
         factura.folio_number, // Usamos el folio que FacturAPI asignó
-        null, // customerId, podríamos buscar el ID del cliente en la base de datos si es necesario
+        axaCustomerId, // ✅ Ahora sí vinculamos al cliente AXA
         factura.total,
-        ctx.from?.id ? BigInt(ctx.from.id) : null // ID del usuario que creó la factura
+        ctx.from?.id && parseInt(ctx.from.id) <= 2147483647 ? parseInt(ctx.from.id) : null // ✅ INT4 safe
       );
 
       console.log('Factura AXA registrada en la base de datos:', registeredInvoice);
