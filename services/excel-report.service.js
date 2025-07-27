@@ -404,19 +404,19 @@ class ExcelReportService {
       to: 'K1' // Solo hasta la columna K (columna 11)
     };
 
-    // Configurar ancho de columnas
+    // Configurar ancho de columnas y formato numérico
     worksheet.columns = [
       { width: 12 }, // Folio
       { width: 40 }, // UUID
       { width: 35 }, // Cliente
       { width: 15 }, // RFC Cliente
       { width: 12 }, // Fecha
-      { width: 12 }, // Subtotal
-      { width: 12 }, // IVA
-      { width: 12 }, // Retención
-      { width: 12 }, // Total
+      { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // Subtotal - FORMATO PESOS MEXICANOS 2 DECIMALES
+      { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // IVA - FORMATO PESOS MEXICANOS 2 DECIMALES
+      { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // Retención - FORMATO PESOS MEXICANOS 2 DECIMALES
+      { width: 15, numFmt: '"$"#,##0.00_);("$"#,##0.00)' }, // Total - FORMATO PESOS MEXICANOS 2 DECIMALES
       { width: 10 }, // Estado
-      { width: 50 }, // URL
+      { width: 145 }, // URL
     ];
 
     // AGREGAR DATOS
@@ -429,13 +429,15 @@ class ExcelReportService {
         invoice.invoiceDate
           ? new Date(invoice.invoiceDate).toLocaleDateString('es-MX')
           : 'Sin fecha',
-        this.formatCurrency(invoice.subtotal || 0),
-        this.formatCurrency(invoice.ivaAmount || 0),
-        this.formatCurrency(invoice.retencionAmount || 0),
-        this.formatCurrency(invoice.total || 0),
+        this.truncateToTwoDecimals(invoice.subtotal || 0), // Columna 6 - TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoice.ivaAmount || 0), // Columna 7 - TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoice.retencionAmount || 0), // Columna 8 - TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoice.total || 0), // Columna 9 - TRUNCADO A 2 DECIMALES
         this.translateStatus(invoice.status || 'unknown'),
         invoice.verificationUrl || 'No disponible',
       ]);
+
+      // Las columnas numéricas ya tienen formato aplicado a nivel de columna
 
       // Alternar colores de filas (solo columnas A-K)
       if (index % 2 === 0) {
@@ -458,10 +460,10 @@ class ExcelReportService {
         '',
         '',
         'TOTALES:',
-        this.formatCurrency(invoices.reduce((sum, inv) => sum + (inv.subtotal || 0), 0)),
-        this.formatCurrency(invoices.reduce((sum, inv) => sum + (inv.ivaAmount || 0), 0)),
-        this.formatCurrency(invoices.reduce((sum, inv) => sum + (inv.retencionAmount || 0), 0)),
-        this.formatCurrency(invoices.reduce((sum, inv) => sum + (inv.total || 0), 0)),
+        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.subtotal || 0), 0)), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.ivaAmount || 0), 0)), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.retencionAmount || 0), 0)), // TRUNCADO A 2 DECIMALES
+        this.truncateToTwoDecimals(invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0)), // TRUNCADO A 2 DECIMALES
         '',
         '',
       ]);
@@ -477,6 +479,8 @@ class ExcelReportService {
           fgColor: { argb: 'D9EAD3' },
         };
       }
+
+      // Las columnas numéricas ya tienen formato aplicado a nivel de columna
     }
 
     // Aplicar bordes solo a las columnas A-K (1-11)
@@ -496,6 +500,8 @@ class ExcelReportService {
       }
     });
 
+    // Las columnas ya tienen ancho configurado arriba
+
     // GUARDAR ARCHIVO
     const tempDir = path.join(__dirname, '../temp/excel-reports');
 
@@ -514,6 +520,15 @@ class ExcelReportService {
   }
 
   // UTILIDADES
+
+  /**
+   * Truncar número a exactamente 2 decimales (SIN REDONDEO)
+   * Ejemplo: 123.456 -> 123.45 (no 123.46)
+   */
+  static truncateToTwoDecimals(amount) {
+    const num = parseFloat(amount || 0);
+    return Math.floor(num * 100) / 100; // Truncar, no redondear
+  }
 
   /**
    * Calcular subtotal desde datos de FacturAPI
