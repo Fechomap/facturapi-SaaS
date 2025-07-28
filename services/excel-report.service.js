@@ -674,7 +674,7 @@ class ExcelReportService {
       // Aplicar filtro de clientes si existe
       if (config.clientIds && config.clientIds.length > 0) {
         where.customerId = {
-          in: config.clientIds,
+          in: config.clientIds.map((id) => parseInt(id)),
         };
       }
 
