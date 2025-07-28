@@ -234,9 +234,14 @@ export function combinedFiltersMenu(filters = {}) {
     buttons.push([Markup.button.callback('📊 Generar reporte', 'excel_confirm_generation')]);
   }
 
-  // Botones de control
+  // Botones de control - Limpiar más visible cuando hay filtros
+  const hasAnyFilters = hasDateFilter || hasClientFilter;
+  const clearButton = hasAnyFilters
+    ? Markup.button.callback('🗑️ LIMPIAR FILTROS', 'excel_clear_all_filters')
+    : Markup.button.callback('🔄 Limpiar todo', 'excel_clear_all_filters');
+  
   buttons.push([
-    Markup.button.callback('🔄 Limpiar todo', 'excel_clear_all_filters'),
+    clearButton,
     Markup.button.callback('🔙 Volver', 'menu_reportes'),
   ]);
 
@@ -374,19 +379,25 @@ export function enhancedNavigationMenu(quickActions = [], hasHistory = false) {
 }
 
 /**
- * Generar texto de resumen de filtros - MEJORADO UX
+ * Generar texto de resumen de filtros - MEJORADO UX con mejor visibilidad
  * @param {Object} filters - Filtros aplicados
  */
 export function generateFilterSummaryText(filters) {
-  let summary = '';
+  const hasFilters = (filters.dateRange) || (filters.selectedClientIds && filters.selectedClientIds.length > 0);
+  
+  if (!hasFilters) {
+    return '🔓 **Sin filtros activos** - Se mostrarán todas las facturas\n';
+  }
+
+  let summary = '🎯 **FILTROS ACTIVOS:**\n';
 
   if (filters.dateRange) {
-    summary += `📅 **Fecha seleccionada:** ${filters.dateRange.display}\n`;
+    summary += `📅 **Fecha:** ${filters.dateRange.display}\n`;
   }
 
   if (filters.selectedClientIds && filters.selectedClientIds.length > 0) {
     const clientCount = filters.selectedClientIds.length;
-    summary += `👥 **Clientes:** ${clientCount} cliente${clientCount > 1 ? 's' : ''}\n`;
+    summary += `👥 **Clientes:** ${clientCount} seleccionado${clientCount > 1 ? 's' : ''}\n`;
   }
 
   if (filters.estimatedInvoices) {

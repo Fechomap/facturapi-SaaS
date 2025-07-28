@@ -503,7 +503,7 @@ export function registerExcelReportHandlers(bot) {
         );
       }
 
-      const startDate = ctx.userState.customStartDate;
+      const startDate = new Date(ctx.userState.customStartDate);
 
       if (endDate < startDate) {
         return ctx.reply(
@@ -576,14 +576,12 @@ async function applyDateFilter(ctx, dateRange) {
     let message = '📅 **Filtro de Fecha Aplicado**\n\n';
     message += `📊 **Período:** ${dateRange.display}\n`;
     message += `📈 **Facturas encontradas:** ${estimation.totalAvailable}\n`;
-    message += `📋 **Se incluirán:** ${estimation.willGenerate}\n`;
 
     if (estimation.hasMoreThanLimit) {
       message += `⚠️ Solo se incluirán las ${estimation.willGenerate} facturas más recientes\n`;
     }
 
-    message += `⏱️ **Tiempo estimado:** ${estimation.estimatedTimeSeconds} segundos\n\n`;
-    message += '¿Qué quieres hacer ahora?';
+    message += '\n¿Qué quieres hacer ahora?';
 
     const buttons = [
       [Markup.button.callback('📊 Generar reporte', 'excel_generate_filtered')],
@@ -592,23 +590,45 @@ async function applyDateFilter(ctx, dateRange) {
       [Markup.button.callback('🔙 Volver', 'excel_report_options')],
     ];
 
-    await ctx.editMessageText(message, {
-      parse_mode: 'Markdown',
-      ...Markup.inlineKeyboard(buttons),
-    });
+    try {
+      await ctx.editMessageText(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    } catch (editError) {
+      // Si no se puede editar el mensaje, enviar uno nuevo
+      await ctx.reply(message, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard(buttons),
+      });
+    }
   } catch (error) {
     console.error('Error aplicando filtro de fecha:', error);
 
-    await ctx.editMessageText(
-      '❌ **Error**\n\n' + 'No se pudo aplicar el filtro de fecha. Intenta nuevamente.',
-      {
-        parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 Reintentar', 'excel_filter_date')],
-          [Markup.button.callback('🔙 Volver', 'excel_report_options')],
-        ]),
-      }
-    );
+    try {
+      await ctx.editMessageText(
+        '❌ **Error**\n\n' + 'No se pudo aplicar el filtro de fecha. Intenta nuevamente.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Reintentar', 'excel_filter_date')],
+            [Markup.button.callback('🔙 Volver', 'excel_report_options')],
+          ]),
+        }
+      );
+    } catch (editError) {
+      // Si no se puede editar, enviar mensaje nuevo
+      await ctx.reply(
+        '❌ **Error**\n\n' + 'No se pudo aplicar el filtro de fecha. Intenta nuevamente.',
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Reintentar', 'excel_filter_date')],
+            [Markup.button.callback('🔙 Volver', 'excel_report_options')],
+          ]),
+        }
+      );
+    }
   }
 }
 
@@ -625,7 +645,7 @@ async function generateFilteredReport(ctx) {
       limit: 5000, // FASE 3: límite aumentado para jobs asíncronos
       includeDetails: true,
       format: 'xlsx',
-      useCache: true,
+      useCache: false, // Deshabilitado por decisión del equipo
       dateRange: filters.dateRange || null,
       clientIds: filters.selectedClientIds || null,
     };
@@ -688,7 +708,8 @@ async function generateFilteredReport(ctx) {
           `📋 **Solicitud:** \`${requestId}\`\n` +
           `⏱️ **Estimado:** ${estimatedTime}\n\n` +
           `🔔 **Te notificaremos automáticamente cuando esté listo**\n\n` +
-          `📊 Mientras tanto, puedes seguir usando el bot normalmente.`,
+          `📊 Mientras tanto, puedes seguir usando el bot normalmente.\n` +
+          `🔄 **Filtros reseteados** - Próximo reporte empezará desde cero.`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
@@ -697,6 +718,10 @@ async function generateFilteredReport(ctx) {
           ]),
         }
       );
+
+      // 🔄 AUTO-RESET DE FILTROS después de crear job asíncrono
+      console.log('🔄 Auto-reseteando filtros después de crear job asíncrono');
+      ctx.userState.excelFilters = {};
     } else {
       // ============================================
       // REPORTE SÍNCRONO (≤500 facturas)
@@ -761,12 +786,17 @@ async function generateFilteredReport(ctx) {
             '• Datos completos del cliente\n' +
             '• Subtotal, IVA, retención y total\n' +
             '• Estado y URL de verificación SAT\n\n' +
-            '💡 Compatible con Excel, Google Sheets y LibreOffice.',
+            '💡 Compatible con Excel, Google Sheets y LibreOffice.\n' +
+            '🔄 **Filtros reseteados** - Próximo reporte empezará desde cero.',
           {
             parse_mode: 'Markdown',
             ...postGenerationMenu(result),
           }
         );
+
+        // 🔄 AUTO-RESET DE FILTROS después de reporte exitoso
+        console.log('🔄 Auto-reseteando filtros después de reporte exitoso');
+        ctx.userState.excelFilters = {};
 
         // Limpiar archivo temporal (solo para reportes síncronos)
         setTimeout(

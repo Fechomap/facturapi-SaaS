@@ -36,7 +36,7 @@ class ExcelReportService {
         // NUEVOS: Filtros FASE 2
         dateRange: options.dateRange || null,
         clientIds: options.clientIds || null,
-        useCache: options.useCache !== false,
+        useCache: false, // Deshabilitado por decisión del equipo
         ...options,
       };
 
@@ -123,11 +123,21 @@ class ExcelReportService {
 
     // FASE 2: Filtro por rango de fechas
     if (config.dateRange && config.dateRange.start && config.dateRange.end) {
+      // Asegurar que las fechas sean objetos Date
+      const startDate = config.dateRange.start instanceof Date 
+        ? config.dateRange.start 
+        : new Date(config.dateRange.start);
+      const endDate = config.dateRange.end instanceof Date 
+        ? config.dateRange.end 
+        : new Date(config.dateRange.end);
+      
       whereClause.invoiceDate = {
-        gte: config.dateRange.start,
-        lte: config.dateRange.end,
+        gte: startDate,
+        lte: endDate,
       };
       console.log(`📅 Aplicando filtro de fecha: ${config.dateRange.display}`);
+      console.log(`🔍 DEBUG - Fecha inicio: ${startDate.toISOString()}`);
+      console.log(`🔍 DEBUG - Fecha fin: ${endDate.toISOString()}`);
     }
 
     // FASE 2: Filtro por clientes específicos
@@ -295,7 +305,10 @@ class ExcelReportService {
           total: parseFloat(invoice.total),
           status: invoice.status,
           createdAt: invoice.createdAt,
-          invoiceDate: invoice.invoiceDate,
+          invoiceDate: invoice.invoiceDate, // MANTENER para filtros de BD
+          
+          // FECHA REAL DE EMISIÓN (usar PostgreSQL como fuente confiable para filtros)
+          realEmissionDate: new Date(invoice.invoiceDate), // USAR POSTGRESQL COMO FUENTE CONFIABLE
 
           // Datos del cliente
           customer: {
@@ -342,6 +355,7 @@ class ExcelReportService {
           ivaAmount: 0,
           retencionAmount: 0,
           verificationUrl: '',
+          realEmissionDate: new Date(invoice.invoiceDate), // Usar fecha de BD como fallback
           error: error.message,
         });
       }
@@ -426,9 +440,9 @@ class ExcelReportService {
         invoice.uuid || invoice.folioFiscal || 'No disponible',
         invoice.customer?.legalName || 'Cliente no especificado',
         invoice.customer?.rfc || 'RFC no disponible',
-        invoice.invoiceDate
-          ? new Date(invoice.invoiceDate) // OBJETO DATE REAL para filtros de Excel
-          : null, // null para fechas vacías (Excel lo maneja mejor que texto)
+        invoice.realEmissionDate
+          ? this.convertToMexicoTime(invoice.realEmissionDate) // CONVERTIR a hora México
+          : (invoice.invoiceDate ? this.convertToMexicoTime(new Date(invoice.invoiceDate)) : null), // Fallback con conversión
         this.truncateToTwoDecimals(invoice.subtotal || 0), // Columna 6 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.ivaAmount || 0), // Columna 7 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.retencionAmount || 0), // Columna 8 - TRUNCADO A 2 DECIMALES
@@ -609,6 +623,30 @@ class ExcelReportService {
     };
 
     return statusMap[status] || status;
+  }
+
+  /**
+   * Convertir fecha UTC a hora local de México para Excel
+   * @param {Date|string} utcDate - Fecha en UTC (Date object o string)
+   * @returns {Date} - Fecha ajustada para Excel en hora México
+   */
+  static convertToMexicoTime(utcDate) {
+    if (!utcDate) return null;
+    
+    // Asegurar que tenemos un Date object (puede venir string desde cache)
+    const dateObj = utcDate instanceof Date ? utcDate : new Date(utcDate);
+    
+    // Verificar que es una fecha válida
+    if (isNaN(dateObj.getTime())) {
+      console.warn('⚠️ Fecha inválida en convertToMexicoTime:', utcDate);
+      return null;
+    }
+    
+    // Crear una nueva fecha ajustada para zona horaria México (-6 horas)
+    // IMPORTANTE: No usar toLocaleString() porque Excel necesita un Date object
+    const mexicoDate = new Date(dateObj.getTime() - (6 * 60 * 60 * 1000)); // -6 horas
+    
+    return mexicoDate;
   }
 
   /**

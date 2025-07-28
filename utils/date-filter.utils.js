@@ -125,11 +125,13 @@ class DateFilterUtils {
    * @returns {Object} - Objeto con fechas personalizadas
    */
   static getCustomRange(startDateStr, endDateStr) {
-    const start = new Date(startDateStr);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(endDateStr);
-    end.setHours(23, 59, 59, 999);
+    // Construir fechas exactas usando año, mes, día para evitar problemas de zona horaria
+    const [startYear, startMonth, startDay] = startDateStr.split('-').map(Number);
+    const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
+    
+    // Crear fechas exactas sin zona horaria
+    const start = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+    const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
 
     // Validar que las fechas sean válidas
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
