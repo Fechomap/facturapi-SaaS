@@ -132,7 +132,7 @@ class ReportsService {
 
         // Función para formatear números con comas
         const formatNumber = (num) => new Intl.NumberFormat('es-MX').format(num);
-        
+
         // Función para limpiar y formatear nombres de clientes
         const formatClientName = (name) => {
           const nameMap = {
@@ -140,7 +140,8 @@ class ReportsService {
             'INFOASIST INFORMACION Y ASISTENCIA': 'InfoAsist Información y Asistencia',
             'CHUBB DIGITAL SERVICES': 'Chubb Digital Services',
             'ARSA ASESORIA INTEGRAL PROFESIONAL': 'ARSA Asesoría Integral Profesional',
-            'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA': 'Protección S.O.S. Jurídico Automovilístico 24H'
+            'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA':
+              'Protección S.O.S. Jurídico Automovilístico 24H',
           };
           return nameMap[name] || name;
         };
@@ -159,10 +160,11 @@ class ReportsService {
           `⸻\n\n` +
           `👥 *Top Clientes*\n` +
           topClients
-            .map((c, index) => 
-              `    ${index + 1}.    ${formatClientName(c.name)}\n` +
-              `• *${c.count}* facturas\n` +
-              `• *$${formatNumber(c.total.toFixed(2))} MXN*\n`
+            .map(
+              (c, index) =>
+                `    ${index + 1}.    ${formatClientName(c.name)}\n` +
+                `• *${c.count}* facturas\n` +
+                `• *$${formatNumber(c.total.toFixed(2))} MXN*\n`
             )
             .join('\n');
 
@@ -247,8 +249,13 @@ class ReportsService {
         daysLeft = Math.ceil((new Date(endDate) - now) / (1000 * 60 * 60 * 24));
       }
 
-      // Calcular uso de facturas
-      const invoicesUsed = subscription.invoicesUsed || 0;
+      // Calcular uso de facturas - CORREGIDO: usar conteo real de facturas emitidas
+      const invoicesUsed = await prisma.tenantInvoice.count({
+        where: {
+          tenantId,
+          // Incluir todas las facturas (válidas y canceladas) porque ambas consumen folio
+        },
+      });
       const invoicesLimit = plan.invoiceLimit || 0;
       const invoicesLeft = Math.max(0, invoicesLimit - invoicesUsed);
       const usagePercentage = invoicesLimit > 0 ? (invoicesUsed / invoicesLimit) * 100 : 0;

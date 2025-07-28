@@ -98,7 +98,7 @@ export async function registerMenuCommand(bot) {
   // Acción para generar reporte de facturas - Ejecuta directamente
   bot.action('reporte_facturas_action', async (ctx) => {
     await ctx.answerCbQuery();
-    
+
     if (!ctx.hasTenant()) {
       return ctx.reply(
         'Para generar un reporte, primero debes registrar tu empresa.',

@@ -9,7 +9,7 @@ const scriptLogger = logger.child({ module: 'fix-invoice-counters' });
 
 /**
  * Script para sincronizar contadores invoicesUsed con la realidad de la BD
- * 
+ *
  * PROBLEMA IDENTIFICADO:
  * - Campo invoicesUsed muestra 530+ facturas
  * - Conteo real en BD: ~415 facturas válidas
@@ -22,28 +22,28 @@ const CONFIG = {
   DRY_RUN: process.argv.includes('--dry-run'), // Modo simulación
   FIX_ORPHAN_INVOICES: process.argv.includes('--fix-orphans'), // Arreglar huérfanas
   VERBOSE: process.argv.includes('--verbose'), // Logs detallados
-  ONLY_TENANT: process.argv.find(arg => arg.startsWith('--tenant='))?.split('=')[1], // Solo un tenant específico
+  ONLY_TENANT: process.argv.find((arg) => arg.startsWith('--tenant='))?.split('=')[1], // Solo un tenant específico
 };
 
 async function main() {
   console.log('🔧 SCRIPT DE SINCRONIZACIÓN DE CONTADORES DE FACTURAS');
   console.log('📅', new Date().toLocaleString());
   console.log('='.repeat(80));
-  
+
   if (CONFIG.DRY_RUN) {
     console.log('🔍 MODO DRY-RUN: Solo simulación, no se modificará la BD');
   }
-  
+
   if (CONFIG.ONLY_TENANT) {
     console.log(`🎯 TENANT ESPECÍFICO: ${CONFIG.ONLY_TENANT}`);
   }
-  
+
   console.log('');
 
   try {
     // 1. Obtener todas las suscripciones a sincronizar
     const subscriptions = await getSubscriptionsToSync();
-    
+
     if (subscriptions.length === 0) {
       console.log('ℹ️ No se encontraron suscripciones para sincronizar');
       return;
@@ -67,7 +67,7 @@ async function main() {
     for (const subscription of subscriptions) {
       try {
         const result = await processSingleSubscription(subscription);
-        
+
         results.processed++;
         if (result.updated) {
           results.updated++;
@@ -77,7 +77,9 @@ async function main() {
         }
 
         if (CONFIG.VERBOSE) {
-          console.log(`✅ ${subscription.tenant.businessName}: ${result.oldCount} → ${result.newCount} (${result.difference >= 0 ? '+' : ''}${result.difference})`);
+          console.log(
+            `✅ ${subscription.tenant.businessName}: ${result.oldCount} → ${result.newCount} (${result.difference >= 0 ? '+' : ''}${result.difference})`
+          );
         }
       } catch (error) {
         results.errors++;
@@ -93,7 +95,6 @@ async function main() {
       console.log('\n🔍 VERIFICACIÓN POST-CORRECCIÓN:');
       await verifyResults();
     }
-
   } catch (error) {
     scriptLogger.error({ error }, 'Error crítico en script de sincronización');
     console.error('💥 ERROR CRÍTICO:', error.message);
@@ -107,7 +108,7 @@ async function main() {
  * Obtiene las suscripciones que necesitan sincronización
  */
 async function getSubscriptionsToSync() {
-  const whereClause = CONFIG.ONLY_TENANT 
+  const whereClause = CONFIG.ONLY_TENANT
     ? { tenantId: CONFIG.ONLY_TENANT }
     : { status: { in: ['active', 'trial'] } };
 
@@ -142,7 +143,7 @@ async function getSubscriptionsToSync() {
 async function analyzeDiscrepancies(subscriptions) {
   console.log('📊 ANÁLISIS DE DISCREPANCIAS ACTUALES:');
   console.log('');
-  
+
   let totalReportedUsed = 0;
   let totalRealValid = 0;
   let tenantsWithDiscrepancies = 0;
@@ -244,7 +245,7 @@ async function showFinalSummary(results, subscriptions) {
   console.log(`➖ Sin cambios: ${results.unchanged}`);
   console.log(`❌ Errores: ${results.errors}`);
   console.log(`📈 Diferencia total corregida: ${results.totalDifference}`);
-  
+
   if (CONFIG.DRY_RUN) {
     console.log('\n🔍 MODO DRY-RUN: No se realizaron cambios reales');
     console.log('📝 Para ejecutar los cambios, ejecuta: node scripts/fix-invoice-counters.js');
@@ -266,9 +267,11 @@ async function verifyResults() {
   for (const subscription of subscriptions) {
     const realCount = await countRealValidInvoices(subscription.tenantId);
     const reportedCount = subscription.invoicesUsed || 0;
-    
+
     if (realCount !== reportedCount) {
-      console.log(`⚠️ Discrepancia persistente en ${subscription.tenant.businessName}: ${reportedCount} vs ${realCount}`);
+      console.log(
+        `⚠️ Discrepancia persistente en ${subscription.tenant.businessName}: ${reportedCount} vs ${realCount}`
+      );
       allSynced = false;
     }
   }

@@ -79,11 +79,13 @@ class OnboardingProgressService {
         [OnboardingSteps.ORGANIZATION_CREATED]: !!tenant, // Si existe tenant, existe organización
         [OnboardingSteps.TENANT_CREATED]: !!tenant,
         [OnboardingSteps.CERTIFICATE_UPLOADED]: !!tenant.facturapiApiKey, // Tiene API key configurada
-        [OnboardingSteps.CERTIFICATE_VERIFIED]: !!(tenant.facturapiApiKey && tenant.facturapiOrganizationId), // API key + Org ID
+        [OnboardingSteps.CERTIFICATE_VERIFIED]: !!(
+          tenant.facturapiApiKey && tenant.facturapiOrganizationId
+        ), // API key + Org ID
         [OnboardingSteps.CLIENTS_CONFIGURED]: tenant.customers?.length > 0, // Tiene clientes configurados
         [OnboardingSteps.LIVE_API_KEY_CONFIGURED]: !!(
-          tenant.facturapiApiKey && 
-          !tenant.facturapiApiKey.startsWith('sk_test') && 
+          tenant.facturapiApiKey &&
+          !tenant.facturapiApiKey.startsWith('sk_test') &&
           !tenant.facturapiApiKey.startsWith('test_')
         ), // API key LIVE (no TEST)
         [OnboardingSteps.SUBSCRIPTION_CREATED]: tenant.subscriptions?.length > 0, // Tiene suscripción
@@ -92,7 +94,7 @@ class OnboardingProgressService {
       // Calcular estadísticas
       const completedStepsArray = Object.entries(steps).filter(([_, completed]) => completed);
       const pendingStepsArray = Object.entries(steps).filter(([_, completed]) => !completed);
-      
+
       const completedCount = completedStepsArray.length;
       const totalRequired = REQUIRED_STEPS.length;
       const progress = Math.round((completedCount / totalRequired) * 100);
@@ -252,11 +254,11 @@ class OnboardingProgressService {
     try {
       // NUEVO MÉTODO: Calcular automáticamente desde datos de BD
       const automaticProgress = await this.calculateProgressFromData(tenantId);
-      
+
       // Si el progreso automático muestra más del 50%, usarlo (más confiable)
       if (automaticProgress.progress >= 50) {
         progressLogger.info(
-          { tenantId, progress: automaticProgress.progress }, 
+          { tenantId, progress: automaticProgress.progress },
           'Usando progreso automático calculado desde BD'
         );
         return automaticProgress;
@@ -279,7 +281,10 @@ class OnboardingProgressService {
             currentSteps = [];
           }
         } catch (e) {
-          progressLogger.warn({ tenantId, error: e.message }, 'Error al parsear progreso, usando automático');
+          progressLogger.warn(
+            { tenantId, error: e.message },
+            'Error al parsear progreso, usando automático'
+          );
           return automaticProgress; // Fallback al automático si hay error
         }
       }
@@ -289,13 +294,14 @@ class OnboardingProgressService {
       const pendingSteps = REQUIRED_STEPS.filter((step) => !completedSteps.includes(step));
       const isCompleted = completedSteps.includes(OnboardingSteps.ONBOARDING_COMPLETED);
       const manualProgress = Math.round(
-        (completedSteps.filter((s) => REQUIRED_STEPS.includes(s)).length / REQUIRED_STEPS.length) * 100
+        (completedSteps.filter((s) => REQUIRED_STEPS.includes(s)).length / REQUIRED_STEPS.length) *
+          100
       );
 
       // Comparar progreso manual vs automático y usar el mayor
       if (automaticProgress.progress > manualProgress) {
         progressLogger.info(
-          { tenantId, automaticProgress: automaticProgress.progress, manualProgress }, 
+          { tenantId, automaticProgress: automaticProgress.progress, manualProgress },
           'Progreso automático es mayor que manual, usando automático'
         );
         return automaticProgress;
@@ -303,7 +309,7 @@ class OnboardingProgressService {
 
       // Usar progreso manual si es mayor
       progressLogger.info(
-        { tenantId, automaticProgress: automaticProgress.progress, manualProgress }, 
+        { tenantId, automaticProgress: automaticProgress.progress, manualProgress },
         'Usando progreso manual existente'
       );
 

@@ -273,10 +273,10 @@ Implementar un sistema completo de reportes en Excel que permita a los usuarios 
 
 ### **📊 CAPACIDADES ACTUALES:**
 
-- **📈 Volumen**: 
+- **📈 Volumen**:
   - Hasta 500 facturas en tiempo real (síncrono)
   - Hasta 5,000 facturas en background (asíncrono)
-- **⚡ Rendimiento**: 
+- **⚡ Rendimiento**:
   - Síncrono: 2-10 segundos según filtros
   - Asíncrono: 3-30 minutos con notificación push
 - **🎯 Filtros**: Por fecha (7 opciones) + por clientes (múltiple)

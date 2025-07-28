@@ -384,6 +384,26 @@ class TenantService {
       throw error;
     }
   }
+
+  /**
+   * Obtiene el conteo real de facturas emitidas para un tenant
+   * @param {string} tenantId - ID del tenant
+   * @returns {Promise<number>} - Número de facturas realmente emitidas
+   */
+  static async getTenantInvoiceCount(tenantId) {
+    try {
+      const count = await prisma.tenantInvoice.count({
+        where: {
+          tenantId,
+          // Incluir todas las facturas (válidas y canceladas) porque ambas consumen folio
+        },
+      });
+      return count;
+    } catch (error) {
+      console.error(`Error al obtener conteo de facturas para tenant ${tenantId}:`, error);
+      return 0;
+    }
+  }
 }
 
 export default TenantService;

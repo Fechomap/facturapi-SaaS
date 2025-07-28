@@ -33,10 +33,13 @@ export function registerSubscriptionCommand(bot) {
         billingPeriod: 'monthly',
       };
 
+      // Calcular facturas emitidas reales (no el contador interno)
+      const realInvoicesUsed = await TenantService.getTenantInvoiceCount(tenantData.id);
+
       console.log('Datos de suscripción recuperados:', {
         tenantId: tenantData.id,
         subscriptionCount: tenantData.subscriptions?.length || 0,
-        invoicesUsed: subscription.invoicesUsed || 0,
+        invoicesUsed: realInvoicesUsed, // Corregido: usar conteo real
       });
 
       // Formatear fechas
@@ -96,7 +99,7 @@ export function registerSubscriptionCommand(bot) {
           `Plan: ${plan.name}\n` +
           `Estado: ${statusEmoji} ${statusMsg}\n` +
           `${periodMsg}\n\n` +
-          `Facturas generadas: ${subscription.invoicesUsed || 0}\n` +
+          `Facturas emitidas: ${realInvoicesUsed}\n` +
           `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod === 'monthly' ? 'mes' : 'año'}\n\n` +
           `Tenant ID: ${tenantData.id}\n` +
           `API Key configurada: ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
@@ -152,10 +155,13 @@ export function registerSubscriptionCommand(bot) {
         billingPeriod: 'monthly',
       };
 
+      // Calcular facturas emitidas reales (no el contador interno)
+      const realInvoicesUsed = await TenantService.getTenantInvoiceCount(tenantData.id);
+
       console.log('Datos de suscripción recuperados:', {
         tenantId: tenantData.id,
         subscriptionCount: tenantData.subscriptions?.length || 0,
-        invoicesUsed: subscription.invoicesUsed || 0,
+        invoicesUsed: realInvoicesUsed, // Corregido: usar conteo real
       });
 
       // Formatear fechas
@@ -215,7 +221,7 @@ export function registerSubscriptionCommand(bot) {
           `Plan: ${plan.name}\n` +
           `Estado: ${statusEmoji} ${statusMsg}\n` +
           `${periodMsg}\n\n` +
-          `Facturas generadas: ${subscription.invoicesUsed || 0}\n` +
+          `Facturas emitidas: ${realInvoicesUsed}\n` +
           `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod === 'monthly' ? 'mes' : 'año'}\n\n` +
           `Tenant ID: ${tenantData.id}\n` +
           `API Key configurada: ${tenantData.facturapiApiKey ? '✅ Sí' : '❌ No'}\n` +
@@ -276,15 +282,15 @@ export function registerSubscriptionCommand(bot) {
     await ctx.answerCbQuery();
     await ctx.reply(
       '🚧 **Actualización de Suscripción**\n\n' +
-      'Esta funcionalidad está en desarrollo como parte de las mejoras del sistema de pagos.\n\n' +
-      '📅 Próximamente estará disponible con nuevas opciones de pago y gestión avanzada de planes.\n\n' +
-      '💡 Mientras tanto, puedes contactar a soporte para cambios urgentes.',
+        'Esta funcionalidad está en desarrollo como parte de las mejoras del sistema de pagos.\n\n' +
+        '📅 Próximamente estará disponible con nuevas opciones de pago y gestión avanzada de planes.\n\n' +
+        '💡 Mientras tanto, puedes contactar a soporte para cambios urgentes.',
       {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('🔙 Volver', 'menu_suscripcion')],
           [Markup.button.callback('📞 Contactar Soporte', 'contact_support')],
-        ])
+        ]),
       }
     );
   });
