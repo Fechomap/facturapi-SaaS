@@ -12,7 +12,16 @@ import {
   postGenerationMenu,
   combinedFiltersMenu,
   generateFilterSummaryText,
+  loadingMenus,
+  menuWithBreadcrumb,
+  enhancedNavigationMenu,
 } from '../views/report-menu.view.js';
+import {
+  MenuStateManager,
+  MenuTransitionUtils,
+  LoadingStates,
+  ActionFeedback,
+} from '../utils/menu-transition.utils.js';
 
 /**
  * Registrar todos los handlers para reportes Excel con filtros
@@ -34,52 +43,61 @@ export function registerExcelReportHandlers(bot) {
       );
     }
 
+    // Inicializar gestor de estado de menús
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('excel_options', {});
+
     // Limpiar estado de filtros previos
     if (!ctx.userState.excelFilters) {
       ctx.userState.excelFilters = {};
     }
 
-    await ctx.reply(
+    // Transición suave al menú principal
+    await MenuTransitionUtils.smoothTransition(
+      ctx,
+      LoadingStates.FILTERS,
       '📊 **Generador de Reportes Excel**\n\n' +
         '¿Cómo quieres generar tu reporte?\n\n' +
         '📅 **Filtrar por fecha** - Selecciona un período específico\n' +
         '👥 **Seleccionar clientes** - Incluye solo clientes específicos\n' +
         '📊 **Todas las facturas** - Reporte completo (hasta 500 facturas)',
-      {
-        parse_mode: 'Markdown',
-        ...excelReportOptionsMenu(),
-      }
+      excelReportOptionsMenu(),
+      300
     );
   });
 
   // Volver al menú de opciones
   bot.action('excel_report_options', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.UPDATED);
 
+    const menuManager = new MenuStateManager(ctx);
     const filters = ctx.userState.excelFilters || {};
 
     if (Object.keys(filters).length > 0) {
-      // Mostrar menú con filtros actuales
+      // Transición suave al menú con filtros
       let message = '📊 **Generador de Reportes Excel**\n\n';
       message += generateFilterSummaryText(filters);
       message += '\n¿Qué quieres hacer?';
 
-      await ctx.editMessageText(message, {
-        parse_mode: 'Markdown',
-        ...combinedFiltersMenu(filters),
-      });
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        LoadingStates.UPDATING,
+        message,
+        combinedFiltersMenu(filters),
+        200
+      );
     } else {
-      // Menú básico sin filtros
-      await ctx.editMessageText(
+      // Transición suave al menú básico
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        LoadingStates.FILTERS,
         '📊 **Generador de Reportes Excel**\n\n' +
           '¿Cómo quieres generar tu reporte?\n\n' +
           '📅 **Filtrar por fecha** - Selecciona un período específico\n' +
           '👥 **Seleccionar clientes** - Incluye solo clientes específicos\n' +
           '📊 **Todas las facturas** - Reporte completo (hasta 500 facturas)',
-        {
-          parse_mode: 'Markdown',
-          ...excelReportOptionsMenu(),
-        }
+        excelReportOptionsMenu(),
+        200
       );
     }
   });
@@ -89,14 +107,19 @@ export function registerExcelReportHandlers(bot) {
   // ============================================
 
   bot.action('excel_filter_date', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.SELECTED);
 
-    await ctx.editMessageText(
-      '📅 **Filtrar por Fecha**\n\n' + 'Selecciona el período que quieres incluir en tu reporte:',
-      {
-        parse_mode: 'Markdown',
-        ...dateFilterMenu(),
-      }
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('excel_dates', {});
+
+    // Transición suave al menú de fechas
+    await MenuTransitionUtils.smoothTransition(
+      ctx,
+      LoadingStates.DATES,
+      '📅 **Filtrar por Fecha**\n\n' + 
+        'Selecciona el período que quieres incluir en tu reporte:',
+      dateFilterMenu(),
+      300
     );
   });
 
@@ -155,124 +178,159 @@ export function registerExcelReportHandlers(bot) {
   // ============================================
 
   bot.action('excel_filter_clients', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.SELECTED);
+
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('excel_clients', {});
 
     try {
+      // Mostrar estado de carga mientras se obtienen los clientes
+      const loadingMenu = loadingMenus().clients();
+      await ctx.editMessageText(loadingMenu.text, {
+        parse_mode: 'Markdown',
+        ...loadingMenu.markup
+      });
+
       const tenantId = ctx.getTenantId();
       const customers = await ExcelReportService.getTenantCustomers(tenantId);
 
       if (customers.length === 0) {
-        return ctx.editMessageText(
+        return MenuTransitionUtils.smoothTransition(
+          ctx,
+          LoadingStates.CLIENTS,
           '👥 **Sin Clientes**\n\n' +
             'No tienes clientes registrados para filtrar.\n' +
             'Primero debes configurar clientes en tu sistema.',
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')],
-              [Markup.button.callback('🔙 Volver', 'excel_report_options')],
-            ]),
-          }
+          Markup.inlineKeyboard([
+            [Markup.button.callback('⚙️ Configurar Clientes', 'configure_clients')],
+            [Markup.button.callback('🔙 Volver', 'excel_report_options')],
+          ]),
+          200
         );
       }
 
       const selectedIds = ctx.userState.excelFilters?.selectedClientIds || [];
 
-      await ctx.editMessageText(
+      // Transición suave al menú de clientes
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        loadingMenu.text,
         '👥 **Seleccionar Clientes**\n\n' +
           'Marca los clientes que quieres incluir en el reporte:\n' +
           '☑️ = Incluido | ☐ = No incluido',
-        {
-          parse_mode: 'Markdown',
-          ...clientSelectionMenu(customers, selectedIds),
-        }
+        clientSelectionMenu(customers, selectedIds),
+        300
       );
     } catch (error) {
       console.error('Error cargando clientes:', error);
-      await ctx.editMessageText(
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        LoadingStates.CLIENTS,
         '❌ **Error**\n\n' + 'No se pudieron cargar los clientes. Intenta nuevamente.',
-        {
-          parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Reintentar', 'excel_filter_clients')],
-            [Markup.button.callback('🔙 Volver', 'excel_report_options')],
-          ]),
-        }
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Reintentar', 'excel_filter_clients')],
+          [Markup.button.callback('🔙 Volver', 'excel_report_options')],
+        ]),
+        200
       );
     }
   });
 
   // Toggle selección de cliente específico
   bot.action(/excel_toggle_client_(\d+)/, async (ctx) => {
-    await ctx.answerCbQuery();
-
     const clientId = ctx.match[1];
     const filters = ctx.userState.excelFilters || {};
     const selectedIds = filters.selectedClientIds || [];
 
-    if (selectedIds.includes(clientId)) {
-      // Remover cliente
+    const isRemoving = selectedIds.includes(clientId);
+    const feedbackText = isRemoving ? ActionFeedback.DESELECTED : ActionFeedback.SELECTED;
+
+    // Actualización optimista del estado
+    if (isRemoving) {
       filters.selectedClientIds = selectedIds.filter((id) => id !== clientId);
     } else {
-      // Agregar cliente
       filters.selectedClientIds = [...selectedIds, clientId];
     }
 
     ctx.userState.excelFilters = filters;
 
-    // Recargar menú de clientes
-    try {
-      const tenantId = ctx.getTenantId();
-      const customers = await ExcelReportService.getTenantCustomers(tenantId);
-
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: clientSelectionMenu(customers, filters.selectedClientIds).reply_markup
-          .inline_keyboard,
-      });
-    } catch (error) {
-      console.error('Error actualizando selección:', error);
-    }
+    // Usar actualización optimista con feedback inmediato
+    await MenuTransitionUtils.optimisticUpdate(
+      ctx,
+      async () => {
+        // Actualizar UI inmediatamente
+        await ctx.answerCbQuery(feedbackText);
+        
+        const tenantId = ctx.getTenantId();
+        const customers = await ExcelReportService.getTenantCustomers(tenantId);
+        
+        await ctx.editMessageReplyMarkup({
+          inline_keyboard: clientSelectionMenu(customers, filters.selectedClientIds).reply_markup
+            .inline_keyboard,
+        });
+      },
+      async () => {
+        // Validación en background (opcional)
+        console.log(`Cliente ${clientId} ${isRemoving ? 'removido' : 'agregado'} exitosamente`);
+      }
+    );
   });
 
   // Seleccionar todos los clientes
   bot.action('excel_select_all_clients', async (ctx) => {
-    await ctx.answerCbQuery();
+    await MenuTransitionUtils.optimisticUpdate(
+      ctx,
+      async () => {
+        await ctx.answerCbQuery(ActionFeedback.SELECTED);
+        
+        const tenantId = ctx.getTenantId();
+        const customers = await ExcelReportService.getTenantCustomers(tenantId);
 
-    try {
-      const tenantId = ctx.getTenantId();
-      const customers = await ExcelReportService.getTenantCustomers(tenantId);
+        const filters = ctx.userState.excelFilters || {};
+        filters.selectedClientIds = customers.map((c) => c.id.toString());
+        ctx.userState.excelFilters = filters;
 
-      const filters = ctx.userState.excelFilters || {};
-      filters.selectedClientIds = customers.map((c) => c.id.toString());
-      ctx.userState.excelFilters = filters;
-
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: clientSelectionMenu(customers, filters.selectedClientIds).reply_markup
-          .inline_keyboard,
-      });
-    } catch (error) {
-      console.error('Error seleccionando todos:', error);
-    }
+        await MenuTransitionUtils.updateKeyboardWithFeedback(
+          ctx,
+          {
+            inline_keyboard: clientSelectionMenu(customers, filters.selectedClientIds).reply_markup
+              .inline_keyboard,
+          },
+          `✅ ${customers.length} clientes seleccionados`
+        );
+      },
+      async () => {
+        console.log('Todos los clientes seleccionados exitosamente');
+      }
+    );
   });
 
   // Limpiar selección de clientes
   bot.action('excel_clear_selection', async (ctx) => {
-    await ctx.answerCbQuery();
+    await MenuTransitionUtils.optimisticUpdate(
+      ctx,
+      async () => {
+        await ctx.answerCbQuery(ActionFeedback.CLEARED);
+        
+        const tenantId = ctx.getTenantId();
+        const customers = await ExcelReportService.getTenantCustomers(tenantId);
 
-    try {
-      const tenantId = ctx.getTenantId();
-      const customers = await ExcelReportService.getTenantCustomers(tenantId);
+        const filters = ctx.userState.excelFilters || {};
+        filters.selectedClientIds = [];
+        ctx.userState.excelFilters = filters;
 
-      const filters = ctx.userState.excelFilters || {};
-      filters.selectedClientIds = [];
-      ctx.userState.excelFilters = filters;
-
-      await ctx.editMessageReplyMarkup({
-        inline_keyboard: clientSelectionMenu(customers, []).reply_markup.inline_keyboard,
-      });
-    } catch (error) {
-      console.error('Error limpiando selección:', error);
-    }
+        await MenuTransitionUtils.updateKeyboardWithFeedback(
+          ctx,
+          {
+            inline_keyboard: clientSelectionMenu(customers, []).reply_markup.inline_keyboard,
+          },
+          '🗑️ Selección limpiada'
+        );
+      },
+      async () => {
+        console.log('Selección de clientes limpiada exitosamente');
+      }
+    );
   });
 
   // ============================================
@@ -297,19 +355,100 @@ export function registerExcelReportHandlers(bot) {
 
   // Limpiar todos los filtros
   bot.action('excel_clear_all_filters', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.CLEARED);
 
     ctx.userState.excelFilters = {};
 
-    await ctx.editMessageText(
+    await MenuTransitionUtils.smoothTransition(
+      ctx,
+      LoadingStates.UPDATING,
       '🗑️ **Filtros Limpiados**\n\n' +
         'Se han eliminado todos los filtros.\n' +
         '¿Cómo quieres generar tu reporte?',
-      {
-        parse_mode: 'Markdown',
-        ...excelReportOptionsMenu(),
-      }
+      excelReportOptionsMenu(),
+      250
     );
+  });
+
+  // ============================================
+  // NAVEGACIÓN CON HISTORIAL
+  // ============================================
+
+  // Handler para volver al menú anterior
+  bot.action('menu_back', async (ctx) => {
+    await ctx.answerCbQuery('⬅️ Volviendo...');
+
+    const menuManager = new MenuStateManager(ctx);
+    const previousMenu = menuManager.popMenu();
+
+    if (previousMenu) {
+      // Volver al menú anterior según el ID
+      let targetAction = 'excel_report_options'; // fallback
+
+      switch (previousMenu.id) {
+        case 'excel_options':
+          targetAction = 'excel_report_options';
+          break;
+        case 'excel_dates':
+          targetAction = 'excel_filter_date';
+          break;
+        case 'excel_clients':
+          targetAction = 'excel_filter_clients';
+          break;
+        case 'main':
+          targetAction = 'menu_principal';
+          break;
+        default:
+          targetAction = 'excel_report_options';
+      }
+
+      // Simular la acción del menú anterior
+      const fakeCtx = {
+        ...ctx,
+        match: null,
+        callbackQuery: { data: targetAction }
+      };
+
+      // Ejecutar la acción correspondiente
+      try {
+        if (targetAction === 'excel_report_options') {
+          return bot.handleUpdate({
+            callback_query: {
+              ...ctx.callbackQuery,
+              data: 'excel_report_options'
+            }
+          });
+        } else {
+          // Para otros casos, redirigir directamente
+          await MenuTransitionUtils.smoothTransition(
+            ctx,
+            LoadingStates.UPDATING,
+            '🔄 **Volviendo al menú anterior...**',
+            excelReportOptionsMenu(),
+            200
+          );
+        }
+      } catch (error) {
+        console.error('Error volviendo al menú anterior:', error);
+        // Fallback al menú principal
+        await MenuTransitionUtils.smoothTransition(
+          ctx,
+          LoadingStates.UPDATING,
+          '📊 **Generador de Reportes Excel**\n\n¿Cómo quieres generar tu reporte?',
+          excelReportOptionsMenu(),
+          200
+        );
+      }
+    } else {
+      // No hay historial, ir al menú principal
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        LoadingStates.UPDATING,
+        '📊 **Generador de Reportes Excel**\n\n¿Cómo quieres generar tu reporte?',
+        excelReportOptionsMenu(),
+        200
+      );
+    }
   });
 
   // ============================================

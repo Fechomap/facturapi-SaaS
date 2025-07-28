@@ -2,6 +2,12 @@ import { Markup } from 'telegraf';
 import prisma from '../../lib/prisma.js';
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import { clientStatusView, clientSetupResultView } from '../views/client.view.js';
+import {
+  MenuStateManager,
+  MenuTransitionUtils,
+  LoadingStates,
+  ActionFeedback,
+} from '../utils/menu-transition.utils.js';
 
 /**
  * Registra los manejadores relacionados con clientes
@@ -62,17 +68,33 @@ export function registerClientHandler(bot) {
 
   // Configuración de clientes
   bot.action('configure_clients', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.SELECTED);
 
-    // Mostrar mensaje de espera
-    await ctx.reply('⏳ Verificando el estado de tus clientes...');
+    // Inicializar gestor de menús
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('clients', {});
 
     try {
+      // Mostrar estado de carga con transición
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        '⚙️ *Cargando configuración de clientes...*',
+        '🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n⏳ Verificando el estado de tus clientes...',
+        Markup.inlineKeyboard([]),
+        300
+      );
+
       const tenantId = ctx.getTenantId();
 
       if (!tenantId) {
-        return ctx.reply(
-          '❌ Error: No se ha encontrado información de tu empresa. Por favor, contacta a soporte.'
+        return MenuTransitionUtils.smoothTransition(
+          ctx,
+          '⚙️ *Cargando configuración de clientes...*',
+          '🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n❌ Error: No se ha encontrado información de tu empresa. Por favor, contacta a soporte.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')],
+          ]),
+          300
         );
       }
 
@@ -82,17 +104,28 @@ export function registerClientHandler(bot) {
         `Estado de clientes: ${customerStatus.configuredCount}/${customerStatus.totalCount} configurados`
       );
 
-      // Mostrar estado usando la vista
+      // Mostrar estado usando la vista con breadcrumb
       const { message, keyboard, parse_mode } = clientStatusView(customerStatus);
-      await ctx.reply(message, { parse_mode, ...keyboard });
+      const enhancedMessage = `🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n${message}`;
+      
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        '🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n⏳ Verificando el estado de tus clientes...',
+        enhancedMessage,
+        keyboard,
+        400
+      );
     } catch (error) {
       console.error('Error al verificar estado de clientes:', error);
-      await ctx.reply(
-        `❌ Ocurrió un error al verificar el estado de los clientes: ${error.message}\n\n` +
-          `Por favor, intenta nuevamente más tarde.`,
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        '⚙️ *Cargando configuración de clientes...*',
+        `🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n❌ Ocurrió un error al verificar el estado de los clientes: ${error.message}\n\nPor favor, intenta nuevamente más tarde.`,
         Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Reintentar', 'configure_clients')],
           [Markup.button.callback('🔙 Volver al menú principal', 'menu_principal')],
-        ])
+        ]),
+        300
       );
     }
   });

@@ -15,6 +15,12 @@ import {
 import CustomerSetupService from '../../services/customer-setup.service.js';
 import { clientSelectionMenu } from '../views/menu.view.js';
 import logger from '../../core/utils/logger.js';
+import {
+  MenuStateManager,
+  MenuTransitionUtils,
+  LoadingStates,
+  ActionFeedback,
+} from '../utils/menu-transition.utils.js';
 
 // Importar prisma de manera segura
 import { prisma as configPrisma } from '../../config/database.js';
@@ -178,20 +184,33 @@ async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
 export function registerInvoiceHandler(bot) {
   // Menú de generación de factura
   bot.action('menu_generar', async (ctx) => {
-    await ctx.answerCbQuery();
+    await ctx.answerCbQuery(ActionFeedback.SELECTED);
+
+    // Inicializar gestor de menús
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('invoices', {});
 
     try {
+      // Mostrar estado de carga mientras verificamos clientes
+      await ctx.editMessageText('📝 *Cargando clientes para facturación...*', {
+        parse_mode: 'Markdown'
+      });
+
       // Importar el servicio para verificar si hay clientes configurados
       // Verificar si el tenant tiene clientes configurados
       const hasCustomers = await CustomerSetupService.hasConfiguredCustomers(ctx.getTenantId());
 
       if (!hasCustomers) {
         // Si no hay clientes configurados, intentar configurarlos automáticamente
-        return ctx.reply(
-          '⚠️ No tienes clientes configurados en tu cuenta. Vamos a intentar configurarlos automáticamente.',
+        return MenuTransitionUtils.smoothTransition(
+          ctx,
+          '📝 *Cargando clientes para facturación...*',
+          '🏠 Menú Principal → 📝 **Generar Factura**\n\n⚠️ No tienes clientes configurados en tu cuenta. Vamos a intentar configurarlos automáticamente.',
           Markup.inlineKeyboard([
             [Markup.button.callback('Configurar Clientes', 'configure_clients')],
-          ])
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
+          ]),
+          300
         );
       }
 
@@ -210,8 +229,14 @@ export function registerInvoiceHandler(bot) {
 
       // Si no hay clientes disponibles (aunque existan en la base de datos)
       if (availableCustomers.length === 0) {
-        return ctx.reply(
-          '⚠️ No hay clientes disponibles para facturar. Por favor, contacta a soporte.'
+        return MenuTransitionUtils.smoothTransition(
+          ctx,
+          '📝 *Cargando clientes para facturación...*',
+          '🏠 Menú Principal → 📝 **Generar Factura**\n\n⚠️ No hay clientes disponibles para facturar. Por favor, contacta a soporte.',
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          ]),
+          300
         );
       }
 
@@ -263,27 +288,50 @@ export function registerInvoiceHandler(bot) {
           name: shortenName(customer.legalName),
         }));
 
-      // Usar la función existente en menu.view.js
-      await ctx.reply(
-        'Seleccione el cliente para generar la factura:',
-        clientSelectionMenu(clientsForMenu, true) // `true` para incluir siempre la opción CHUBB
+      // Usar la función existente en menu.view.js con transición suave
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        '📝 *Cargando clientes para facturación...*',
+        '🏠 Menú Principal → 📝 **Generar Factura**\n\nSeleccione el cliente para generar la factura:',
+        clientSelectionMenu(clientsForMenu, true), // `true` para incluir siempre la opción CHUBB
+        400
       );
     } catch (error) {
       console.error('Error al verificar clientes:', error);
 
-      ctx.reply(
-        '❌ Ocurrió un error al obtener los clientes disponibles. Por favor, intente nuevamente más tarde.',
-        Markup.inlineKeyboard([[Markup.button.callback('Volver al Menú', 'menu_principal')]])
+      await MenuTransitionUtils.smoothTransition(
+        ctx,
+        '📝 *Cargando clientes para facturación...*',
+        '🏠 Menú Principal → 📝 **Generar Factura**\n\n❌ Ocurrió un error al obtener los clientes disponibles. Por favor, intente nuevamente más tarde.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔄 Reintentar', 'menu_generar')],
+          [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+        ]),
+        300
       );
     }
   });
 
   // Manejar consulta de facturas
-  bot.action('menu_consultar', (ctx) => {
-    ctx.answerCbQuery();
-    // Iniciamos el flujo de consulta
+  bot.action('menu_consultar', async (ctx) => {
+    await ctx.answerCbQuery(ActionFeedback.SELECTED);
+
+    // Inicializar gestor de menús
+    const menuManager = new MenuStateManager(ctx);
+    menuManager.pushMenu('query', {});
+
+    // Iniciamos el flujo de consulta con transición suave
     ctx.userState.esperando = 'folioConsulta';
-    ctx.reply('Por favor, ingrese el número de folio de la factura que desea consultar:');
+    
+    await MenuTransitionUtils.smoothTransition(
+      ctx,
+      '🔍 *Cargando consulta de facturas...*',
+      '🏠 Menú Principal → 🔍 **Consultar Factura**\n\nPor favor, ingrese el número de folio de la factura que desea consultar:',
+      Markup.inlineKeyboard([
+        [Markup.button.callback('❌ Cancelar', 'menu_principal')]
+      ]),
+      300
+    );
   });
 
   // Manejador para confirmación de factura
