@@ -95,10 +95,55 @@ export async function registerMenuCommand(bot) {
     );
   });
 
-  // Acción para generar reporte de facturas
+  // Acción para generar reporte de facturas - Ejecuta directamente
   bot.action('reporte_facturas_action', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_facturas');
+    
+    if (!ctx.hasTenant()) {
+      return ctx.reply(
+        'Para generar un reporte, primero debes registrar tu empresa.',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('📝 Registrar empresa', 'start_registration')],
+        ])
+      );
+    }
+
+    try {
+      await ctx.reply('⏳ Generando reporte mensual de facturación, por favor espera...');
+
+      const tenantId = ctx.getTenantId();
+      const ReportsService = (await import('../../services/reports.service.js')).default;
+
+      // Usar fecha actual para el reporte
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth(); // 0-11
+
+      const reportResult = await ReportsService.generateMonthlyInvoiceReport(tenantId, {
+        year,
+        month,
+        format: 'text',
+      });
+
+      await ctx.reply(reportResult.formatted, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.callback(
+              '📅 Ver mes anterior',
+              `reporte_mes_${year}_${month - 1 >= 0 ? month - 1 : 11}`
+            ),
+          ],
+          [Markup.button.callback('🔙 Volver al menú', 'menu_principal')],
+        ]),
+      });
+    } catch (error) {
+      console.error('Error al generar reporte de facturas desde menú:', error);
+      await ctx.reply(
+        `❌ Error al generar el reporte: ${error.message}`,
+        Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', 'menu_principal')]])
+      );
+    }
   });
 
   // ELIMINADO: Acción para generar reporte de suscripción (duplicidad con "Mi Suscripción")
