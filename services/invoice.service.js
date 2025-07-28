@@ -187,7 +187,7 @@ class InvoiceService {
             factura.folio_number,
             localCustomerDbId, // Usar ID de PostgreSQL para FK
             factura.total,
-            data.userId || null
+            null // QUICK FIX: Always use null for createdById to avoid INT4 overflow with Telegram IDs
           ),
         'register-invoice',
         { tenantId, facturapiInvoiceId: factura.id }
