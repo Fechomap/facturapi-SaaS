@@ -92,33 +92,33 @@ export function loadingMainMenus() {
   return {
     main: () => ({
       text: '🔄 *Cargando menú principal...*',
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     reports: () => ({
       text: '📊 *Cargando reportes...*',
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     users: () => ({
       text: '👥 *Cargando usuarios...*',
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     invoices: () => ({
       text: '📝 *Cargando facturas...*',
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     subscription: () => ({
       text: '💳 *Cargando suscripción...*',
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     clients: () => ({
       text: '⚙️ *Cargando clientes...*',
-      markup: Markup.inlineKeyboard([])
-    })
+      markup: Markup.inlineKeyboard([]),
+    }),
   };
 }
 
@@ -127,13 +127,13 @@ export function loadingMainMenus() {
  * @param {string} context - Contexto adicional opcional
  */
 export function enhancedMainMenu(context = '') {
-  const menuText = context 
+  const menuText = context
     ? `🏠 **Menú Principal** ${context}\n\nSelecciona una opción:`
     : '🏠 **Menú Principal**\n\nSelecciona una opción:';
-    
+
   return {
     text: menuText,
-    markup: mainMenu()
+    markup: mainMenu(),
   };
 }
 
@@ -143,6 +143,6 @@ export function enhancedMainMenu(context = '') {
 export function enhancedReportsMenu() {
   return {
     text: '🏠 Menú Principal → 📊 **Reportes y Análisis**\n\nSelecciona el tipo de reporte que deseas consultar:',
-    markup: reportsMenu()
+    markup: reportsMenu(),
   };
 }

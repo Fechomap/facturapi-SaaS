@@ -18,7 +18,7 @@ export class MenuStateManager {
         history: [],
         currentMenu: 'main',
         menuData: {},
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
       };
     }
   }
@@ -28,12 +28,12 @@ export class MenuStateManager {
    */
   pushMenu(menuId, data = {}) {
     const currentState = this.ctx.userState.menuSystem;
-    
+
     // Guardar estado actual en historial
     currentState.history.push({
       id: currentState.currentMenu,
       data: { ...currentState.menuData },
-      timestamp: currentState.lastUpdate
+      timestamp: currentState.lastUpdate,
     });
 
     // Actualizar estado actual
@@ -52,7 +52,7 @@ export class MenuStateManager {
    */
   popMenu() {
     const currentState = this.ctx.userState.menuSystem;
-    
+
     if (currentState.history.length > 0) {
       const previousMenu = currentState.history.pop();
       currentState.currentMenu = previousMenu.id;
@@ -60,7 +60,7 @@ export class MenuStateManager {
       currentState.lastUpdate = Date.now();
       return previousMenu;
     }
-    
+
     return null;
   }
 
@@ -84,8 +84,8 @@ export class MenuStateManager {
   getBreadcrumb() {
     const history = this.ctx.userState.menuSystem.history;
     const current = this.ctx.userState.menuSystem.currentMenu;
-    
-    return [...history.map(h => h.id), current];
+
+    return [...history.map((h) => h.id), current];
   }
 }
 
@@ -100,32 +100,32 @@ export class MenuTransitionUtils {
     try {
       // Mostrar estado de carga
       await ctx.editMessageText(loadingText, { parse_mode: 'Markdown' });
-      
+
       // Pausa para efecto visual
       if (delay > 0) {
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      
+
       // Mostrar contenido final
       await ctx.editMessageText(finalText, {
         parse_mode: 'Markdown',
-        ...finalMarkup
+        ...finalMarkup,
       });
-      
+
       return true;
     } catch (error) {
       console.error('Error en transición suave:', error);
-      
+
       // Fallback: mostrar contenido final directamente
       try {
         await ctx.editMessageText(finalText, {
           parse_mode: 'Markdown',
-          ...finalMarkup
+          ...finalMarkup,
         });
       } catch (fallbackError) {
         console.error('Error en fallback de transición:', fallbackError);
       }
-      
+
       return false;
     }
   }
@@ -137,24 +137,24 @@ export class MenuTransitionUtils {
     try {
       // Dar feedback inmediato
       await ctx.answerCbQuery(feedbackText);
-      
+
       // Actualizar teclado
       await ctx.editMessageReplyMarkup(newMarkup);
-      
+
       return true;
     } catch (error) {
       // Manejar error "message not modified" silenciosamente
       if (!error.message?.includes('message is not modified')) {
         console.error('Error actualizando teclado:', error);
       }
-      
+
       // Intentar dar feedback aunque falle la actualización
       try {
         await ctx.answerCbQuery(feedbackText);
       } catch (cbError) {
         console.error('Error en callback query:', cbError);
       }
-      
+
       return false;
     }
   }
@@ -165,20 +165,19 @@ export class MenuTransitionUtils {
   static async confirmedTransition(ctx, newText, newMarkup, confirmationDelay = 300) {
     try {
       // Mostrar confirmación temporal
-      await ctx.editMessageText(
-        `${newText}\n\n🔄 *Actualizando interfaz...*`,
-        { parse_mode: 'Markdown' }
-      );
-      
+      await ctx.editMessageText(`${newText}\n\n🔄 *Actualizando interfaz...*`, {
+        parse_mode: 'Markdown',
+      });
+
       // Pausa breve
-      await new Promise(resolve => setTimeout(resolve, confirmationDelay));
-      
+      await new Promise((resolve) => setTimeout(resolve, confirmationDelay));
+
       // Mostrar estado final
       await ctx.editMessageText(newText, {
         parse_mode: 'Markdown',
-        ...newMarkup
+        ...newMarkup,
       });
-      
+
       return true;
     } catch (error) {
       console.error('Error en transición confirmada:', error);
@@ -193,32 +192,31 @@ export class MenuTransitionUtils {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Agregar timestamp para evitar "message not modified"
-        const uniqueText = attempt > 1 
-          ? `${text}\n\n🔄 *Actualizado: ${new Date().toLocaleTimeString()}*`
-          : text;
-        
+        const uniqueText =
+          attempt > 1 ? `${text}\n\n🔄 *Actualizado: ${new Date().toLocaleTimeString()}*` : text;
+
         await ctx.editMessageText(uniqueText, {
           parse_mode: 'Markdown',
-          ...markup
+          ...markup,
         });
-        
+
         return true;
       } catch (error) {
         if (error.message?.includes('message is not modified')) {
           // Contenido idéntico, intentar con timestamp
           continue;
         }
-        
+
         if (attempt === maxRetries) {
           console.error(`Error después de ${maxRetries} intentos:`, error);
           throw error;
         }
-        
+
         // Esperar antes del siguiente intento
-        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+        await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
       }
     }
-    
+
     return false;
   }
 
@@ -229,7 +227,7 @@ export class MenuTransitionUtils {
     try {
       // Actualizar UI inmediatamente
       await updateFunction();
-      
+
       // Validar en background
       setTimeout(async () => {
         try {
@@ -239,7 +237,7 @@ export class MenuTransitionUtils {
           // Aquí podrías revertir o mostrar error
         }
       }, 100);
-      
+
       return true;
     } catch (error) {
       console.error('Error en actualización optimista:', error);
@@ -258,7 +256,7 @@ export const LoadingStates = {
   DATES: '🔄 *Configurando fechas...*',
   GENERATING: '🔄 *Generando reporte...*',
   UPDATING: '🔄 *Actualizando...*',
-  SAVING: '🔄 *Guardando configuración...*'
+  SAVING: '🔄 *Guardando configuración...*',
 };
 
 /**
@@ -271,7 +269,7 @@ export const ActionFeedback = {
   SAVED: '💾 Guardado',
   CLEARED: '🗑️ Limpiado',
   APPLIED: '✅ Aplicado',
-  CANCELLED: '❌ Cancelado'
+  CANCELLED: '❌ Cancelado',
 };
 
 /**
@@ -280,7 +278,7 @@ export const ActionFeedback = {
 export function createLoadingMenu(loadingText = LoadingStates.GENERIC) {
   return {
     text: loadingText,
-    markup: Markup.inlineKeyboard([])
+    markup: Markup.inlineKeyboard([]),
   };
 }
 
@@ -304,17 +302,15 @@ export function debounce(func, wait) {
  */
 export function generateBreadcrumb(menuPath, separator = ' → ') {
   const menuNames = {
-    'main': '🏠 Inicio',
-    'reportes': '📊 Reportes',
-    'excel_options': '📋 Excel',
-    'excel_filters': '🔧 Filtros',
-    'excel_dates': '📅 Fechas',
-    'excel_clients': '👥 Clientes'
+    main: '🏠 Inicio',
+    reportes: '📊 Reportes',
+    excel_options: '📋 Excel',
+    excel_filters: '🔧 Filtros',
+    excel_dates: '📅 Fechas',
+    excel_clients: '👥 Clientes',
   };
 
-  return menuPath
-    .map(id => menuNames[id] || id)
-    .join(separator);
+  return menuPath.map((id) => menuNames[id] || id).join(separator);
 }
 
 export default {
@@ -324,5 +320,5 @@ export default {
   ActionFeedback,
   createLoadingMenu,
   debounce,
-  generateBreadcrumb
+  generateBreadcrumb,
 };

@@ -281,34 +281,34 @@ export function loadingMenus() {
   return {
     generic: () => ({
       text: LoadingStates.GENERIC,
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     filters: () => ({
       text: LoadingStates.FILTERS,
-      markup: Markup.inlineKeyboard([])
+      markup: Markup.inlineKeyboard([]),
     }),
-    
+
     clients: () => ({
       text: LoadingStates.CLIENTS,
       markup: Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Cancelar', 'excel_report_options')]
-      ])
+        [Markup.button.callback('❌ Cancelar', 'excel_report_options')],
+      ]),
     }),
-    
+
     dates: () => ({
       text: LoadingStates.DATES,
       markup: Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Cancelar', 'excel_report_options')]
-      ])
+        [Markup.button.callback('❌ Cancelar', 'excel_report_options')],
+      ]),
     }),
-    
+
     generating: (progress = 0) => ({
       text: `${LoadingStates.GENERATING}\n\n${'█'.repeat(Math.floor(progress / 5))}${'░'.repeat(20 - Math.floor(progress / 5))} ${progress}%`,
       markup: Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Cancelar generación', 'excel_cancel_generation')]
-      ])
-    })
+        [Markup.button.callback('❌ Cancelar generación', 'excel_cancel_generation')],
+      ]),
+    }),
   };
 }
 
@@ -319,10 +319,10 @@ export function loadingMenus() {
  */
 export function menuWithBreadcrumb(menuPath, mainMenu) {
   const breadcrumb = generateBreadcrumb(menuPath);
-  
+
   return {
     text: `${breadcrumb}\n\n${mainMenu.text || ''}`,
-    markup: mainMenu.markup || mainMenu
+    markup: mainMenu.markup || mainMenu,
   };
 }
 
@@ -332,13 +332,17 @@ export function menuWithBreadcrumb(menuPath, mainMenu) {
  * @param {string} confirmCallback - Callback para confirmar
  * @param {string} cancelCallback - Callback para cancelar
  */
-export function confirmationMenuWithHistory(action, confirmCallback, cancelCallback = 'excel_report_options') {
+export function confirmationMenuWithHistory(
+  action,
+  confirmCallback,
+  cancelCallback = 'excel_report_options'
+) {
   return Markup.inlineKeyboard([
     [
       Markup.button.callback(`✅ Confirmar ${action}`, confirmCallback),
-      Markup.button.callback('❌ Cancelar', cancelCallback)
+      Markup.button.callback('❌ Cancelar', cancelCallback),
     ],
-    [Markup.button.callback('🔙 Volver al menú anterior', 'menu_back')]
+    [Markup.button.callback('🔙 Volver al menú anterior', 'menu_back')],
   ]);
 }
 
@@ -349,15 +353,13 @@ export function confirmationMenuWithHistory(action, confirmCallback, cancelCallb
  */
 export function enhancedNavigationMenu(quickActions = [], hasHistory = false) {
   const buttons = [];
-  
+
   // Acciones rápidas en filas de 2
   for (let i = 0; i < quickActions.length; i += 2) {
     const row = quickActions.slice(i, i + 2);
-    buttons.push(row.map(action => 
-      Markup.button.callback(action.text, action.callback)
-    ));
+    buttons.push(row.map((action) => Markup.button.callback(action.text, action.callback)));
   }
-  
+
   // Fila de navegación
   const navRow = [];
   if (hasHistory) {
@@ -365,9 +367,9 @@ export function enhancedNavigationMenu(quickActions = [], hasHistory = false) {
   }
   navRow.push(Markup.button.callback('🏠 Inicio', 'menu_principal'));
   navRow.push(Markup.button.callback('📊 Reportes', 'menu_reportes'));
-  
+
   buttons.push(navRow);
-  
+
   return Markup.inlineKeyboard(buttons);
 }
 

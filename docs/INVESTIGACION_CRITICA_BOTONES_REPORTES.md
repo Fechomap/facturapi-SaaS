@@ -107,7 +107,7 @@ bot.action('reporte_facturas_action')
 ```javascript
 // Mi Suscripción (bot/commands/subscription.command.js:99)
 `Facturas generadas: ${subscription.invoicesUsed || 0}\n` +
-  `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod}\n`// Reporte de Suscripción (services/reports.service.js:284)
+  `Precio del plan: $${plan.price} ${plan.currency} / ${plan.billingPeriod}\n` // Reporte de Suscripción (services/reports.service.js:284)
   `• Facturas emitidas: ${invoicesUsed} de ${invoicesLimit}\n` +
   `*Precio:* ${Number(plan.price).toFixed(2)} ${plan.currency}/${plan.billingPeriod}\n`;
 ```

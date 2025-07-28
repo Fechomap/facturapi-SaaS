@@ -116,8 +116,7 @@ export function registerExcelReportHandlers(bot) {
     await MenuTransitionUtils.smoothTransition(
       ctx,
       LoadingStates.DATES,
-      '📅 **Filtrar por Fecha**\n\n' + 
-        'Selecciona el período que quieres incluir en tu reporte:',
+      '📅 **Filtrar por Fecha**\n\n' + 'Selecciona el período que quieres incluir en tu reporte:',
       dateFilterMenu(),
       300
     );
@@ -188,7 +187,7 @@ export function registerExcelReportHandlers(bot) {
       const loadingMenu = loadingMenus().clients();
       await ctx.editMessageText(loadingMenu.text, {
         parse_mode: 'Markdown',
-        ...loadingMenu.markup
+        ...loadingMenu.markup,
       });
 
       const tenantId = ctx.getTenantId();
@@ -260,10 +259,10 @@ export function registerExcelReportHandlers(bot) {
       async () => {
         // Actualizar UI inmediatamente
         await ctx.answerCbQuery(feedbackText);
-        
+
         const tenantId = ctx.getTenantId();
         const customers = await ExcelReportService.getTenantCustomers(tenantId);
-        
+
         await ctx.editMessageReplyMarkup({
           inline_keyboard: clientSelectionMenu(customers, filters.selectedClientIds).reply_markup
             .inline_keyboard,
@@ -282,7 +281,7 @@ export function registerExcelReportHandlers(bot) {
       ctx,
       async () => {
         await ctx.answerCbQuery(ActionFeedback.SELECTED);
-        
+
         const tenantId = ctx.getTenantId();
         const customers = await ExcelReportService.getTenantCustomers(tenantId);
 
@@ -311,7 +310,7 @@ export function registerExcelReportHandlers(bot) {
       ctx,
       async () => {
         await ctx.answerCbQuery(ActionFeedback.CLEARED);
-        
+
         const tenantId = ctx.getTenantId();
         const customers = await ExcelReportService.getTenantCustomers(tenantId);
 
@@ -406,7 +405,7 @@ export function registerExcelReportHandlers(bot) {
       const fakeCtx = {
         ...ctx,
         match: null,
-        callbackQuery: { data: targetAction }
+        callbackQuery: { data: targetAction },
       };
 
       // Ejecutar la acción correspondiente
@@ -415,8 +414,8 @@ export function registerExcelReportHandlers(bot) {
           return bot.handleUpdate({
             callback_query: {
               ...ctx.callbackQuery,
-              data: 'excel_report_options'
-            }
+              data: 'excel_report_options',
+            },
           });
         } else {
           // Para otros casos, redirigir directamente

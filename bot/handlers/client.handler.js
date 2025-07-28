@@ -107,7 +107,7 @@ export function registerClientHandler(bot) {
       // Mostrar estado usando la vista con breadcrumb
       const { message, keyboard, parse_mode } = clientStatusView(customerStatus);
       const enhancedMessage = `🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n${message}`;
-      
+
       await MenuTransitionUtils.smoothTransition(
         ctx,
         '🏠 Menú Principal → ⚙️ **Configurar Clientes**\n\n⏳ Verificando el estado de tus clientes...',

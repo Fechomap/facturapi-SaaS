@@ -193,7 +193,7 @@ export function registerInvoiceHandler(bot) {
     try {
       // Mostrar estado de carga mientras verificamos clientes
       await ctx.editMessageText('📝 *Cargando clientes para facturación...*', {
-        parse_mode: 'Markdown'
+        parse_mode: 'Markdown',
       });
 
       // Importar el servicio para verificar si hay clientes configurados
@@ -233,9 +233,7 @@ export function registerInvoiceHandler(bot) {
           ctx,
           '📝 *Cargando clientes para facturación...*',
           '🏠 Menú Principal → 📝 **Generar Factura**\n\n⚠️ No hay clientes disponibles para facturar. Por favor, contacta a soporte.',
-          Markup.inlineKeyboard([
-            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
-          ]),
+          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]]),
           300
         );
       }
@@ -305,7 +303,7 @@ export function registerInvoiceHandler(bot) {
         '🏠 Menú Principal → 📝 **Generar Factura**\n\n❌ Ocurrió un error al obtener los clientes disponibles. Por favor, intente nuevamente más tarde.',
         Markup.inlineKeyboard([
           [Markup.button.callback('🔄 Reintentar', 'menu_generar')],
-          [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')]
+          [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
         ]),
         300
       );
@@ -322,14 +320,12 @@ export function registerInvoiceHandler(bot) {
 
     // Iniciamos el flujo de consulta con transición suave
     ctx.userState.esperando = 'folioConsulta';
-    
+
     await MenuTransitionUtils.smoothTransition(
       ctx,
       '🔍 *Cargando consulta de facturas...*',
       '🏠 Menú Principal → 🔍 **Consultar Factura**\n\nPor favor, ingrese el número de folio de la factura que desea consultar:',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('❌ Cancelar', 'menu_principal')]
-      ]),
+      Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', 'menu_principal')]]),
       300
     );
   });
