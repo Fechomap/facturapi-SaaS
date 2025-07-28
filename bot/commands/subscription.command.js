@@ -271,8 +271,21 @@ export function registerSubscriptionCommand(bot) {
     }
   });
 
-  // Implementar acción para actualizar suscripción
-  bot.action('update_subscription', async (_ctx) => {
-    // ... (código original para actualizar suscripción) ...
+  // Acción para actualizar suscripción - Temporalmente deshabilitada
+  bot.action('update_subscription', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      '🚧 **Actualización de Suscripción**\n\n' +
+      'Esta funcionalidad está en desarrollo como parte de las mejoras del sistema de pagos.\n\n' +
+      '📅 Próximamente estará disponible con nuevas opciones de pago y gestión avanzada de planes.\n\n' +
+      '💡 Mientras tanto, puedes contactar a soporte para cambios urgentes.',
+      {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🔙 Volver', 'menu_suscripcion')],
+          [Markup.button.callback('📞 Contactar Soporte', 'contact_support')],
+        ])
+      }
+    );
   });
 }

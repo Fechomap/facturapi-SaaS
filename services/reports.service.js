@@ -130,19 +130,40 @@ class ReportsService {
           'Diciembre',
         ];
 
+        // Función para formatear números con comas
+        const formatNumber = (num) => new Intl.NumberFormat('es-MX').format(num);
+        
+        // Función para limpiar y formatear nombres de clientes
+        const formatClientName = (name) => {
+          const nameMap = {
+            'AXA ASSISTANCE MEXICO': 'AXA Assistance México',
+            'INFOASIST INFORMACION Y ASISTENCIA': 'InfoAsist Información y Asistencia',
+            'CHUBB DIGITAL SERVICES': 'Chubb Digital Services',
+            'ARSA ASESORIA INTEGRAL PROFESIONAL': 'ARSA Asesoría Integral Profesional',
+            'PROTECCION S.O.S. JURIDICO AUTOMOVILISTICO LAS VEINTICUATRO HORAS DEL DIA': 'Protección S.O.S. Jurídico Automovilístico 24H'
+          };
+          return nameMap[name] || name;
+        };
+
         const textReport =
           `📊 *Reporte Mensual de Facturación*\n\n` +
-          `*Empresa:* ${tenant.businessName}\n` +
-          `*Período:* ${monthNames[month]} ${year}\n\n` +
-          `*Resumen:*\n` +
-          `• Facturas emitidas: ${totalInvoices}\n` +
-          `• Facturas válidas: ${validInvoices.length}\n` +
-          `• Facturas canceladas: ${canceledInvoices.length}\n` +
-          `• Monto total: $${totalAmount.toFixed(2)} MXN\n` +
-          `• Monto facturas válidas: $${validAmount.toFixed(2)} MXN\n\n` +
-          `*Top Clientes:*\n` +
+          `🧾 *Empresa:* ${tenant.businessName}\n` +
+          `📅 *Período:* ${monthNames[month]} ${year}\n\n` +
+          `⸻\n\n` +
+          `📌 *Resumen*\n` +
+          `    •    Facturas emitidas: ${totalInvoices}\n` +
+          `    •    Facturas válidas: ${validInvoices.length}\n` +
+          `    •    Facturas canceladas: ${canceledInvoices.length}\n` +
+          `    •    💰 Monto total: $${formatNumber(totalAmount.toFixed(2))} MXN\n` +
+          `    •    💵 Monto válido: $${formatNumber(validAmount.toFixed(2))} MXN\n\n` +
+          `⸻\n\n` +
+          `👥 *Top Clientes*\n` +
           topClients
-            .map((c) => `• ${c.name}: ${c.count} facturas, $${c.total.toFixed(2)} MXN`)
+            .map((c, index) => 
+              `    ${index + 1}.    ${formatClientName(c.name)}\n` +
+              `• *${c.count}* facturas\n` +
+              `• *$${formatNumber(c.total.toFixed(2))} MXN*\n`
+            )
             .join('\n');
 
         return {

@@ -101,11 +101,8 @@ export async function registerMenuCommand(bot) {
     await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_facturas');
   });
 
-  // Acción para generar reporte de suscripción
-  bot.action('reporte_suscripcion_action', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.telegram.sendMessage(ctx.chat.id, '/reporte_suscripcion');
-  });
+  // ELIMINADO: Acción para generar reporte de suscripción (duplicidad con "Mi Suscripción")
+  // La funcionalidad está disponible en el menú principal como "💳 Mi Suscripción"
 
   // FASE 2: Importar y registrar handlers de Excel con filtros avanzados
   const { registerExcelReportHandlers } = await import('../handlers/excel-report.handler.js');
