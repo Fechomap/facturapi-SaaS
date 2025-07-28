@@ -1,11 +1,10 @@
 // bot/commands/menu.command.js
 import { Markup } from 'telegraf';
-import { 
-  mainMenu, 
-  reportsMenu, 
-  loadingMainMenus, 
-  enhancedMainMenu, 
-  enhancedReportsMenu 
+import {
+  mainMenu,
+  loadingMainMenus,
+  enhancedMainMenu,
+  enhancedReportsMenu,
 } from '../views/menu.view.js';
 import {
   MenuStateManager,
@@ -36,7 +35,7 @@ export async function registerMenuCommand(bot) {
       const mainMenuView = enhancedMainMenu();
       await ctx.reply(mainMenuView.text, {
         parse_mode: 'Markdown',
-        ...mainMenuView.markup
+        ...mainMenuView.markup,
       });
     } else {
       await ctx.reply(
@@ -64,7 +63,7 @@ export async function registerMenuCommand(bot) {
     if (ctx.hasTenant()) {
       // Transición suave al menú principal
       const mainMenuView = enhancedMainMenu();
-      
+
       await MenuTransitionUtils.smoothTransition(
         ctx,
         loadingMainMenus().main().text,
@@ -132,7 +131,7 @@ export async function registerMenuCommand(bot) {
 
     // Transición suave al menú de reportes con breadcrumb
     const reportsMenuView = enhancedReportsMenu();
-    
+
     await MenuTransitionUtils.smoothTransition(
       ctx,
       loadingMainMenus().reports().text,
@@ -218,20 +217,20 @@ export async function registerMenuCommand(bot) {
     if (previousMenu) {
       // Mapear IDs de menú a acciones
       const menuActions = {
-        'main': 'menu_principal',
-        'reports': 'menu_reportes', 
-        'users': 'menu_usuarios',
-        'invoices': 'menu_generar',
-        'query': 'menu_consultar',
-        'subscription': 'menu_suscripcion',
-        'clients': 'configure_clients',
-        'excel_options': 'reporte_excel_action',
-        'excel_dates': 'excel_filter_date',
-        'excel_clients': 'excel_filter_clients'
+        main: 'menu_principal',
+        reports: 'menu_reportes',
+        users: 'menu_usuarios',
+        invoices: 'menu_generar',
+        query: 'menu_consultar',
+        subscription: 'menu_suscripcion',
+        clients: 'configure_clients',
+        excel_options: 'reporte_excel_action',
+        excel_dates: 'excel_filter_date',
+        excel_clients: 'excel_filter_clients',
       };
 
       const targetAction = menuActions[previousMenu.id] || 'menu_principal';
-      
+
       // Ejecutar la acción correspondiente directamente
       try {
         if (targetAction === 'menu_principal') {
@@ -252,7 +251,7 @@ export async function registerMenuCommand(bot) {
     }
   });
 
-  // NOTA: El botón "🔙 Volver al Menú" de la selección de clientes 
+  // NOTA: El botón "🔙 Volver al Menú" de la selección de clientes
   // usa la acción 'menu_principal' que ya tiene transiciones implementadas arriba
 
   // FASE 2: Importar y registrar handlers de Excel con filtros avanzados
@@ -280,12 +279,8 @@ export async function registerMenuCommand(bot) {
     menuManager.pushMenu('users', {});
 
     try {
-      // Mostrar estado de carga
+      // Preparar mensaje de carga para smoothTransition
       const loadingMenu = loadingMainMenus().users();
-      await ctx.editMessageText(loadingMenu.text, {
-        parse_mode: 'Markdown',
-        ...loadingMenu.markup
-      });
 
       // Ejecutar la misma lógica que el comando /usuarios
       const tenantId = ctx.getTenantId();
@@ -328,24 +323,18 @@ export async function registerMenuCommand(bot) {
         [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
       ]);
 
-      await MenuTransitionUtils.smoothTransition(
-        ctx,
-        loadingMenu.text,
-        message,
-        keyboard,
-        400
-      );
+      await MenuTransitionUtils.smoothTransition(ctx, loadingMenu.text, message, keyboard, 400);
     } catch (error) {
       console.error('Error al mostrar usuarios desde menú:', error);
-      await MenuTransitionUtils.smoothTransition(
-        ctx,
-        loadingMainMenus().users().text,
+      await ctx.editMessageText(
         '🏠 Menú Principal → 👥 **Usuarios**\n\n❌ Error al obtener la lista de usuarios.',
-        Markup.inlineKeyboard([
-          [Markup.button.callback('🔄 Reintentar', 'menu_usuarios')],
-          [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
-        ]),
-        200
+        {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard([
+            [Markup.button.callback('🔄 Reintentar', 'menu_usuarios')],
+            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
+          ]).reply_markup,
+        }
       );
     }
   });

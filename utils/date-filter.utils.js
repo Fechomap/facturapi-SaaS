@@ -294,6 +294,62 @@ class DateFilterUtils {
   }
 
   /**
+   * Procesar filtro de fecha y devolver fechas de inicio y fin
+   * @param {Object} dateRange - Objeto con configuración de filtro de fecha
+   * @returns {Object} - Objeto con startDate y endDate
+   */
+  static getDateRangeForFilter(dateRange) {
+    if (!dateRange) {
+      return { startDate: null, endDate: null };
+    }
+
+    // Si ya tiene start y end como Date objects
+    if (dateRange.start && dateRange.end) {
+      return {
+        startDate: dateRange.start instanceof Date ? dateRange.start : new Date(dateRange.start),
+        endDate: dateRange.end instanceof Date ? dateRange.end : new Date(dateRange.end),
+      };
+    }
+
+    // Si tiene key para rangos predefinidos
+    if (dateRange.key) {
+      const predefinedRanges = this.getAllPredefinedRanges();
+
+      switch (dateRange.key) {
+        case 'last_7_days':
+          return {
+            startDate: predefinedRanges.last7Days.start,
+            endDate: predefinedRanges.last7Days.end,
+          };
+        case 'last_30_days':
+          return {
+            startDate: predefinedRanges.last30Days.start,
+            endDate: predefinedRanges.last30Days.end,
+          };
+        case 'current_month':
+          return {
+            startDate: predefinedRanges.currentMonth.start,
+            endDate: predefinedRanges.currentMonth.end,
+          };
+        case 'previous_month':
+          return {
+            startDate: predefinedRanges.previousMonth.start,
+            endDate: predefinedRanges.previousMonth.end,
+          };
+        case 'current_year':
+          return {
+            startDate: predefinedRanges.currentYear.start,
+            endDate: predefinedRanges.currentYear.end,
+          };
+        default:
+          return { startDate: null, endDate: null };
+      }
+    }
+
+    return { startDate: null, endDate: null };
+  }
+
+  /**
    * Convertir string de fecha de usuario a Date
    * @param {string} userInput - Input del usuario (ej: "15/01/2025", "2025-01-15")
    * @returns {Date|null} - Fecha parseada o null si es inválida
