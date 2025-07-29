@@ -14,12 +14,19 @@ import { writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
 import ExcelJS from 'exceljs';
 
-// Tenants objetivo
-const TARGET_TENANTS = [
-  '14ed1f0f-30e7-4be3-961c-f53b161e8ba2',
-  '71f154fc-01b4-40cb-9f38-7aa5db18b65d', 
-  '872e20db-c67b-4013-a792-8136f0f8a08b'
-];
+// Obtener todos los tenants activos dinámicamente
+async function getAllActiveTenants() {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true, businessName: true, rfc: true }
+    });
+    return tenants.map(t => t.id);
+  } catch (error) {
+    log('ERROR', 'Error obteniendo tenants:', error);
+    return [];
+  }
+}
 
 const CONFIG = {
   RATE_LIMIT_MS: 3000, // 3 segundos entre consultas
@@ -44,6 +51,40 @@ let STATS = {
 };
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Convertir fecha UTC a timezone de México (CDMX)
+ * @param {Date|string} date - Fecha a convertir
+ * @returns {string} - Fecha en formato YYYY-MM-DD HH:mm:ss en timezone México
+ */
+function formatDateToMexicoTimezone(date) {
+  if (!date) return '';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(dateObj.getTime())) return '';
+  
+  // Convertir a timezone de México (UTC-6)
+  const mexicoDate = new Date(dateObj.toLocaleString("en-US", {timeZone: "America/Mexico_City"}));
+  
+  const year = mexicoDate.getFullYear();
+  const month = String(mexicoDate.getMonth() + 1).padStart(2, '0');
+  const day = String(mexicoDate.getDate()).padStart(2, '0');
+  const hours = String(mexicoDate.getHours()).padStart(2, '0');
+  const minutes = String(mexicoDate.getMinutes()).padStart(2, '0');
+  const seconds = String(mexicoDate.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Obtener solo la fecha (sin hora) en timezone de México
+ * @param {Date|string} date - Fecha a convertir
+ * @returns {string} - Fecha en formato YYYY-MM-DD
+ */
+function formatDateOnlyToMexico(date) {
+  if (!date) return '';
+  return formatDateToMexicoTimezone(date).split(' ')[0];
+}
 
 function log(level, message, data = null) {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
@@ -202,11 +243,11 @@ async function extractFacturapiInvoices(tenant) {
       paymentMethod: invoice.payment_method || '',
       paymentForm: invoice.payment_form || '',
       
-      // Fechas (múltiples formatos para análisis)
+      // Fechas (timezone México CDMX)
       date: invoice.date || '',
-      dateOnly: invoice.date ? new Date(invoice.date).toISOString().split('T')[0] : '',
+      dateOnly: formatDateOnlyToMexico(invoice.date),
       createdAt: invoice.created_at || '',
-      createdAtOnly: invoice.created_at ? new Date(invoice.created_at).toISOString().split('T')[0] : '',
+      createdAtOnly: formatDateOnlyToMexico(invoice.created_at),
       
       // Montos
       subtotal: invoice.subtotal || 0,
@@ -517,7 +558,11 @@ async function main() {
   try {
     log('INFO', '🚀 INICIANDO EXPORTACIÓN COMPLETA DE FACTURAPI');
     console.log('═'.repeat(80));
-    log('INFO', `📋 Tenants objetivo: ${TARGET_TENANTS.length}`);
+    
+    // Obtener todos los tenants activos
+    const TARGET_TENANTS = await getAllActiveTenants();
+    
+    log('INFO', `📋 Tenants activos encontrados: ${TARGET_TENANTS.length}`);
     log('INFO', `📁 Directorio salida: ${CONFIG.OUTPUT_DIR}`);
     log('INFO', `⚡ Rate limit: ${CONFIG.RATE_LIMIT_MS}ms entre requests`);
     

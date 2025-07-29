@@ -11,12 +11,19 @@ import { writeFileSync, mkdirSync } from 'fs';
 import path from 'path';
 import ExcelJS from 'exceljs';
 
-// Mismos tenants que FacturAPI
-const TARGET_TENANTS = [
-  '14ed1f0f-30e7-4be3-961c-f53b161e8ba2',
-  '71f154fc-01b4-40cb-9f38-7aa5db18b65d', 
-  '872e20db-c67b-4013-a792-8136f0f8a08b'
-];
+// Obtener todos los tenants activos dinámicamente
+async function getAllActiveTenants() {
+  try {
+    const tenants = await prisma.tenant.findMany({
+      where: { isActive: true },
+      select: { id: true, businessName: true, rfc: true }
+    });
+    return tenants.map(t => t.id);
+  } catch (error) {
+    log('ERROR', 'Error obteniendo tenants:', error);
+    return [];
+  }
+}
 
 const CONFIG = {
   OUTPUT_DIR: './postgresql-export',
@@ -29,6 +36,47 @@ let STATS = {
   tenants: { processed: 0, errors: 0 },
   postgresql: { totalInvoices: 0, errors: 0 },
 };
+
+/**
+ * Convertir fecha UTC a timezone de México (CDMX)
+ * @param {Date} date - Fecha a convertir
+ * @returns {string} - Fecha en formato YYYY-MM-DD HH:mm:ss en timezone México
+ */
+function formatDateToMexicoTimezone(date) {
+  if (!date) return '';
+  
+  // Convertir a timezone de México (UTC-6)
+  const mexicoDate = new Date(date.toLocaleString("en-US", {timeZone: "America/Mexico_City"}));
+  
+  const year = mexicoDate.getFullYear();
+  const month = String(mexicoDate.getMonth() + 1).padStart(2, '0');
+  const day = String(mexicoDate.getDate()).padStart(2, '0');
+  const hours = String(mexicoDate.getHours()).padStart(2, '0');
+  const minutes = String(mexicoDate.getMinutes()).padStart(2, '0');
+  const seconds = String(mexicoDate.getSeconds()).padStart(2, '0');
+  
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Obtener solo la fecha (sin hora) en timezone de México
+ * @param {Date} date - Fecha a convertir
+ * @returns {string} - Fecha en formato YYYY-MM-DD
+ */
+function formatDateOnlyToMexico(date) {
+  if (!date) return '';
+  return formatDateToMexicoTimezone(date).split(' ')[0];
+}
+
+/**
+ * Obtener solo la hora en timezone de México
+ * @param {Date} date - Fecha a convertir
+ * @returns {string} - Hora en formato HH:mm:ss
+ */
+function formatTimeOnlyToMexico(date) {
+  if (!date) return '';
+  return formatDateToMexicoTimezone(date).split(' ')[1];
+}
 
 function log(level, message, data = null) {
   const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
@@ -75,6 +123,7 @@ async function extractPostgreSQLInvoices(tenant) {
         id: true,
         tenantId: true,
         facturapiInvoiceId: true,
+        uuid: true,
         series: true,
         folioNumber: true,
         status: true,
@@ -93,49 +142,18 @@ async function extractPostgreSQLInvoices(tenant) {
     STATS.postgresql.totalInvoices += invoices.length;
     log('SUCCESS', `🗄️ PostgreSQL completado: ${invoices.length} facturas`);
     
-    // Transformar datos a formato comparable con FacturAPI
+    // Transformar datos a formato simplificado
     return invoices.map((invoice, index) => ({
-      rowNumber: index + 1,
-      
-      // Tenant info
       tenantId: tenant.id,
       tenantName: tenant.businessName,
       tenantRfc: tenant.rfc,
-      tenantEmail: tenant.email || '',
-      
-      // PostgreSQL specific fields
+      folio: `${invoice.series || ''}${invoice.folioNumber || ''}`,
+      uuid: invoice.uuid || '',
+      fechaFactura: formatDateOnlyToMexico(invoice.invoiceDate),
+      total: parseFloat(invoice.total || 0),
+      status: invoice.status || '',
       postgresId: invoice.id,
       facturapiId: invoice.facturapiInvoiceId,
-      customerId: invoice.customerId,
-      createdById: invoice.createdById,
-      
-      // Invoice basics
-      series: invoice.series || '',
-      folioNumber: invoice.folioNumber || '',
-      folio: `${invoice.series || ''}${invoice.folioNumber || ''}`,
-      
-      // Status
-      status: invoice.status || '',
-      
-      // Fechas (formato legible para comparación)
-      fechaFactura: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[0] : '',
-      fechaCreacion: invoice.createdAt ? new Date(invoice.createdAt).toISOString().split('T')[0] : '',
-      fechaActualizacion: invoice.updatedAt ? new Date(invoice.updatedAt).toISOString().split('T')[0] : '',
-      
-      horaFactura: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString().split('T')[1].split('.')[0] : '',
-      horaCreacion: invoice.createdAt ? new Date(invoice.createdAt).toISOString().split('T')[1].split('.')[0] : '',
-      
-      // Montos
-      total: invoice.total || 0,
-      
-      // Metadatos para comparación
-      source: 'PostgreSQL',
-      extractedAt: new Date().toISOString(),
-      
-      // Fechas raw para análisis técnico
-      rawInvoiceDate: invoice.invoiceDate?.toISOString() || '',
-      rawCreatedAt: invoice.createdAt?.toISOString() || '',
-      rawUpdatedAt: invoice.updatedAt?.toISOString() || '',
     }));
 
   } catch (error) {
@@ -239,15 +257,17 @@ async function exportToExcel(data, filename) {
       worksheetRow.eachCell((cell, colNumber) => {
         const header = headers[colNumber - 1];
         
-        if (header.includes('fecha') || header.includes('Fecha')) {
+        if (header === 'fechaFactura') {
           if (cell.value && cell.value !== '') {
             cell.numFmt = 'yyyy-mm-dd';
+            cell.alignment = { horizontal: 'center' };
           }
         }
         
-        if (header.includes('total') || header.includes('Total')) {
+        if (header === 'total') {
           if (!isNaN(cell.value) && cell.value !== '') {
             cell.numFmt = '"$"#,##0.00';
+            cell.alignment = { horizontal: 'right' };
           }
         }
         
@@ -279,23 +299,19 @@ async function exportToExcel(data, filename) {
 
 function getColumnWidth(header) {
   const widthMap = {
-    'tenantName': 25,
-    'facturapiId': 30,
-    'postgresId': 12,
+    'tenantId': 40,
+    'tenantName': 30,
+    'tenantRfc': 15,
     'folio': 15,
-    'total': 12,
+    'uuid': 40,
     'fechaFactura': 12,
-    'fechaCreacion': 12,
+    'total': 15,
     'status': 12,
-    'customerId': 12,
-    'createdById': 12,
+    'postgresId': 12,
+    'facturapiId': 30,
   };
   
-  for (const [key, width] of Object.entries(widthMap)) {
-    if (header.includes(key)) return width;
-  }
-  
-  return Math.min(Math.max(header.length + 2, 10), 50);
+  return widthMap[header] || 15;
 }
 
 function showSummary(allData) {
@@ -306,7 +322,7 @@ function showSummary(allData) {
   console.log('═'.repeat(80));
   
   console.log(`⏱️  Duración: ${Math.floor(duration / 60)}m ${duration % 60}s`);
-  console.log(`🏢 Tenants procesados: ${STATS.tenants.processed}/${TARGET_TENANTS.length}`);
+  console.log(`🏢 Tenants procesados: ${STATS.tenants.processed}`);
   console.log(`🗄️ Total facturas: ${STATS.postgresql.totalInvoices}`);
   console.log(`❌ Errores: ${STATS.postgresql.errors}`);
   
@@ -355,7 +371,11 @@ async function main() {
   try {
     log('INFO', '🚀 INICIANDO EXTRACCIÓN POSTGRESQL');
     console.log('═'.repeat(80));
-    log('INFO', `📋 Tenants objetivo: ${TARGET_TENANTS.length} (mismos que FacturAPI)`);
+    
+    // Obtener todos los tenants activos
+    const TARGET_TENANTS = await getAllActiveTenants();
+    
+    log('INFO', `📋 Tenants activos encontrados: ${TARGET_TENANTS.length}`);
     log('INFO', `📁 Salida: ${CONFIG.OUTPUT_DIR}`);
     
     const allData = [];
