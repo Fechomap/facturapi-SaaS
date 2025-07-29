@@ -38,7 +38,17 @@ Scripts de testing y diagnóstico:
 
 ### 🔧 `/maintenance/`
 
-Scripts de mantenimiento general (vacía por ahora)
+Scripts de mantenimiento y verificación:
+
+- `check-invoice-dates-simple.js` - Verificar fechas entre PostgreSQL y FacturAPI
+- `debug-tenant-check.js` - Debug de información básica de tenant
+
+### 📊 `/data-extraction/`
+
+Scripts para extracción completa de datos:
+
+- `facturapi-export-complete.js` - Extrae todas las facturas de FacturAPI (CSV + Excel)
+- `postgresql-export.js` - Extrae todas las facturas de PostgreSQL (CSV + Excel)
 
 ## 🚀 Uso
 
@@ -54,6 +64,14 @@ node scripts/monitoring/benchmark-before-after.js
 
 # Testing
 node scripts/testing/test-redis.js
+
+# Extracción de datos
+node scripts/data-extraction/facturapi-export-complete.js
+node scripts/data-extraction/postgresql-export.js
+
+# Mantenimiento
+node scripts/maintenance/check-invoice-dates-simple.js [tenantId] [limit]
+node scripts/maintenance/debug-tenant-check.js [tenantId]
 
 # Backup y Restore
 npm run backup:create

@@ -8,19 +8,19 @@ datasource db {
 }
 
 model SubscriptionPlan {
-  id            Int                  @id @default(autoincrement())
-  name          String               @db.VarChar(50)
-  description   String?
-  price         Decimal              @db.Decimal(10, 2)
-  currency      String               @default("MXN") @db.VarChar(3)
-  billingPeriod String               @default("monthly") @db.VarChar(20)
-  invoiceLimit  Int
-  isActive      Boolean              @default(true)
-  stripeProductId String?            @map("stripe_product_id") @db.VarChar(100)
-  stripePriceId String?              @map("stripe_price_id") @db.VarChar(100)
-  createdAt     DateTime             @default(now()) @map("created_at")
-  updatedAt     DateTime             @default(now()) @map("updated_at")
-  subscriptions TenantSubscription[]
+  id              Int                  @id @default(autoincrement())
+  name            String               @db.VarChar(50)
+  description     String?
+  price           Decimal              @db.Decimal(10, 2)
+  currency        String               @default("MXN") @db.VarChar(3)
+  billingPeriod   String               @default("monthly") @db.VarChar(20)
+  invoiceLimit    Int
+  isActive        Boolean              @default(true)
+  stripeProductId String?              @map("stripe_product_id") @db.VarChar(100)
+  stripePriceId   String?              @map("stripe_price_id") @db.VarChar(100)
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @default(now()) @map("updated_at")
+  subscriptions   TenantSubscription[]
 
   @@map("subscription_plans")
 }
@@ -38,13 +38,13 @@ model Tenant {
   isActive                Boolean              @default(true) @map("is_active")
   createdAt               DateTime             @default(now()) @map("created_at")
   updatedAt               DateTime             @default(now()) @map("updated_at")
-  stripeCustomerId        String?              @unique @map("stripe_customer_id") @db.VarChar(100) // Añadido @unique
+  stripeCustomerId        String?              @unique @map("stripe_customer_id") @db.VarChar(100)
   auditLogs               AuditLog[]
+  notifications           Notification[]
   customers               TenantCustomer[]
   documents               TenantDocument[]
   folios                  TenantFolio[]
   invoices                TenantInvoice[]
-  notifications           Notification[]
   payments                TenantPayment[]
   settings                TenantSetting[]
   subscriptions           TenantSubscription[]
@@ -162,6 +162,7 @@ model TenantInvoice {
   paymentDate        DateTime?        @map("payment_date")
   paymentStatus      String?          @map("payment_status") @db.VarChar(20)
   tags               String?
+  uuid               String?          @db.VarChar(100)
   documents          TenantDocument[]
   createdBy          TenantUser?      @relation(fields: [createdById], references: [id])
   customer           TenantCustomer?  @relation(fields: [customerId], references: [id])
