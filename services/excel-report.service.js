@@ -307,8 +307,9 @@ class ExcelReportService {
           createdAt: invoice.createdAt,
           invoiceDate: invoice.invoiceDate, // MANTENER para filtros de BD
           
-          // FECHA REAL DE EMISIÓN (usar PostgreSQL como fuente confiable para filtros)
-          realEmissionDate: new Date(invoice.invoiceDate), // USAR POSTGRESQL COMO FUENTE CONFIABLE
+          // CORRECCIÓN: USAR POSTGRESQL COMO FUENTE ÚNICA DE FECHAS
+          // PostgreSQL ya tiene las fechas sincronizadas correctamente desde el reporte crítico
+          realEmissionDate: invoice.invoiceDate, // USAR DIRECTAMENTE POSTGRESQL (sin new Date())
 
           // Datos del cliente
           customer: {
@@ -355,7 +356,7 @@ class ExcelReportService {
           ivaAmount: 0,
           retencionAmount: 0,
           verificationUrl: '',
-          realEmissionDate: new Date(invoice.invoiceDate), // Usar fecha de BD como fallback
+          realEmissionDate: invoice.invoiceDate, // CORRECCIÓN: Usar fecha directamente de PostgreSQL
           error: error.message,
         });
       }
@@ -440,9 +441,7 @@ class ExcelReportService {
         invoice.uuid || invoice.folioFiscal || 'No disponible',
         invoice.customer?.legalName || 'Cliente no especificado',
         invoice.customer?.rfc || 'RFC no disponible',
-        invoice.realEmissionDate
-          ? this.convertToMexicoTime(invoice.realEmissionDate) // CONVERTIR a hora México
-          : (invoice.invoiceDate ? this.convertToMexicoTime(new Date(invoice.invoiceDate)) : null), // Fallback con conversión
+        invoice.realEmissionDate ? this.createMexicoDateForExcel(invoice.realEmissionDate) : (invoice.invoiceDate ? this.createMexicoDateForExcel(invoice.invoiceDate) : null), // Convertir a fecha México para Excel
         this.truncateToTwoDecimals(invoice.subtotal || 0), // Columna 6 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.ivaAmount || 0), // Columna 7 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.retencionAmount || 0), // Columna 8 - TRUNCADO A 2 DECIMALES
@@ -642,11 +641,46 @@ class ExcelReportService {
       return null;
     }
     
-    // Crear una nueva fecha ajustada para zona horaria México (-6 horas)
-    // IMPORTANTE: No usar toLocaleString() porque Excel necesita un Date object
-    const mexicoDate = new Date(dateObj.getTime() - (6 * 60 * 60 * 1000)); // -6 horas
+    // CORREGIDO: Usar timezone automático de México (considera horario de verano)
+    // Esto convierte de UTC a timezone México automáticamente
+    const mexicoDateString = dateObj.toLocaleString("en-US", {timeZone: "America/Mexico_City"});
+    const mexicoDate = new Date(mexicoDateString);
     
     return mexicoDate;
+  }
+
+  /**
+   * Preparar fecha para Excel (CORREGIDO: Evitar inconsistencia entre día local e ISO)
+   * @param {Date|string} dateFromDB - Fecha desde PostgreSQL (ya en timezone correcto)
+   * @returns {Date} - Fecha lista para Excel con día consistente
+   */
+  static createMexicoDateForExcel(dateFromDB) {
+    if (!dateFromDB) return null;
+    
+    const dateObj = dateFromDB instanceof Date ? dateFromDB : new Date(dateFromDB);
+    
+    if (isNaN(dateObj.getTime())) {
+      console.warn('⚠️ Fecha inválida en createMexicoDateForExcel:', dateFromDB);
+      return null;
+    }
+    
+    // CORRECCIÓN CRÍTICA: El problema era que toISOString() mostraba un día diferente
+    // al día local, causando que Excel interpretara fechas incorrectas.
+    // 
+    // Ejemplo del problema:
+    // - Fecha local: Mon Jul 28 2025 22:53:59 GMT-0600 (día 28)
+    // - toISOString(): 2025-07-29T04:53:59.937Z (día 29) ← PROBLEMA
+    //
+    // Solución: Crear fecha usando solo año, mes, día (sin horas) para evitar
+    // conversiones de timezone que causen inconsistencias
+    const year = dateObj.getFullYear();
+    const month = dateObj.getMonth();
+    const day = dateObj.getDate();
+    
+    // Crear fecha exacta sin horas para mantener consistencia entre día local e ISO
+    const consistentDate = new Date(year, month, day, 0, 0, 0, 0);
+    
+    return consistentDate;
   }
 
   /**

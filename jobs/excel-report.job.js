@@ -1,5 +1,5 @@
 // jobs/excel-report.job.js - Job Asíncrono para Reportes Excel Grandes
-import { generateExcelReport } from '../services/excel-report.service.js';
+import ExcelReportService from '../services/excel-report.service.js';
 import { notifyUserReportReady } from '../services/notification.service.js';
 import logger from '../core/utils/logger.js';
 import fs from 'fs/promises';
@@ -27,10 +27,6 @@ export async function processExcelReportJob(job) {
     // Generar timestamp único para el archivo
     const timestamp = Date.now();
     const fileName = `reporte_facturas_async_${tenantId}_${timestamp}.xlsx`;
-    const filePath = path.join(process.cwd(), 'temp', 'excel-reports', fileName);
-
-    // Asegurar que el directorio existe
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
 
     // Actualizar progreso: Consultando datos
     await job.progress(15);
@@ -42,21 +38,36 @@ export async function processExcelReportJob(job) {
       await job.progress(Math.floor(mappedProgress));
     };
 
-    const reportData = await generateExcelReport(tenantId, filters, filePath, progressCallback);
+    // Configurar opciones para el reporte
+    const reportOptions = {
+      limit: 5000,
+      includeDetails: true,
+      format: 'xlsx',
+      useCache: false,
+      dateRange: filters.dateRange || null,
+      clientIds: filters.selectedClientIds || null,
+    };
+
+    const reportData = await ExcelReportService.generateInvoiceReport(tenantId, reportOptions);
 
     // Actualizar progreso: Finalizando
     await job.progress(95);
 
+    // Verificar que el reporte se generó correctamente
+    if (!reportData.success) {
+      throw new Error(reportData.error || 'Error desconocido generando reporte');
+    }
+
     // Verificar que el archivo se creó correctamente
-    const stats = await fs.stat(filePath);
+    const stats = await fs.stat(reportData.filePath);
     const fileSizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
     jobLogger.info('Excel report generated successfully', {
       jobId: job.id,
       tenantId,
-      filePath,
+      filePath: reportData.filePath,
       fileSizeMB,
-      invoiceCount: reportData.totalInvoices,
+      invoiceCount: reportData.stats.totalInvoices,
     });
 
     // Notificar al usuario que el reporte está listo
@@ -64,25 +75,25 @@ export async function processExcelReportJob(job) {
       chatId,
       tenantId,
       userId,
-      filePath,
+      filePath: reportData.filePath,
       fileName,
-      invoiceCount: reportData.totalInvoices,
+      invoiceCount: reportData.stats.totalInvoices,
       fileSizeMB,
       requestId,
       jobId: job.id,
     });
 
     // Programar limpieza del archivo en 24 horas
-    await scheduleFileCleanup(filePath, fileName);
+    await scheduleFileCleanup(reportData.filePath, fileName);
 
     // Progreso final
     await job.progress(100);
 
     return {
       success: true,
-      filePath,
+      filePath: reportData.filePath,
       fileName,
-      invoiceCount: reportData.totalInvoices,
+      invoiceCount: reportData.stats.totalInvoices,
       fileSizeMB,
       completedAt: new Date(),
     };

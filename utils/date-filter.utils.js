@@ -2,21 +2,53 @@
 // Utilidades para manejo de filtros de fecha en reportes
 
 /**
- * Utilidades para filtros de fecha
+ * Utilidades para filtros de fecha con timezone México
  */
 class DateFilterUtils {
   /**
-   * Obtener rango de fechas para "últimos X días"
+   * Obtener fecha actual en timezone de México
+   * @returns {Date} - Fecha actual en timezone México
+   */
+  static getCurrentMexicoDate() {
+    // Obtener fecha actual en timezone de México (America/Mexico_City)
+    const now = new Date();
+    const mexicoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Mexico_City"}));
+    return mexicoTime;
+  }
+
+  /**
+   * Crear fecha en timezone de México (CORREGIDO: Sin doble conversión)
+   * @param {number} year - Año
+   * @param {number} month - Mes (0-11)
+   * @param {number} day - Día
+   * @param {number} hour - Hora (0-23)
+   * @param {number} minute - Minuto (0-59)
+   * @param {number} second - Segundo (0-59)
+   * @param {number} ms - Milisegundo (0-999)
+   * @returns {Date} - Fecha en timezone México
+   */
+  static createMexicoDate(year, month, day, hour = 0, minute = 0, second = 0, ms = 0) {
+    // CORRECCIÓN: Crear fecha directamente sin conversión adicional
+    // El sistema ya está configurado para timezone México
+    return new Date(year, month, day, hour, minute, second, ms);
+  }
+
+  /**
+   * Obtener rango de fechas para "últimos X días" en timezone México
    * @param {number} days - Número de días hacia atrás
    * @returns {Object} - Objeto con fechas de inicio y fin
    */
   static getLastDaysRange(days) {
-    const end = new Date();
-    end.setHours(23, 59, 59, 999); // Final del día actual
+    const now = this.getCurrentMexicoDate();
+    
+    // Final del día actual (23:59:59.999) en México
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
 
-    const start = new Date();
+    // Inicio del día X días atrás (00:00:00.000) en México
+    const start = new Date(now);
     start.setDate(start.getDate() - days + 1);
-    start.setHours(0, 0, 0, 0); // Inicio del día
+    start.setHours(0, 0, 0, 0);
 
     return {
       start,
@@ -27,16 +59,17 @@ class DateFilterUtils {
   }
 
   /**
-   * Obtener rango para mes actual
+   * Obtener rango para mes actual en timezone México
    * @returns {Object} - Objeto con fechas del mes actual
    */
   static getCurrentMonthRange() {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
+    const now = this.getCurrentMexicoDate();
+    
+    // Primer día del mes actual a las 00:00:00.000
+    const start = this.createMexicoDate(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    
+    // Último día del mes actual a las 23:59:59.999
+    const end = this.createMexicoDate(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
     const monthNames = [
       'Enero',
@@ -62,18 +95,19 @@ class DateFilterUtils {
   }
 
   /**
-   * Obtener rango para mes anterior
+   * Obtener rango para mes anterior en timezone México
    * @returns {Object} - Objeto con fechas del mes anterior
    */
   static getPreviousMonthRange() {
-    const now = new Date();
-    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const now = this.getCurrentMexicoDate();
+    const previousMonth = new Date(now);
+    previousMonth.setMonth(now.getMonth() - 1);
 
-    const start = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 1);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0);
-    end.setHours(23, 59, 59, 999);
+    // Primer día del mes anterior a las 00:00:00.000
+    const start = this.createMexicoDate(previousMonth.getFullYear(), previousMonth.getMonth(), 1, 0, 0, 0, 0);
+    
+    // Último día del mes anterior a las 23:59:59.999
+    const end = this.createMexicoDate(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0, 23, 59, 59, 999);
 
     const monthNames = [
       'Enero',
@@ -99,16 +133,17 @@ class DateFilterUtils {
   }
 
   /**
-   * Obtener rango para año actual
+   * Obtener rango para año actual en timezone México
    * @returns {Object} - Objeto con fechas del año actual
    */
   static getCurrentYearRange() {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), 0, 1);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(now.getFullYear(), 11, 31);
-    end.setHours(23, 59, 59, 999);
+    const now = this.getCurrentMexicoDate();
+    
+    // Primer día del año a las 00:00:00.000
+    const start = this.createMexicoDate(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    
+    // Último día del año a las 23:59:59.999
+    const end = this.createMexicoDate(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
     return {
       start,
@@ -119,19 +154,24 @@ class DateFilterUtils {
   }
 
   /**
-   * Crear rango personalizado
+   * Crear rango personalizado en timezone México
    * @param {string} startDateStr - Fecha de inicio en formato YYYY-MM-DD
    * @param {string} endDateStr - Fecha de fin en formato YYYY-MM-DD
    * @returns {Object} - Objeto con fechas personalizadas
    */
   static getCustomRange(startDateStr, endDateStr) {
-    // Construir fechas exactas usando año, mes, día para evitar problemas de zona horaria
+    // Validar formato de fecha
+    if (!this.isValidDateString(startDateStr) || !this.isValidDateString(endDateStr)) {
+      throw new Error('Formato de fecha inválido. Use YYYY-MM-DD');
+    }
+
+    // Construir fechas exactas usando año, mes, día en timezone México
     const [startYear, startMonth, startDay] = startDateStr.split('-').map(Number);
     const [endYear, endMonth, endDay] = endDateStr.split('-').map(Number);
     
-    // Crear fechas exactas sin zona horaria
-    const start = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
-    const end = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+    // Crear fechas exactas en timezone México
+    const start = this.createMexicoDate(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+    const end = this.createMexicoDate(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
 
     // Validar que las fechas sean válidas
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
@@ -181,12 +221,14 @@ class DateFilterUtils {
   }
 
   /**
-   * Formatear fecha para SQL/Prisma
+   * Formatear fecha para SQL/Prisma manteniendo timezone México
    * @param {Date} date - Fecha a formatear
-   * @returns {string} - Fecha en formato ISO
+   * @returns {Date} - Fecha como objeto Date para Prisma
    */
   static formatDateForQuery(date) {
-    return date.toISOString();
+    // Prisma puede manejar Date objects directamente
+    // No convertir a ISO string para evitar problemas de timezone
+    return date;
   }
 
   /**
@@ -265,11 +307,11 @@ class DateFilterUtils {
   }
 
   /**
-   * Obtener rangos de fecha populares basados en el día actual
+   * Obtener rangos de fecha populares basados en el día actual en México
    * @returns {Array} - Rangos recomendados
    */
   static getRecommendedRanges() {
-    const today = new Date();
+    const today = this.getCurrentMexicoDate();
     const dayOfMonth = today.getDate();
     const ranges = [];
 
