@@ -57,10 +57,7 @@ export function registerExcelReportHandlers(bot) {
       ctx,
       LoadingStates.FILTERS,
       '📊 **Generador de Reportes Excel**\n\n' +
-        '¿Cómo quieres generar tu reporte?\n\n' +
-        '📅 **Filtrar por fecha** - Selecciona un período específico\n' +
-        '👥 **Seleccionar clientes** - Incluye solo clientes específicos\n' +
-        '📊 **Todas las facturas** - Reporte completo (hasta 500 facturas)',
+        'Ya puedes generar tu reporte aplicando filtros por días o por clientes.',
       excelReportOptionsMenu(),
       300
     );
@@ -92,10 +89,7 @@ export function registerExcelReportHandlers(bot) {
         ctx,
         LoadingStates.FILTERS,
         '📊 **Generador de Reportes Excel**\n\n' +
-          '¿Cómo quieres generar tu reporte?\n\n' +
-          '📅 **Filtrar por fecha** - Selecciona un período específico\n' +
-          '👥 **Seleccionar clientes** - Incluye solo clientes específicos\n' +
-          '📊 **Todas las facturas** - Reporte completo (hasta 500 facturas)',
+          'Ya puedes generar tu reporte aplicando filtros por días o por clientes.',
         excelReportOptionsMenu(),
         200
       );
@@ -363,7 +357,7 @@ export function registerExcelReportHandlers(bot) {
       LoadingStates.UPDATING,
       '🗑️ **Filtros Limpiados**\n\n' +
         'Se han eliminado todos los filtros.\n' +
-        '¿Cómo quieres generar tu reporte?',
+        'Ya puedes generar tu reporte aplicando filtros por días o por clientes.',
       excelReportOptionsMenu(),
       250
     );
@@ -433,7 +427,7 @@ export function registerExcelReportHandlers(bot) {
         await MenuTransitionUtils.smoothTransition(
           ctx,
           LoadingStates.UPDATING,
-          '📊 **Generador de Reportes Excel**\n\n¿Cómo quieres generar tu reporte?',
+          '📊 **Generador de Reportes Excel**\n\nYa puedes generar tu reporte aplicando filtros por días o por clientes.',
           excelReportOptionsMenu(),
           200
         );
@@ -443,7 +437,7 @@ export function registerExcelReportHandlers(bot) {
       await MenuTransitionUtils.smoothTransition(
         ctx,
         LoadingStates.UPDATING,
-        '📊 **Generador de Reportes Excel**\n\n¿Cómo quieres generar tu reporte?',
+        '📊 **Generador de Reportes Excel**\n\nYa puedes generar tu reporte aplicando filtros por días o por clientes.',
         excelReportOptionsMenu(),
         200
       );
@@ -570,7 +564,7 @@ async function applyDateFilter(ctx, dateRange) {
     const tenantId = ctx.getTenantId();
     const estimation = await ExcelReportService.estimateReportGeneration(tenantId, {
       dateRange,
-      limit: 500,
+      limit: 5000,
     });
 
     let message = '📅 **Filtro de Fecha Aplicado**\n\n';

@@ -30,7 +30,7 @@ class ExcelReportService {
     try {
       // Configuración por defecto con FASE 2 mejorada
       const config = {
-        limit: options.limit || 500, // FASE 2: límite aumentado a 500 facturas
+        limit: options.limit || 5000, // FASE 3: límite aumentado a 5000 facturas con procesamiento por lotes
         includeDetails: options.includeDetails !== false,
         format: options.format || 'xlsx',
         // NUEVOS: Filtros FASE 2
@@ -245,7 +245,7 @@ class ExcelReportService {
         where: whereClause,
       });
 
-      const actualLimit = Math.min(totalCount, filters.limit || 500);
+      const actualLimit = Math.min(totalCount, filters.limit || 5000);
 
       // Estimación de tiempo: 300ms por factura + overhead
       const baseTimePerInvoice = 300;
@@ -259,7 +259,7 @@ class ExcelReportService {
         estimatedTimeSeconds,
         timeCategory:
           estimatedTimeSeconds < 10 ? 'fast' : estimatedTimeSeconds < 30 ? 'medium' : 'slow',
-        hasMoreThanLimit: totalCount > (filters.limit || 500),
+        hasMoreThanLimit: totalCount > (filters.limit || 5000),
       };
     } catch (error) {
       console.error('❌ Error estimando generación:', error.message);
