@@ -48,17 +48,16 @@ class ExcelReportService {
         if (cachedResult) {
           console.log(`🚀 Reporte obtenido desde cache`);
           // Generar Excel desde datos cacheados
-          const filePath = await this.generateExcelFile(tenantId, cachedResult.data, config);
+          const buffer = await this.generateExcelBuffer(tenantId, cachedResult.data, config);
           const duration = Date.now() - startTime;
 
           return {
             success: true,
-            filePath,
+            buffer,
             fromCache: true,
             stats: {
               totalInvoices: cachedResult.data.length,
               duration,
-              fileSize: this.getFileSize(filePath),
             },
           };
         }
@@ -78,8 +77,8 @@ class ExcelReportService {
 
       console.log(`✨ Facturas enriquecidas: ${enrichedInvoices.length}`);
 
-      // PASO 3: Generar archivo Excel
-      const filePath = await this.generateExcelFile(tenantId, enrichedInvoices, config);
+      // PASO 3: Generar Excel en memoria
+      const buffer = await this.generateExcelBuffer(tenantId, enrichedInvoices, config);
 
       // FASE 2: Guardar en cache para futuras consultas
       if (config.useCache && enrichedInvoices.length > 0) {
@@ -88,16 +87,15 @@ class ExcelReportService {
 
       const duration = Date.now() - startTime;
       console.log(`✅ Reporte Excel generado exitosamente en ${duration}ms`);
-      console.log(`📄 Archivo: ${filePath}`);
+      console.log(`📄 Buffer tamaño: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
 
       return {
         success: true,
-        filePath,
+        buffer,
         fromCache: false,
         stats: {
           totalInvoices: enrichedInvoices.length,
           duration,
-          fileSize: this.getFileSize(filePath),
         },
       };
     } catch (error) {
@@ -368,6 +366,88 @@ class ExcelReportService {
   /**
    * Generar archivo Excel
    */
+  /**
+   * Generar Excel en memoria (buffer) - SIN ARCHIVOS TEMPORALES
+   */
+  static async generateExcelBuffer(tenantId, invoices, config) {
+    console.log('📊 Generando Excel en memoria...');
+
+    // Crear workbook
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Reporte de Facturas');
+
+    // Configurar propiedades del workbook
+    workbook.creator = 'Sistema de Facturación';
+    workbook.lastModifiedBy = 'FacturAPI SaaS';
+    workbook.created = new Date();
+    workbook.modified = new Date();
+
+    // ENCABEZADOS DE COLUMNAS (11 campos principales)
+    const headers = [
+      'Folio', // A
+      'UUID/Folio Fiscal', // B
+      'Cliente', // C
+      'RFC Cliente', // D
+      'Fecha Factura', // E
+      'Subtotal', // F
+      'IVA', // G
+      'Retención', // H
+      'Total', // I
+      'Estado', // J
+      'URL Verificación', // K
+    ];
+
+    // Agregar encabezados con estilo
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '366092' },
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    });
+
+    // Agregar datos de las facturas
+    invoices.forEach((invoice) => {
+      const row = [
+        invoice.folio || `${invoice.series}${invoice.folioNumber}`,
+        invoice.uuid || invoice.folioFiscal || 'No disponible',
+        invoice.customer?.legalName || 'Cliente no especificado',
+        invoice.customer?.rfc || 'RFC no disponible',
+        invoice.realEmissionDate ? this.createMexicoDateForExcel(invoice.realEmissionDate) : (invoice.invoiceDate ? this.createMexicoDateForExcel(invoice.invoiceDate) : null),
+        this.truncateToTwoDecimals(invoice.subtotal || 0),
+        this.truncateToTwoDecimals(invoice.ivaAmount || 0),
+        this.truncateToTwoDecimals(invoice.retencionAmount || 0),
+        this.truncateToTwoDecimals(invoice.total || 0),
+        this.translateStatus(invoice.status || 'unknown'),
+        invoice.verificationUrl || 'No disponible',
+      ];
+
+      worksheet.addRow(row);
+    });
+
+    // Ajustar ancho de columnas automáticamente
+    worksheet.columns.forEach((column) => {
+      let maxLength = 0;
+      column.eachCell({ includeEmpty: false }, (cell) => {
+        const cellLength = cell.value ? cell.value.toString().length : 0;
+        if (cellLength > maxLength) {
+          maxLength = cellLength;
+        }
+      });
+      column.width = maxLength < 10 ? 12 : maxLength + 2;
+    });
+
+    // Generar buffer en memoria (SIN ARCHIVO)
+    const buffer = await workbook.xlsx.writeBuffer();
+    
+    console.log(`📊 Excel generado en memoria: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
+    return buffer;
+  }
+
+  // MÉTODO LEGACY - mantener para compatibilidad con cache
   static async generateExcelFile(tenantId, invoices, config) {
     console.log('📊 Generando archivo Excel...');
 
