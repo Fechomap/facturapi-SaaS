@@ -754,21 +754,26 @@ class ExcelReportService {
       return null;
     }
 
-    // CORRECCIÓN CRÍTICA: El problema era que toISOString() mostraba un día diferente
-    // al día local, causando que Excel interpretara fechas incorrectas.
+    // CORRECCIÓN CRÍTICA MEJORADA: El problema era que getDate() usa la timezone del sistema
+    // En local (México) funciona bien, pero en Railway (UTC) da días incorrectos
     //
-    // Ejemplo del problema:
-    // - Fecha local: Mon Jul 28 2025 22:53:59 GMT-0600 (día 28)
-    // - toISOString(): 2025-07-29T04:53:59.937Z (día 29) ← PROBLEMA
+    // PROBLEMA IDENTIFICADO:
+    // - Local (America/Mexico_City): getDate() correcto
+    // - Railway (UTC): getDate() incorrecto - día diferente
     //
-    // Solución: Crear fecha usando solo año, mes, día (sin horas) para evitar
-    // conversiones de timezone que causen inconsistencias
-    const year = dateObj.getFullYear();
-    const month = dateObj.getMonth();
-    const day = dateObj.getDate();
-
-    // Crear fecha exacta sin horas para mantener consistencia entre día local e ISO
-    const consistentDate = new Date(year, month, day, 0, 0, 0, 0);
+    // SOLUCIÓN: Convertir primero a timezone México, luego extraer día/mes/año
+    const mexicoDateString = dateObj.toLocaleString('en-US', { 
+      timeZone: 'America/Mexico_City',
+      year: 'numeric',
+      month: '2-digit', 
+      day: '2-digit'
+    });
+    
+    // Parse "MM/DD/YYYY" format
+    const [month, day, year] = mexicoDateString.split('/').map(num => parseInt(num));
+    
+    // Crear fecha usando valores de timezone México (month-1 porque Date usa 0-based)
+    const consistentDate = new Date(year, month - 1, day, 0, 0, 0, 0);
 
     return consistentDate;
   }
