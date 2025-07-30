@@ -633,15 +633,28 @@ async function applyDateFilter(ctx, dateRange) {
 }
 
 /**
- * Generar reporte con filtros aplicados - ARQUITECTURA SIMPLE: SOLO ASYNC/AWAIT
+ * Generar reporte con filtros aplicados - ARQUITECTURA POR LOTES INTELIGENTE
  */
 async function generateFilteredReport(ctx) {
   try {
     const filters = ctx.userState.excelFilters || {};
     
-    // Usar el servicio simple - UNA SOLA LÍNEA
-    const { generateExcelReportAsync } = await import('../../services/simple-excel.service.js');
-    await generateExcelReportAsync(ctx, filters);
+    // Primero estimar el tamaño del reporte
+    const tenantId = ctx.getTenantId();
+    const estimation = await ExcelReportService.estimateReportGeneration(tenantId, filters);
+    
+    // Decidir qué servicio usar basado en el tamaño
+    if (estimation.willGenerate >= 100) {
+      // REPORTES GRANDES: Usar procesamiento por lotes con progreso real
+      console.log(`📦 Reporte grande detectado (${estimation.willGenerate} facturas) - usando procesamiento por lotes`);
+      const { generateExcelReportBatched } = await import('../../services/batch-excel.service.js');
+      await generateExcelReportBatched(ctx, filters);
+    } else {
+      // REPORTES PEQUEÑOS: Usar servicio simple rápido  
+      console.log(`🚀 Reporte pequeño detectado (${estimation.willGenerate} facturas) - usando procesamiento simple`);
+      const { generateExcelReportAsync } = await import('../../services/simple-excel.service.js');
+      await generateExcelReportAsync(ctx, filters);
+    }
     
     // Limpiar filtros para próximo reporte
     ctx.userState.excelFilters = {};
