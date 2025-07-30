@@ -239,11 +239,8 @@ export function combinedFiltersMenu(filters = {}) {
   const clearButton = hasAnyFilters
     ? Markup.button.callback('🗑️ LIMPIAR FILTROS', 'excel_clear_all_filters')
     : Markup.button.callback('🔄 Limpiar todo', 'excel_clear_all_filters');
-  
-  buttons.push([
-    clearButton,
-    Markup.button.callback('🔙 Volver', 'menu_reportes'),
-  ]);
+
+  buttons.push([clearButton, Markup.button.callback('🔙 Volver', 'menu_reportes')]);
 
   return Markup.inlineKeyboard(buttons);
 }
@@ -383,8 +380,9 @@ export function enhancedNavigationMenu(quickActions = [], hasHistory = false) {
  * @param {Object} filters - Filtros aplicados
  */
 export function generateFilterSummaryText(filters) {
-  const hasFilters = (filters.dateRange) || (filters.selectedClientIds && filters.selectedClientIds.length > 0);
-  
+  const hasFilters =
+    filters.dateRange || (filters.selectedClientIds && filters.selectedClientIds.length > 0);
+
   if (!hasFilters) {
     return '🔓 **Sin filtros activos** - Se mostrarán todas las facturas\n';
   }

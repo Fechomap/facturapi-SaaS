@@ -18,34 +18,33 @@ export async function generateExcelReportAsync(ctx, filters = {}) {
   const tenantId = ctx.getTenantId();
   const userId = ctx.from.id;
   const chatId = ctx.chat.id;
-  
+
   simpleLogger.info('🚀 Iniciando reporte Excel simple asíncrono', {
     tenantId,
     userId,
-    filters: Object.keys(filters)
+    filters: Object.keys(filters),
   });
 
   try {
     // PASO 1: Mensaje inmediato (nunca bloquea)
     const progressMsg = await ctx.reply(
       '📊 **Generando Reporte Excel**\n\n' +
-      '🔄 Procesando facturas...\n' +
-      '📱 Te mantendré informado del progreso',
+        '🔄 Procesando facturas...\n' +
+        '📱 Te mantendré informado del progreso',
       { parse_mode: 'Markdown' }
     );
 
     // PASO 2: Procesar en background SIN BLOQUEAR
     processInBackground(ctx, tenantId, userId, chatId, filters, progressMsg.message_id);
-    
-    return { success: true };
 
+    return { success: true };
   } catch (error) {
     simpleLogger.error('❌ Error iniciando reporte asíncrono', {
       tenantId,
       userId,
-      error: error.message
+      error: error.message,
     });
-    
+
     await ctx.reply('❌ **Error**\n\nNo se pudo iniciar el reporte.', { parse_mode: 'Markdown' });
     return { success: false, error: error.message };
   }
@@ -91,25 +90,25 @@ async function processInBackground(ctx, tenantId, userId, chatId, filters, messa
       messageId,
       null,
       '✅ **¡Reporte Excel Completado!**\n\n' +
-      `📊 **Facturas:** ${reportData.stats.totalInvoices}\n` +
-      `📁 **Tamaño:** ${fileSizeMB} MB\n` +
-      `⏱️ **Generado:** ${new Date().toLocaleString('es-MX')}\n\n` +
-      '📎 **Enviando archivo...**',
+        `📊 **Facturas:** ${reportData.stats.totalInvoices}\n` +
+        `📁 **Tamaño:** ${fileSizeMB} MB\n` +
+        `⏱️ **Generado:** ${new Date().toLocaleString('es-MX')}\n\n` +
+        '📎 **Enviando archivo...**',
       { parse_mode: 'Markdown' }
     );
 
     // PASO 7: Enviar archivo Excel directamente desde memoria
     const fileName = `reporte_facturas_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
+
     await ctx.telegram.sendDocument(
       chatId,
       {
         source: reportData.buffer,
-        filename: fileName
+        filename: fileName,
       },
       {
         caption: `🎉 **¡Reporte enviado exitosamente!**`,
-        parse_mode: 'Markdown'
+        parse_mode: 'Markdown',
       }
     );
 
@@ -120,14 +119,13 @@ async function processInBackground(ctx, tenantId, userId, chatId, filters, messa
       userId,
       filePath: reportData.filePath,
       invoiceCount: reportData.stats.totalInvoices,
-      fileSizeMB
+      fileSizeMB,
     });
-
   } catch (error) {
     simpleLogger.error('❌ Error procesando Excel en background', {
       tenantId,
       userId,
-      error: error.message
+      error: error.message,
     });
 
     // Notificar error al usuario
@@ -137,8 +135,8 @@ async function processInBackground(ctx, tenantId, userId, chatId, filters, messa
         messageId,
         null,
         '❌ **Error generando reporte**\n\n' +
-        `💬 ${error.message}\n\n` +
-        '🔄 Puedes intentar nuevamente.',
+          `💬 ${error.message}\n\n` +
+          '🔄 Puedes intentar nuevamente.',
         { parse_mode: 'Markdown' }
       );
     } catch (notifyError) {
@@ -146,8 +144,8 @@ async function processInBackground(ctx, tenantId, userId, chatId, filters, messa
       await ctx.telegram.sendMessage(
         chatId,
         '❌ **Error generando reporte**\n\n' +
-        `💬 ${error.message}\n\n` +
-        '🔄 Puedes intentar nuevamente.',
+          `💬 ${error.message}\n\n` +
+          '🔄 Puedes intentar nuevamente.',
         { parse_mode: 'Markdown' }
       );
     }
@@ -160,14 +158,12 @@ async function processInBackground(ctx, tenantId, userId, chatId, filters, messa
 async function updateProgress(ctx, chatId, messageId, percentage, message) {
   try {
     const progressBar = generateProgressBar(percentage);
-    
+
     await ctx.telegram.editMessageText(
       chatId,
       messageId,
       null,
-      `📊 **Generando Reporte Excel**\n\n` +
-      `${progressBar} ${percentage}%\n\n` +
-      `🔄 ${message}`,
+      `📊 **Generando Reporte Excel**\n\n` + `${progressBar} ${percentage}%\n\n` + `🔄 ${message}`,
       { parse_mode: 'Markdown' }
     );
   } catch (error) {
@@ -182,10 +178,10 @@ function generateProgressBar(percentage) {
   const totalBars = 10;
   const filledBars = Math.floor((percentage / 100) * totalBars);
   const emptyBars = totalBars - filledBars;
-  
+
   return '▓'.repeat(filledBars) + '░'.repeat(emptyBars);
 }
 
 export default {
-  generateExcelReportAsync
+  generateExcelReportAsync,
 };

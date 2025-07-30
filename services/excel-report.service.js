@@ -122,13 +122,15 @@ class ExcelReportService {
     // FASE 2: Filtro por rango de fechas
     if (config.dateRange && config.dateRange.start && config.dateRange.end) {
       // Asegurar que las fechas sean objetos Date
-      const startDate = config.dateRange.start instanceof Date 
-        ? config.dateRange.start 
-        : new Date(config.dateRange.start);
-      const endDate = config.dateRange.end instanceof Date 
-        ? config.dateRange.end 
-        : new Date(config.dateRange.end);
-      
+      const startDate =
+        config.dateRange.start instanceof Date
+          ? config.dateRange.start
+          : new Date(config.dateRange.start);
+      const endDate =
+        config.dateRange.end instanceof Date
+          ? config.dateRange.end
+          : new Date(config.dateRange.end);
+
       whereClause.invoiceDate = {
         gte: startDate,
         lte: endDate,
@@ -304,7 +306,7 @@ class ExcelReportService {
           status: invoice.status,
           createdAt: invoice.createdAt,
           invoiceDate: invoice.invoiceDate, // MANTENER para filtros de BD
-          
+
           // CORRECCIÓN: USAR POSTGRESQL COMO FUENTE ÚNICA DE FECHAS
           // PostgreSQL ya tiene las fechas sincronizadas correctamente desde el reporte crítico
           realEmissionDate: invoice.invoiceDate, // USAR DIRECTAMENTE POSTGRESQL (sin new Date())
@@ -416,7 +418,11 @@ class ExcelReportService {
         invoice.uuid || invoice.folioFiscal || 'No disponible',
         invoice.customer?.legalName || 'Cliente no especificado',
         invoice.customer?.rfc || 'RFC no disponible',
-        invoice.realEmissionDate ? this.createMexicoDateForExcel(invoice.realEmissionDate) : (invoice.invoiceDate ? this.createMexicoDateForExcel(invoice.invoiceDate) : null),
+        invoice.realEmissionDate
+          ? this.createMexicoDateForExcel(invoice.realEmissionDate)
+          : invoice.invoiceDate
+            ? this.createMexicoDateForExcel(invoice.invoiceDate)
+            : null,
         this.truncateToTwoDecimals(invoice.subtotal || 0),
         this.truncateToTwoDecimals(invoice.ivaAmount || 0),
         this.truncateToTwoDecimals(invoice.retencionAmount || 0),
@@ -442,7 +448,7 @@ class ExcelReportService {
 
     // Generar buffer en memoria (SIN ARCHIVO)
     const buffer = await workbook.xlsx.writeBuffer();
-    
+
     console.log(`📊 Excel generado en memoria: ${(buffer.length / 1024 / 1024).toFixed(2)} MB`);
     return buffer;
   }
@@ -521,7 +527,11 @@ class ExcelReportService {
         invoice.uuid || invoice.folioFiscal || 'No disponible',
         invoice.customer?.legalName || 'Cliente no especificado',
         invoice.customer?.rfc || 'RFC no disponible',
-        invoice.realEmissionDate ? this.createMexicoDateForExcel(invoice.realEmissionDate) : (invoice.invoiceDate ? this.createMexicoDateForExcel(invoice.invoiceDate) : null), // Convertir a fecha México para Excel
+        invoice.realEmissionDate
+          ? this.createMexicoDateForExcel(invoice.realEmissionDate)
+          : invoice.invoiceDate
+            ? this.createMexicoDateForExcel(invoice.invoiceDate)
+            : null, // Convertir a fecha México para Excel
         this.truncateToTwoDecimals(invoice.subtotal || 0), // Columna 6 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.ivaAmount || 0), // Columna 7 - TRUNCADO A 2 DECIMALES
         this.truncateToTwoDecimals(invoice.retencionAmount || 0), // Columna 8 - TRUNCADO A 2 DECIMALES
@@ -711,21 +721,21 @@ class ExcelReportService {
    */
   static convertToMexicoTime(utcDate) {
     if (!utcDate) return null;
-    
+
     // Asegurar que tenemos un Date object (puede venir string desde cache)
     const dateObj = utcDate instanceof Date ? utcDate : new Date(utcDate);
-    
+
     // Verificar que es una fecha válida
     if (isNaN(dateObj.getTime())) {
       console.warn('⚠️ Fecha inválida en convertToMexicoTime:', utcDate);
       return null;
     }
-    
+
     // CORREGIDO: Usar timezone automático de México (considera horario de verano)
     // Esto convierte de UTC a timezone México automáticamente
-    const mexicoDateString = dateObj.toLocaleString("en-US", {timeZone: "America/Mexico_City"});
+    const mexicoDateString = dateObj.toLocaleString('en-US', { timeZone: 'America/Mexico_City' });
     const mexicoDate = new Date(mexicoDateString);
-    
+
     return mexicoDate;
   }
 
@@ -736,17 +746,17 @@ class ExcelReportService {
    */
   static createMexicoDateForExcel(dateFromDB) {
     if (!dateFromDB) return null;
-    
+
     const dateObj = dateFromDB instanceof Date ? dateFromDB : new Date(dateFromDB);
-    
+
     if (isNaN(dateObj.getTime())) {
       console.warn('⚠️ Fecha inválida en createMexicoDateForExcel:', dateFromDB);
       return null;
     }
-    
+
     // CORRECCIÓN CRÍTICA: El problema era que toISOString() mostraba un día diferente
     // al día local, causando que Excel interpretara fechas incorrectas.
-    // 
+    //
     // Ejemplo del problema:
     // - Fecha local: Mon Jul 28 2025 22:53:59 GMT-0600 (día 28)
     // - toISOString(): 2025-07-29T04:53:59.937Z (día 29) ← PROBLEMA
@@ -756,10 +766,10 @@ class ExcelReportService {
     const year = dateObj.getFullYear();
     const month = dateObj.getMonth();
     const day = dateObj.getDate();
-    
+
     // Crear fecha exacta sin horas para mantener consistencia entre día local e ISO
     const consistentDate = new Date(year, month, day, 0, 0, 0, 0);
-    
+
     return consistentDate;
   }
 

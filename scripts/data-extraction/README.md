@@ -5,6 +5,7 @@ Esta carpeta contiene scripts para extraer datos completos de las fuentes princi
 ## 📤 Scripts Disponibles
 
 ### `facturapi-export-complete.js`
+
 **Extracción completa de FacturAPI**
 
 - **Propósito**: Extrae TODAS las facturas de FacturAPI de los tenants configurados
@@ -14,6 +15,7 @@ Esta carpeta contiene scripts para extraer datos completos de las fuentes princi
 - **Rate Limiting**: 3 segundos entre requests (respeta API de FacturAPI)
 
 **Campos extraídos**: 45+ campos incluyendo:
+
 - Identificadores (FacturAPI ID, UUID, Folio)
 - Fechas detalladas (emisión, creación)
 - Información fiscal (status, tipo, uso)
@@ -21,6 +23,7 @@ Esta carpeta contiene scripts para extraer datos completos de las fuentes princi
 - Información del tenant
 
 ### `postgresql-export.js`
+
 **Extracción completa de PostgreSQL**
 
 - **Propósito**: Extrae todas las facturas de la base de datos local
@@ -30,6 +33,7 @@ Esta carpeta contiene scripts para extraer datos completos de las fuentes princi
 - **Ventaja**: Instantáneo, sin límites de API
 
 **Campos extraídos**:
+
 - IDs y referencias de facturas
 - Fechas de base de datos
 - Status y montos
@@ -39,6 +43,7 @@ Esta carpeta contiene scripts para extraer datos completos de las fuentes princi
 ## 🎯 Casos de Uso
 
 ### 1. **Auditoría Completa**
+
 ```bash
 # Extraer de ambas fuentes para comparar
 node scripts/data-extraction/facturapi-export-complete.js
@@ -46,11 +51,13 @@ node scripts/data-extraction/postgresql-export.js
 ```
 
 ### 2. **Análisis de Discrepancias**
+
 - Compara las fechas entre ambas fuentes
 - Identifica facturas faltantes
 - Valida integridad de datos
 
 ### 3. **Incorporación de Nueva Empresa**
+
 - Usar como base para nuevos tenants
 - Adaptar IDs de tenant en el código
 - Mantener la estructura de extracción
@@ -58,7 +65,9 @@ node scripts/data-extraction/postgresql-export.js
 ## ⚙️ Configuración
 
 ### Modificar Tenants Objetivo
+
 En `facturapi-export-complete.js`:
+
 ```javascript
 const TARGET_TENANTS = [
   'nuevo-tenant-id-1',
@@ -68,6 +77,7 @@ const TARGET_TENANTS = [
 ```
 
 ### Personalizar Salida
+
 - Cambiar `OUTPUT_DIR` para ubicación diferente
 - Modificar campos extraídos según necesidades
 - Ajustar formato de salida (CSV/Excel)

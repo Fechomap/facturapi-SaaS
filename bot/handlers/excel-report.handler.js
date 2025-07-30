@@ -632,33 +632,34 @@ async function applyDateFilter(ctx, dateRange) {
 async function generateFilteredReport(ctx) {
   try {
     const filters = ctx.userState.excelFilters || {};
-    
+
     // Primero estimar el tamaño del reporte
     const tenantId = ctx.getTenantId();
     const estimation = await ExcelReportService.estimateReportGeneration(tenantId, filters);
-    
+
     // Decidir qué servicio usar basado en el tamaño
     if (estimation.willGenerate >= 100) {
       // REPORTES GRANDES: Usar procesamiento por lotes con progreso real
-      console.log(`📦 Reporte grande detectado (${estimation.willGenerate} facturas) - usando procesamiento por lotes`);
+      console.log(
+        `📦 Reporte grande detectado (${estimation.willGenerate} facturas) - usando procesamiento por lotes`
+      );
       const { generateExcelReportBatched } = await import('../../services/batch-excel.service.js');
       await generateExcelReportBatched(ctx, filters);
     } else {
-      // REPORTES PEQUEÑOS: Usar servicio simple rápido  
-      console.log(`🚀 Reporte pequeño detectado (${estimation.willGenerate} facturas) - usando procesamiento simple`);
+      // REPORTES PEQUEÑOS: Usar servicio simple rápido
+      console.log(
+        `🚀 Reporte pequeño detectado (${estimation.willGenerate} facturas) - usando procesamiento simple`
+      );
       const { generateExcelReportAsync } = await import('../../services/simple-excel.service.js');
       await generateExcelReportAsync(ctx, filters);
     }
-    
+
     // Limpiar filtros para próximo reporte
     ctx.userState.excelFilters = {};
-    
   } catch (error) {
     console.error('❌ Error generando reporte:', error);
     await ctx.reply(
-      '❌ **Error Inesperado**\n\n' +
-      `Error: ${error.message}\n\n` +
-      '🔄 Intenta nuevamente.',
+      '❌ **Error Inesperado**\n\n' + `Error: ${error.message}\n\n` + '🔄 Intenta nuevamente.',
       { parse_mode: 'Markdown' }
     );
   }

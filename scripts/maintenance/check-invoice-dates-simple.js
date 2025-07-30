@@ -6,12 +6,12 @@
 import prisma from '../../lib/prisma.js';
 import axios from 'axios';
 
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function checkInvoiceDates() {
   const tenantId = process.argv[2];
   const limit = parseInt(process.argv[3]) || 3;
-  
+
   if (!tenantId) {
     console.log('Uso: node scripts/check-invoice-dates-simple.js [tenantId] [limit]');
     process.exit(1);
@@ -20,7 +20,7 @@ async function checkInvoiceDates() {
   try {
     console.log(`🔍 Verificando fechas para tenant: ${tenantId}`);
     console.log(`📊 Límite: ${limit} facturas`);
-    
+
     // 1. Obtener tenant y API key
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -42,8 +42,8 @@ async function checkInvoiceDates() {
       where: {
         tenantId,
         invoiceDate: {
-          gte: new Date('2025-07-27T00:00:00Z')
-        }
+          gte: new Date('2025-07-27T00:00:00Z'),
+        },
       },
       select: {
         id: true,
@@ -53,7 +53,7 @@ async function checkInvoiceDates() {
         series: true,
       },
       orderBy: { invoiceDate: 'asc' },
-      take: limit
+      take: limit,
     });
 
     console.log(`📅 Facturas encontradas: ${suspiciousInvoices.length}`);
@@ -70,7 +70,7 @@ async function checkInvoiceDates() {
           `https://www.facturapi.io/v2/invoices/${invoice.facturapiInvoiceId}`,
           {
             headers: {
-              'Authorization': `Bearer ${tenant.facturapiApiKey}`,
+              Authorization: `Bearer ${tenant.facturapiApiKey}`,
               'Content-Type': 'application/json',
             },
             timeout: 10000,
@@ -87,7 +87,9 @@ async function checkInvoiceDates() {
         const apiDate = realDate.toISOString().split('T')[0];
 
         if (bdDate !== apiDate) {
-          const daysDiff = Math.round((invoice.invoiceDate.getTime() - realDate.getTime()) / (1000 * 60 * 60 * 24));
+          const daysDiff = Math.round(
+            (invoice.invoiceDate.getTime() - realDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
           console.log(`   ⚠️  DIFERENCIA: ${daysDiff} días`);
           console.log(`   ❌ NECESITA CORRECCIÓN: ${bdDate} → ${apiDate}`);
         } else {
@@ -96,12 +98,10 @@ async function checkInvoiceDates() {
 
         // Rate limiting
         await sleep(3000);
-
       } catch (error) {
         console.log(`   ❌ Error: ${error.message}`);
       }
     }
-
   } catch (error) {
     console.error('❌ Error fatal:', error.message);
   } finally {

@@ -748,6 +748,7 @@ node scripts/count-invoices-by-tenant.js
 ##### **Problemas Identificados y Resueltos**
 
 1. **Campo UUID Faltante** (100% de facturas afectadas)
+
    - **Problema**: Campo `uuid` no existía en esquema de base de datos
    - **Impacto**: 945 facturas sin UUID para cumplimiento fiscal
    - **Solución**: Agregado campo UUID al esquema + migración DB push exitosa
@@ -763,13 +764,13 @@ node scripts/count-invoices-by-tenant.js
 
 ##### **Distribución Final de Facturas**
 
-| Tenant | Empresa | Facturas | UUIDs | Fechas Corregidas | Estado |
-|--------|---------|----------|-------|-------------------|--------|
-| ANDREA | ANDREA FERNANDA OLVERA PEREZ | 1 | ✅ | 0 | ✅ Perfecto |
-| Transportes | Transportes y Grúas Halcones | 48 | ✅ | 0 | ✅ Perfecto |
-| ALFREDO | ALFREDO ALEJANDRO PEREZ AGUILAR | 334 | ✅ | 182 | ✅ Corregido |
-| Pruebas | Prueba sa de cv | 562 | ✅ | 134 | ✅ Corregido |
-| **TOTAL** | **4 tenants** | **945** | **945** | **316** | **🎯 100% Sincronizado** |
+| Tenant      | Empresa                         | Facturas | UUIDs   | Fechas Corregidas | Estado                   |
+| ----------- | ------------------------------- | -------- | ------- | ----------------- | ------------------------ |
+| ANDREA      | ANDREA FERNANDA OLVERA PEREZ    | 1        | ✅      | 0                 | ✅ Perfecto              |
+| Transportes | Transportes y Grúas Halcones    | 48       | ✅      | 0                 | ✅ Perfecto              |
+| ALFREDO     | ALFREDO ALEJANDRO PEREZ AGUILAR | 334      | ✅      | 182               | ✅ Corregido             |
+| Pruebas     | Prueba sa de cv                 | 562      | ✅      | 134               | ✅ Corregido             |
+| **TOTAL**   | **4 tenants**                   | **945**  | **945** | **316**           | **🎯 100% Sincronizado** |
 
 ##### **Métricas de Rendimiento**
 
@@ -796,7 +797,7 @@ node scripts/count-invoices-by-tenant.js
 ✅ Fechas correctas: 334 (100%)
 📅 Necesitan corrección: 0
 
-# Verificación Tenant Pruebas (antes: 134 fechas incorrectas)  
+# Verificación Tenant Pruebas (antes: 134 fechas incorrectas)
 📊 Facturas sospechosas encontradas: 0
 ✅ Fechas correctas: 562 (100%)
 📅 Necesitan corrección: 0
@@ -809,7 +810,7 @@ node scripts/count-invoices-by-tenant.js
 ```
 📁 scripts/data-extraction/
 ├── facturapi-export-complete.js   ✅ Extracción FacturAPI (CSV + Excel)
-├── postgresql-export.js           ✅ Extracción PostgreSQL (CSV + Excel)  
+├── postgresql-export.js           ✅ Extracción PostgreSQL (CSV + Excel)
 └── README.md                      📋 Documentación completa
 ```
 
@@ -860,7 +861,7 @@ node scripts/count-invoices-by-tenant.js
 
 ```
 📋 PLAN-AUDITORIA-FACTURAS.md     ✅ Proceso completo documentado
-📋 REPORTE-CRITICO... (este archivo)  ✅ Análisis técnico detallado  
+📋 REPORTE-CRITICO... (este archivo)  ✅ Análisis técnico detallado
 📋 scripts/README.md               ✅ Índice de scripts actualizado
 📋 scripts/*/README.md             ✅ Documentación específica por área
 ```
@@ -870,7 +871,7 @@ node scripts/count-invoices-by-tenant.js
 ```
 💾 backups/20250728_2146/         ✅ Backup pre-sincronización
 ├── railway.dump                  ✅ Base principal respaldada
-├── saas.dump                     ✅ Base secundaria respaldada  
+├── saas.dump                     ✅ Base secundaria respaldada
 └── staging.dump                  ✅ Base de pruebas respaldada
 ```
 

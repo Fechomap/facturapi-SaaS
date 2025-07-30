@@ -7,10 +7,10 @@ import prisma from '../../lib/prisma.js';
 
 async function debugTenant() {
   const tenantId = process.argv[2] || '3ed011ab-1c1d-4a07-92ad-4b2eb35bcfdb';
-  
+
   try {
     console.log('🔍 Verificando tenant:', tenantId);
-    
+
     // 1. Verificar si el tenant existe
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -37,7 +37,7 @@ async function debugTenant() {
 
     // 2. Contar todas las facturas del tenant
     const totalInvoices = await prisma.tenantInvoice.count({
-      where: { tenantId }
+      where: { tenantId },
     });
 
     console.log('📊 Total facturas del tenant:', totalInvoices);
@@ -48,8 +48,8 @@ async function debugTenant() {
       where: {
         tenantId,
         invoiceDate: {
-          gte: suspiciousDate
-        }
+          gte: suspiciousDate,
+        },
       },
       select: {
         id: true,
@@ -60,15 +60,17 @@ async function debugTenant() {
         series: true,
       },
       orderBy: { invoiceDate: 'asc' },
-      take: 10
+      take: 10,
     });
 
     console.log('📅 Facturas desde 27/07/2025:', suspiciousInvoices.length);
 
     if (suspiciousInvoices.length > 0) {
       console.log('📋 Primeras facturas sospechosas:');
-      suspiciousInvoices.forEach(inv => {
-        console.log(`   ${inv.series}${inv.folioNumber}: ${inv.invoiceDate.toISOString().split('T')[0]} (FacturAPI: ${inv.facturapiInvoiceId})`);
+      suspiciousInvoices.forEach((inv) => {
+        console.log(
+          `   ${inv.series}${inv.folioNumber}: ${inv.invoiceDate.toISOString().split('T')[0]} (FacturAPI: ${inv.facturapiInvoiceId})`
+        );
       });
     }
 
@@ -78,14 +80,15 @@ async function debugTenant() {
       where: { tenantId },
       _count: { invoiceDate: true },
       orderBy: { invoiceDate: 'desc' },
-      take: 10
+      take: 10,
     });
 
     console.log('\n📈 Top 10 fechas con más facturas:');
-    dateGroups.forEach(group => {
-      console.log(`   ${group.invoiceDate.toISOString().split('T')[0]}: ${group._count.invoiceDate} facturas`);
+    dateGroups.forEach((group) => {
+      console.log(
+        `   ${group.invoiceDate.toISOString().split('T')[0]}: ${group._count.invoiceDate} facturas`
+      );
     });
-
   } catch (error) {
     console.error('❌ Error:', error.message);
   } finally {
