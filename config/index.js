@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import logger from '../core/utils/logger.js';
-import { facturapiConfig, stripeConfig, validateServicesConfig } from './services.js';
+import { facturapiConfig, validateServicesConfig } from './services.js';
 import { authConfig, validateAuthConfig } from './auth.js';
 import {
   getDatabaseConfig,
@@ -133,9 +133,6 @@ const config = {
     prisma,
     connect: connectDatabase,
   },
-
-  // Configuración de Stripe
-  stripe: stripeConfig,
 
   // Configuración de autenticación
   auth: authConfig,

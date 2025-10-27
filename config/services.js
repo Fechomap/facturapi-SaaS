@@ -39,20 +39,6 @@ const facturapiConfig = {
   retryBackoff: 1.5,
 };
 
-// Configuración de Stripe
-const stripeConfig = {
-  secretKey: process.env.STRIPE_SECRET_KEY,
-  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-
-  // API version
-  apiVersion: '2023-10-16',
-
-  // Configuración de productos/precios
-  products: {
-    // Aquí podríamos mapear nuestros planes a IDs de productos en Stripe
-  },
-};
-
 // NOTA: IDs de clientes removidos - sistema multitenant usa búsqueda dinámica
 
 // Comprobar la configuración crítica e imprimir advertencias
@@ -63,19 +49,6 @@ function validateServicesConfig() {
   if (!facturapiConfig.userKey) {
     warnings.push(
       `FACTURAPI_USER_KEY no está configurada. Algunas operaciones administrativas con FacturAPI no funcionarán.`
-    );
-  }
-
-  // Validar Stripe
-  if (!stripeConfig.secretKey) {
-    warnings.push(
-      'STRIPE_SECRET_KEY no está configurada. La integración con Stripe no funcionará.'
-    );
-  }
-
-  if (!stripeConfig.webhookSecret) {
-    warnings.push(
-      'STRIPE_WEBHOOK_SECRET no está configurada. Los webhooks de Stripe no funcionarán correctamente.'
     );
   }
 
@@ -91,4 +64,4 @@ function validateServicesConfig() {
   return warnings;
 }
 
-export { facturapiConfig, stripeConfig, validateServicesConfig };
+export { facturapiConfig, validateServicesConfig };

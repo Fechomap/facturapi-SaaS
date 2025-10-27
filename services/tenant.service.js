@@ -142,7 +142,7 @@ class TenantService {
       const status = subscription.status;
       const plan = subscription.plan;
       const paymentLink =
-        tenant.paymentLink || 'https://mock-stripe-payment-link.com/pricemockdefault/1745906401125'; // Usar link del tenant o fallback
+        tenant.paymentLink || 'https://mock-payment-link.com/default'; // Usar link del tenant o fallback
 
       // 1. Verificar Estado de la Suscripción
       const isActiveStatus = status === 'active' || status === 'trial'; // Cambiado 'trialing' por 'trial'
@@ -297,47 +297,17 @@ class TenantService {
    * Genera un enlace de pago para un tenant
    * @param {string} tenantId - ID del tenant
    * @returns {Promise<Object>} - Enlace de pago generado
+   * @deprecated Stripe integration removed. Implement new payment gateway here.
    */
   static async generatePaymentLink(tenantId) {
-    try {
-      // Obtener el tenant con su suscripción y plan
-      const tenant = await this.findTenantWithSubscription(tenantId);
+    throw new Error('Payment link generation not implemented. Stripe integration has been removed.');
 
-      if (!tenant) {
-        throw new Error('Tenant no encontrado');
-      }
-
-      const subscription = tenant.subscriptions?.[0];
-
-      if (!subscription) {
-        throw new Error('No se encontró una suscripción para este tenant');
-      }
-
-      const plan = subscription.plan;
-
-      if (!plan || !plan.stripePriceId) {
-        throw new Error('El plan no tiene un ID de precio de Stripe configurado');
-      }
-
-      // Importar el servicio de Stripe
-      const StripeService = (await import('../services/stripe.service.js')).default;
-
-      // Generar el enlace de pago
-      const paymentLink = await StripeService.createPaymentLink({
-        priceId: plan.stripePriceId,
-        quantity: 1,
-        metadata: {
-          tenant_id: tenantId,
-          subscription_id: subscription.id,
-          plan_name: plan.name,
-        },
-      });
-
-      return paymentLink;
-    } catch (error) {
-      console.error(`Error al generar enlace de pago para tenant ${tenantId}:`, error);
-      throw error;
-    }
+    // TODO: Implementar nueva pasarela de pago aquí
+    // Ejemplo de estructura esperada:
+    // 1. Obtener tenant y suscripción
+    // 2. Validar plan activo
+    // 3. Generar link con nueva pasarela
+    // 4. Retornar URL del payment link
   }
 
   /**

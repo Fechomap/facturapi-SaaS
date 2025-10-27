@@ -1,9 +1,6 @@
 // api/controllers/webhook.controller.js
-import { config } from '../../config/index.js';
 import logger from '../../core/utils/logger.js';
-import { handleWebhookEvent } from '../../services/payment.service.js';
 import NotificationService from '../../services/notification.service.js';
-import { withRetry } from '../../services/retry.service.js';
 import prisma from '../../lib/prisma.js';
 
 // Logger específico para webhooks
@@ -13,96 +10,6 @@ const webhookLogger = logger.child({ module: 'webhook-controller' });
  * Controlador para webhooks de servicios externos
  */
 class WebhookController {
-  /**
-   * Procesa webhooks de Stripe
-   * @param {Object} req - Request de Express
-   * @param {Object} res - Response de Express
-   * @param {Function} next - Función next de Express
-   */
-  async handleStripeWebhook(req, res, _next) {
-    try {
-      // Verificar firma del webhook de Stripe
-      const signature = req.headers['stripe-signature'];
-
-      if (!signature) {
-        webhookLogger.warn('Se recibió webhook sin firma de Stripe');
-        return res.status(400).json({ error: 'Falta la firma del webhook' });
-      }
-
-      // El payload viene como un buffer raw para la verificación de firma
-      const payload = req.body;
-      const stripeWebhookSecret = config.stripe.webhookSecret;
-
-      if (!stripeWebhookSecret) {
-        webhookLogger.error('No se ha configurado STRIPE_WEBHOOK_SECRET');
-        // Siempre enviamos 200 para que Stripe no reintente
-        return res.status(200).json({
-          received: true,
-          processed: false,
-          error: 'Configuración de webhook no disponible',
-        });
-      }
-
-      // Procesar el evento con reintentos para mayor robustez
-      const result = await withRetry(
-        async () => {
-          return await handleWebhookEvent(
-            payload,
-            signature,
-            stripeWebhookSecret,
-            config.stripe.secretKey
-          );
-        },
-        {
-          maxRetries: 3,
-          retryDelay: 1000,
-          description: 'Procesar webhook de Stripe',
-        }
-      );
-
-      // Registrar el evento procesado
-      webhookLogger.info(
-        {
-          event: result.result?.eventType,
-          action: result.result?.action,
-        },
-        'Webhook de Stripe procesado correctamente'
-      );
-
-      // Si el evento requiere notificación, notificar a administradores
-      if (result.result?.notifyAdmins) {
-        NotificationService.notifySystemAdmins(
-          `🔔 *Evento importante de Stripe*\n\n` +
-            `*Tipo:* ${result.result.eventType}\n` +
-            `*Acción:* ${result.result.action}\n` +
-            `*Tenant:* ${result.result.tenantId || 'N/A'}\n` +
-            `*Detalles:* ${result.result.details || 'No disponibles'}`
-        ).catch((error) => {
-          webhookLogger.warn(
-            { error: error.message },
-            'Error al enviar notificación de evento Stripe'
-          );
-        });
-      }
-
-      // Siempre enviamos success 200 para que Stripe no reintente
-      res.json({
-        received: true,
-        processed: true,
-        success: result.success,
-      });
-    } catch (error) {
-      webhookLogger.error('Error al procesar webhook de Stripe:', error);
-
-      // Incluso en caso de error, devolvemos 200 para que Stripe no reintente
-      res.status(200).json({
-        received: true,
-        error: error.message,
-        processed: false,
-      });
-    }
-  }
-
   /**
    * Procesa webhooks de FacturAPI
    * @param {Object} req - Request de Express

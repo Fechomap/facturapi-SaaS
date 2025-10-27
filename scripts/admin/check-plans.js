@@ -11,7 +11,8 @@ async function main() {
     plans.forEach((plan) => {
       console.log(`- ID: ${plan.id}`);
       console.log(`  Nombre: ${plan.name}`);
-      console.log(`  Stripe Price ID: ${plan.stripePriceId || 'No configurado'}`);
+      console.log(`  Precio: $${plan.price} ${plan.currency}`);
+      console.log(`  Límite de facturas: ${plan.invoiceLimit}`);
       console.log('---');
     });
   } catch (error) {

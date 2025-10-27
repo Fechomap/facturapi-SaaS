@@ -86,8 +86,6 @@ graph TB
     F --> G[(PostgreSQL<br/>Multitenant DB)]
     F --> H[FacturAPI<br/>External Service]
 
-    I[Stripe] --> D
-
     subgraph "Core Services"
         F
         E
@@ -95,7 +93,6 @@ graph TB
 
     subgraph "External Services"
         H
-        I
     end
 
     subgraph "Data Layer"
@@ -109,7 +106,6 @@ graph TB
 - **Database**: PostgreSQL 13+ con Prisma ORM
 - **Cache**: Redis 7+ para sesiones
 - **Bot**: Telegraf para Telegram
-- **Payments**: Stripe para suscripciones
 - **CFDI**: FacturAPI para timbrado
 
 ## 🚀 Inicio Rápido
@@ -210,10 +206,6 @@ FACTURAPI_USER_KEY="sk_user_xxxxxxxxxx"
 # Telegram
 TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 ADMIN_CHAT_IDS="123456789,987654321"
-
-# Stripe
-STRIPE_SECRET_KEY="sk_test_xxxxxxxxxx"
-STRIPE_WEBHOOK_SECRET="whsec_xxxxxxxxxx"
 
 # Seguridad
 JWT_SECRET="tu-secreto-super-seguro-aqui"

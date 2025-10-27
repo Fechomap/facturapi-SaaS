@@ -2,7 +2,7 @@
 import { prisma } from '../config/database.js';
 import logger from '../core/utils/logger.js';
 import NotificationService from '../services/notification.service.js';
-import StripeService from '../services/stripe.service.js';
+// import StripeService from '../services/stripe.service.js'; // REMOVED: Stripe integration disabled
 
 // Logger específico para jobs de suscripción
 const subscriptionLogger = logger.child({ module: 'subscription-jobs' });
@@ -130,8 +130,15 @@ async function checkExpiringSubscriptions() {
 /**
  * Encuentra suscripciones expiradas, genera link de pago y notifica.
  * @returns {Promise<void>}
+ * @deprecated Stripe integration removed. Implement new payment gateway here.
  */
 async function processExpiredSubscriptions() {
+  subscriptionLogger.warn('processExpiredSubscriptions is disabled. Stripe integration has been removed.');
+  subscriptionLogger.warn('TODO: Implement new payment gateway for expired subscriptions.');
+  return;
+
+  // DISABLED: All Stripe logic below has been disabled
+  /*
   subscriptionLogger.info('Procesando suscripciones expiradas para generar link de pago');
   const now = new Date();
 
@@ -329,6 +336,7 @@ async function processExpiredSubscriptions() {
   } catch (error) {
     subscriptionLogger.error({ error }, 'Error general al procesar suscripciones expiradas');
   }
+  */
 }
 
 // Exportar las tareas programadas
