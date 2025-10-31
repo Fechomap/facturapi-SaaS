@@ -1,6 +1,5 @@
 // bot/views/menu.view.js
 import { Markup } from 'telegraf';
-import { LoadingStates } from '../utils/menu-transition.utils.js';
 
 /**
  * Genera el teclado persistente con botón MENU

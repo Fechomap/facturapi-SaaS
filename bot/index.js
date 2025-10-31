@@ -4,7 +4,6 @@ import { config } from '../config/index.js';
 import { sessionMiddleware } from '../core/auth/session.service.js';
 import tenantContextMiddleware from '../core/tenant/tenant.middleware.js';
 import { registerAllCommands } from './commands/index.js';
-import authMiddleware from './middlewares/auth.middleware.js';
 import multiUserAuthMiddleware from './middlewares/multi-auth.middleware.js';
 import { registerUserManagementCommands } from './commands/user-management.commands.js';
 
