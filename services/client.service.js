@@ -88,6 +88,23 @@ const CLIENTES_PREDEFINIDOS = [
     email: 'axa@example.com',
     phone: '',
   },
+  {
+    legal_name: 'CLUB DE ASISTENCIA',
+    tax_id: 'CAS981016P46',
+    tax_system: '601',
+    address: {
+      street: 'Montes Urales',
+      exterior: '632',
+      interior: 'PISO 5',
+      neighborhood: 'Lomas de Chapultepec',
+      zip: '11000',
+      municipality: 'Miguel Hidalgo',
+      state: 'Ciudad de México',
+      country: 'MEX',
+    },
+    email: 'club@example.com',
+    phone: '',
+  },
 ];
 
 /**
