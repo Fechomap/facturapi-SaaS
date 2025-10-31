@@ -4,6 +4,7 @@ import { registerInvoiceHandler } from './invoice.handler.js';
 import { registerChubbHandler } from './chubb.handler.js';
 import { registerAxaHandler } from './axa.handler.js';
 import { registerClubAsistenciaHandler } from './club-asistencia.handler.js';
+import { registerQualitasHandler } from './qualitas.handler.js';
 import { registerOnboardingHandler } from './onboarding.handler.js';
 
 /**
@@ -27,6 +28,9 @@ export function registerAllHandlers(bot) {
 
   registerClubAsistenciaHandler(bot);
   console.log('✅ Club de Asistencia handler registrado');
+
+  registerQualitasHandler(bot);
+  console.log('✅ Qualitas handler registrado');
 
   registerOnboardingHandler(bot);
   console.log('✅ Onboarding handler registrado');

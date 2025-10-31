@@ -105,6 +105,23 @@ const CLIENTES_PREDEFINIDOS = [
     email: 'club@example.com',
     phone: '',
   },
+  {
+    legal_name: 'QUALITAS COMPAÑIA DE SEGUROS',
+    tax_id: 'QCS931209G49',
+    tax_system: '601',
+    address: {
+      street: 'San José de los Cedros',
+      exterior: 'SN',
+      interior: '',
+      neighborhood: 'San José de los Cedros',
+      zip: '05200',
+      municipality: 'Cuajimalpa de Morelos',
+      state: 'Ciudad de México',
+      country: 'MEX',
+    },
+    email: 'qualitas@example.com',
+    phone: '',
+  },
 ];
 
 /**

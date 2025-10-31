@@ -15,6 +15,7 @@ import { registerInvoiceHandler } from './handlers/invoice.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerAxaHandler } from './handlers/axa.handler.js';
 import { registerClubAsistenciaHandler } from './handlers/club-asistencia.handler.js';
+import { registerQualitasHandler } from './handlers/qualitas.handler.js';
 import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
@@ -90,8 +91,9 @@ export async function createBot(logger) {
   registerChubbHandler(bot); // 4. Excel CHUBB
   registerAxaHandler(bot); // 5. Excel AXA
   registerClubAsistenciaHandler(bot); // 6. Excel CLUB DE ASISTENCIA
-  registerOnboardingHandler(bot); // 7. Onboarding
-  registerProductionSetupHandler(bot); // 8. Producción (ÚLTIMO)
+  registerQualitasHandler(bot); // 7. Excel QUALITAS
+  registerOnboardingHandler(bot); // 8. Onboarding
+  registerProductionSetupHandler(bot); // 9. Producción (ÚLTIMO)
 
   logger.info('Bot configurado correctamente');
   return bot;

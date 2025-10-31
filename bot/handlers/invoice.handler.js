@@ -276,10 +276,14 @@ export function registerInvoiceHandler(bot) {
       // Guardar el mapa de nombres en el estado del contexto
       ctx.clientNameMap = shortToFullNameMap;
 
-      // Filtrar clientes, excluyendo CHUBB y AXA del flujo normal (solo Excel)
+      // Filtrar clientes, excluyendo los que usan Excel (CHUBB, AXA, CLUB DE ASISTENCIA, QUALITAS)
       const clientsForMenu = availableCustomers
         .filter(
-          (customer) => !customer.legalName.includes('CHUBB') && !customer.legalName.includes('AXA')
+          (customer) =>
+            !customer.legalName.includes('CHUBB') &&
+            !customer.legalName.includes('AXA') &&
+            !customer.legalName.includes('CLUB DE ASISTENCIA') &&
+            !customer.legalName.includes('QUALITAS')
         )
         .map((customer) => ({
           id: customer.facturapiCustomerId,
