@@ -174,8 +174,8 @@ export function registerAxaHandler(bot) {
           // Importar el servicio de configuración de clientes
           const CustomerSetupService = await import('../../services/customer-setup.service.js');
 
-          // Configurar los clientes predefinidos
-          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+          // Configurar los clientes predefinidos (solo crear los que faltan)
+          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, false);
 
           // Buscar nuevamente el cliente AXA
           const axaClientAfterSetup = await prisma.tenantCustomer.findFirst({

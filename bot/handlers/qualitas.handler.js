@@ -143,7 +143,8 @@ export function registerQualitasHandler(bot) {
 
         try {
           const CustomerSetupService = await import('../../services/customer-setup.service.js');
-          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, true);
+          // Solo crear clientes que faltan, no recrear los existentes
+          await CustomerSetupService.default.setupPredefinedCustomers(tenantId, false);
 
           const qualitasClientAfterSetup = await prisma.tenantCustomer.findFirst({
             where: {

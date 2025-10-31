@@ -142,8 +142,8 @@ export function registerClientHandler(bot) {
 
       const tenantId = ctx.getTenantId();
 
-      // Ejecutar la configuración de clientes
-      const results = await CustomerSetupService.setupPredefinedCustomers(tenantId, true);
+      // Ejecutar la configuración de clientes (solo los que faltan, no recrear)
+      const results = await CustomerSetupService.setupPredefinedCustomers(tenantId, false);
 
       // Verificar que los clientes se hayan creado correctamente
       const clientService = await import('../../services/client.service.js');
