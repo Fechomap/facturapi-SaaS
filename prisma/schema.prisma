@@ -26,19 +26,19 @@ model SubscriptionPlan {
 }
 
 model Tenant {
-  id                      String               @id @default(uuid()) @db.Uuid
-  businessName            String               @map("business_name") @db.VarChar(255)
-  rfc                     String               @unique @db.VarChar(20)
-  email                   String               @db.VarChar(255)
-  phone                   String?              @db.VarChar(20)
+  id                      String                @id @default(uuid()) @db.Uuid
+  businessName            String                @map("business_name") @db.VarChar(255)
+  rfc                     String                @unique @db.VarChar(20)
+  email                   String                @db.VarChar(255)
+  phone                   String?               @db.VarChar(20)
   address                 String?
-  contactName             String?              @map("contact_name") @db.VarChar(255)
-  facturapiOrganizationId String?              @map("facturapi_organization_id") @db.VarChar(100)
-  facturapiApiKey         String?              @map("facturapi_api_key") @db.VarChar(255)
-  isActive                Boolean              @default(true) @map("is_active")
-  createdAt               DateTime             @default(now()) @map("created_at")
-  updatedAt               DateTime             @default(now()) @map("updated_at")
-  stripeCustomerId        String?              @unique @map("stripe_customer_id") @db.VarChar(100)
+  contactName             String?               @map("contact_name") @db.VarChar(255)
+  facturapiOrganizationId String?               @map("facturapi_organization_id") @db.VarChar(100)
+  facturapiApiKey         String?               @map("facturapi_api_key") @db.VarChar(255)
+  isActive                Boolean               @default(true) @map("is_active")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @default(now()) @map("updated_at")
+  stripeCustomerId        String?               @unique @map("stripe_customer_id") @db.VarChar(100)
   auditLogs               AuditLog[]
   notifications           Notification[]
   customers               TenantCustomer[]
@@ -46,6 +46,7 @@ model Tenant {
   folios                  TenantFolio[]
   invoices                TenantInvoice[]
   payments                TenantPayment[]
+  paymentComplements      PaymentComplement[]
   settings                TenantSetting[]
   subscriptions           TenantSubscription[]
   users                   TenantUser[]
@@ -245,4 +246,27 @@ model Notification {
   @@index([status])
   @@index([createdAt])
   @@map("notifications")
+}
+
+model PaymentComplement {
+  id                    Int      @id @default(autoincrement())
+  tenantId              String   @map("tenant_id") @db.Uuid
+  facturapiComplementId String   @map("facturapi_complement_id") @db.VarChar(100)
+  uuid                  String   @db.VarChar(100)
+  series                String?  @db.VarChar(5)
+  folioNumber           Int?     @map("folio_number")
+  customerId            String   @map("customer_id") @db.VarChar(100)
+  customerName          String   @map("customer_name") @db.VarChar(255)
+  paymentForm           String   @map("payment_form") @db.VarChar(10)
+  totalAmount           Decimal  @map("total_amount") @db.Decimal(12, 2)
+  relatedInvoices       Json     @map("related_invoices")
+  paymentDate           DateTime @map("payment_date")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @default(now()) @map("updated_at")
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, facturapiComplementId])
+  @@index([tenantId, customerId])
+  @@index([uuid])
+  @@map("payment_complements")
 }

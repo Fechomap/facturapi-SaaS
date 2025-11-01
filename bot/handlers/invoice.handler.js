@@ -81,7 +81,7 @@ function ensureTempDirExists() {
  * @param {Object} ctx - Contexto del usuario
  * @returns {Promise<string>} - Ruta al archivo descargado
  */
-async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
+export async function descargarFactura(facturaId, formato, folio, clienteNombre, ctx) {
   console.log(`Descargando factura ${facturaId} en formato ${formato}`);
 
   const tempDir = ensureTempDirExists();
@@ -852,11 +852,46 @@ export function registerInvoiceHandler(bot) {
                 estaCancelada = false;
               }
 
+              // Buscar complementos de pago asociados a esta factura
+              let complementosPago = [];
+              try {
+                // Buscar complementos que contengan el UUID de esta factura
+                const todosComplementos = await prisma.paymentComplement.findMany({
+                  where: {
+                    tenantId: ctx.getTenantId(),
+                  },
+                  orderBy: {
+                    paymentDate: 'desc',
+                  },
+                });
+
+                // Buscar por folio en lugar de UUID (más confiable)
+                const folioFactura = factura.folio_number;
+
+                complementosPago = todosComplementos.filter((comp) => {
+                  const relatedInvoices = comp.relatedInvoices;
+                  if (Array.isArray(relatedInvoices)) {
+                    // Buscar por folio o por UUID
+                    return relatedInvoices.some(inv =>
+                      inv.folio === folioFactura ||
+                      inv.uuid === factura.id ||
+                      inv.uuid === factura.uuid
+                    );
+                  }
+                  return false;
+                });
+
+                console.log(`Encontrados ${complementosPago.length} complementos para factura folio ${folioFactura}`);
+              } catch (error) {
+                console.error('Error al buscar complementos de pago:', error);
+              }
+
               // Usar la vista para mostrar los detalles de la factura
               const { message, keyboard, parse_mode } = invoiceDetailsView(
                 factura,
                 estadoFactura,
-                estaCancelada
+                estaCancelada,
+                complementosPago
               );
               ctx.reply(message, { parse_mode, ...keyboard });
 

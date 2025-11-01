@@ -335,6 +335,353 @@ class FacturapiService {
       console.log(`🧹 Cache eliminado para tenant ${tenantId}`);
     }
   }
+
+  // ========== METODOS PARA COMPLEMENTOS DE PAGO (TIPO "P") ==========
+
+  /**
+   * Calcula la base imponible y los impuestos de un monto total
+   * @param {number} montoTotal - Monto total (con IVA incluido)
+   * @param {number} tasaIVA - Tasa de IVA trasladado (default: 0.16 para 16%)
+   * @param {number} tasaRetencion - Tasa de retención de IVA (default: 0.04 para 4%)
+   * @param {boolean} incluirRetencion - Si se debe incluir retención (default: true)
+   * @returns {Object} - { base, iva, retencion, total, taxesArray }
+   */
+  static calcularImpuestos(
+    montoTotal,
+    tasaIVA = 0.16,
+    tasaRetencion = 0.04,
+    incluirRetencion = true
+  ) {
+    // Calcular la base (monto sin IVA)
+    const base = montoTotal / (1 + tasaIVA);
+    const iva = montoTotal - base;
+    const retencion = incluirRetencion ? base * tasaRetencion : 0;
+
+    // Construir array de taxes en formato Facturapi
+    const taxesArray = [
+      {
+        base: parseFloat(base.toFixed(2)),
+        type: 'IVA',
+        factor: 'Tasa',
+        rate: tasaIVA,
+        withholding: false,
+      },
+    ];
+
+    // Agregar retención si se requiere
+    if (incluirRetencion) {
+      taxesArray.push({
+        base: parseFloat(base.toFixed(2)),
+        type: 'IVA',
+        factor: 'Tasa',
+        rate: tasaRetencion,
+        withholding: true,
+      });
+    }
+
+    return {
+      base: parseFloat(base.toFixed(2)),
+      iva: parseFloat(iva.toFixed(2)),
+      retencion: parseFloat(retencion.toFixed(2)),
+      total: parseFloat(montoTotal.toFixed(2)),
+      taxesArray, // Array listo para usar en Facturapi
+    };
+  }
+
+  /**
+   * Calcula el saldo pendiente de una factura después de pagos anteriores
+   * @param {number} totalFactura - Monto total de la factura original
+   * @param {Array} pagosAnteriores - Array de pagos anteriores [{ amount: number }]
+   * @returns {Object} - { totalPagado, saldoPendiente }
+   */
+  static calcularSaldos(totalFactura, pagosAnteriores = []) {
+    const totalPagado = pagosAnteriores.reduce((sum, pago) => sum + pago.amount, 0);
+    const saldoPendiente = totalFactura - totalPagado;
+
+    return {
+      totalPagado: parseFloat(totalPagado.toFixed(2)),
+      saldoPendiente: parseFloat(saldoPendiente.toFixed(2)),
+    };
+  }
+
+  /**
+   * Valida los datos de un complemento de pago antes de enviarlo
+   * @param {Object} pagoData - Datos del complemento de pago
+   * @returns {Object} - { valid: boolean, errors: Array }
+   */
+  static validarComplementoPago(pagoData) {
+    const errors = [];
+
+    // Validar customer
+    if (!pagoData.customer) {
+      errors.push('El campo customer es requerido');
+    }
+
+    // Validar payment_form
+    if (!pagoData.payment_form) {
+      errors.push('El campo payment_form es requerido');
+    }
+
+    // Validar related_documents
+    if (!pagoData.related_documents || !Array.isArray(pagoData.related_documents)) {
+      errors.push('El campo related_documents debe ser un array');
+    } else if (pagoData.related_documents.length === 0) {
+      errors.push('Debe incluir al menos una factura en related_documents');
+    } else {
+      // Validar cada documento relacionado
+      pagoData.related_documents.forEach((doc, index) => {
+        if (!doc.uuid) {
+          errors.push(`Documento ${index + 1}: falta el campo uuid`);
+        }
+        if (!doc.amount || doc.amount <= 0) {
+          errors.push(`Documento ${index + 1}: el monto debe ser mayor a 0`);
+        }
+        if (!doc.installment || doc.installment < 1) {
+          errors.push(`Documento ${index + 1}: installment debe ser >= 1`);
+        }
+        if (!doc.last_balance || doc.last_balance <= 0) {
+          errors.push(`Documento ${index + 1}: last_balance debe ser mayor a 0`);
+        }
+        if (doc.amount > doc.last_balance) {
+          errors.push(
+            `Documento ${index + 1}: el monto a pagar (${doc.amount}) no puede ser mayor al saldo pendiente (${doc.last_balance})`
+          );
+        }
+        if (!doc.taxes || !Array.isArray(doc.taxes) || doc.taxes.length === 0) {
+          errors.push(`Documento ${index + 1}: debe incluir al menos un impuesto en taxes`);
+        }
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Crear complemento de pago (CFDI tipo "P")
+   * @param {string} tenantId - ID del tenant
+   * @param {Object} pagoData - Datos del pago
+   * @param {Object|string} pagoData.customer - Información del cliente (objeto completo o ID)
+   * @param {string} pagoData.payment_form - Forma de pago (código del catálogo SAT)
+   * @param {string} pagoData.date - Fecha del pago (ISO 8601, opcional)
+   * @param {Array} pagoData.related_documents - Facturas que se están pagando
+   * @param {string} pagoData.related_documents[].uuid - UUID de la factura
+   * @param {number} pagoData.related_documents[].amount - Monto que se paga
+   * @param {number} pagoData.related_documents[].installment - Número de parcialidad
+   * @param {number} pagoData.related_documents[].last_balance - Saldo antes del pago
+   * @param {Array} pagoData.related_documents[].taxes - Impuestos del pago
+   * @returns {Promise<Object>} - Complemento de pago creado
+   */
+  static async createPaymentComplement(tenantId, pagoData) {
+    try {
+      // Validar datos antes de enviar
+      const validacion = this.validarComplementoPago(pagoData);
+      if (!validacion.valid) {
+        console.error(`Errores de validación en complemento de pago:`, validacion.errors);
+        throw new Error(`Datos inválidos: ${validacion.errors.join(', ')}`);
+      }
+
+      const facturapi = await this.getFacturapiClient(tenantId);
+
+      // Construir estructura del complemento de pago tipo "P"
+      // IMPORTANTE: data debe ser un ARRAY con la fecha del pago
+      const complementoPago = {
+        type: 'P',
+        customer: pagoData.customer,
+        complements: [
+          {
+            type: 'pago',
+            data: [
+              {
+                date: pagoData.date || new Date().toISOString(), // Fecha del pago
+                payment_form: pagoData.payment_form,
+                related_documents: pagoData.related_documents,
+              },
+            ],
+          },
+        ],
+      };
+
+      console.log(
+        `Creando complemento de pago para tenant ${tenantId}:`,
+        JSON.stringify(complementoPago, null, 2)
+      );
+
+      // Crear usando cola para evitar sobrecarga
+      const resultado = await this.createInvoiceQueued(facturapi, complementoPago, tenantId);
+
+      console.log(
+        `✅ Complemento de pago creado exitosamente. UUID: ${resultado.id || resultado.uuid}`
+      );
+
+      return resultado;
+    } catch (error) {
+      console.error(`Error al crear complemento de pago para tenant ${tenantId}:`, error);
+      if (error.response?.data) {
+        console.error('Detalles del error de Facturapi:', error.response.data);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Crear complemento de pago simple (una sola factura, pago completo)
+   * @param {string} tenantId - ID del tenant
+   * @param {Object} params - Parámetros del pago
+   * @param {string|Object} params.customer - ID del cliente o objeto customer
+   * @param {string} params.payment_form - Forma de pago
+   * @param {string} params.invoice_uuid - UUID de la factura a pagar
+   * @param {number} params.amount - Monto del pago
+   * @param {number} params.installment - Número de parcialidad (default: 1)
+   * @param {number} params.last_balance - Saldo pendiente antes del pago
+   * @param {number} params.tax_rate - Tasa de IVA (default: 0.16)
+   * @param {number} params.retention_rate - Tasa de retención (default: 0.04)
+   * @param {boolean} params.include_retention - Incluir retención (default: true)
+   * @param {string} params.date - Fecha del pago (ISO 8601, opcional)
+   * @returns {Promise<Object>} - Complemento de pago creado
+   */
+  static async createSimplePaymentComplement(tenantId, params) {
+    try {
+      const {
+        customer,
+        payment_form,
+        invoice_uuid,
+        amount,
+        installment = 1,
+        last_balance,
+        tax_rate = 0.16,
+        retention_rate = 0.04,
+        include_retention = true,
+        date,
+      } = params;
+
+      // Calcular impuestos con el formato correcto
+      const { taxesArray } = this.calcularImpuestos(amount, tax_rate, retention_rate, include_retention);
+
+      // Construir datos del pago
+      const pagoData = {
+        customer,
+        payment_form,
+        date: date || new Date().toISOString(),
+        related_documents: [
+          {
+            uuid: invoice_uuid,
+            amount: parseFloat(amount.toFixed(2)),
+            installment,
+            last_balance: parseFloat(last_balance.toFixed(2)),
+            taxes: taxesArray, // Usar el array con formato completo
+          },
+        ],
+      };
+
+      return await this.createPaymentComplement(tenantId, pagoData);
+    } catch (error) {
+      console.error(`Error al crear complemento de pago simple para tenant ${tenantId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear complemento de pago para múltiples facturas
+   * @param {string} tenantId - ID del tenant
+   * @param {Object} params - Parámetros del pago
+   * @param {string|Object} params.customer - ID del cliente o objeto customer
+   * @param {string} params.payment_form - Forma de pago
+   * @param {string} params.date - Fecha del pago (ISO 8601, opcional)
+   * @param {Array} params.invoices - Array de facturas a pagar
+   * @param {string} params.invoices[].uuid - UUID de la factura
+   * @param {number} params.invoices[].amount - Monto a pagar
+   * @param {number} params.invoices[].installment - Número de parcialidad
+   * @param {number} params.invoices[].last_balance - Saldo pendiente
+   * @param {number} params.invoices[].tax_rate - Tasa de IVA (opcional, default: 0.16)
+   * @param {number} params.invoices[].retention_rate - Tasa de retención (opcional, default: 0.04)
+   * @param {boolean} params.invoices[].include_retention - Incluir retención (opcional, default: true)
+   * @returns {Promise<Object>} - Complemento de pago creado
+   */
+  static async createMultipleInvoicesPaymentComplement(tenantId, params) {
+    try {
+      const { customer, payment_form, invoices, date } = params;
+
+      if (!invoices || invoices.length === 0) {
+        throw new Error('Debe proporcionar al menos una factura para pagar');
+      }
+
+      // Construir related_documents para cada factura
+      const related_documents = invoices.map((invoice) => {
+        const tax_rate = invoice.tax_rate || 0.16;
+        const retention_rate = invoice.retention_rate || 0.04;
+        const include_retention = invoice.include_retention !== undefined ? invoice.include_retention : true;
+
+        const { taxesArray } = this.calcularImpuestos(
+          invoice.amount,
+          tax_rate,
+          retention_rate,
+          include_retention
+        );
+
+        return {
+          uuid: invoice.uuid,
+          amount: parseFloat(invoice.amount.toFixed(2)),
+          installment: invoice.installment || 1,
+          last_balance: parseFloat(invoice.last_balance.toFixed(2)),
+          taxes: taxesArray,
+        };
+      });
+
+      const pagoData = {
+        customer,
+        payment_form,
+        date: date || new Date().toISOString(),
+        related_documents,
+      };
+
+      return await this.createPaymentComplement(tenantId, pagoData);
+    } catch (error) {
+      console.error(
+        `Error al crear complemento de pago múltiple para tenant ${tenantId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Crear múltiples complementos de pago en lote
+   * @param {string} tenantId - ID del tenant
+   * @param {Array} pagosData - Array de datos de pagos
+   * @returns {Promise<Array>} - Array con resultados { success: boolean, data/error }
+   */
+  static async createMultiplePaymentComplements(tenantId, pagosData) {
+    const results = [];
+
+    for (const pagoData of pagosData) {
+      try {
+        const result = await this.createPaymentComplement(tenantId, pagoData);
+        results.push({
+          success: true,
+          data: result,
+          uuid: result.id || result.uuid,
+        });
+      } catch (error) {
+        results.push({
+          success: false,
+          error: error.message,
+          pagoData,
+        });
+      }
+    }
+
+    const exitosos = results.filter((r) => r.success).length;
+    const fallidos = results.filter((r) => !r.success).length;
+
+    console.log(
+      `Procesamiento de complementos de pago completado. Exitosos: ${exitosos}, Fallidos: ${fallidos}`
+    );
+
+    return results;
+  }
 }
 
 export default FacturapiService;

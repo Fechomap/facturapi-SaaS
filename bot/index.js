@@ -16,6 +16,7 @@ import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerAxaHandler } from './handlers/axa.handler.js';
 import { registerClubAsistenciaHandler } from './handlers/club-asistencia.handler.js';
 import { registerQualitasHandler } from './handlers/qualitas.handler.js';
+import { registerPaymentComplementHandler } from './handlers/payment-complement.handler.js'; // Complementos de Pago
 import { registerOnboardingHandler } from './handlers/onboarding.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerTestHandlers } from './handlers/test-handlers.js'; // Nueva importación
@@ -88,12 +89,13 @@ export async function createBot(logger) {
   handleBatchGenerateInvoices(bot); // 1.1. Handler simplificado para batch
   registerClientHandler(bot); // 2. Clientes
   registerInvoiceHandler(bot); // 3. Facturas
-  registerChubbHandler(bot); // 4. Excel CHUBB
-  registerAxaHandler(bot); // 5. Excel AXA
-  registerClubAsistenciaHandler(bot); // 6. Excel CLUB DE ASISTENCIA
-  registerQualitasHandler(bot); // 7. Excel QUALITAS
-  registerOnboardingHandler(bot); // 8. Onboarding
-  registerProductionSetupHandler(bot); // 9. Producción (ÚLTIMO)
+  registerPaymentComplementHandler(bot); // 4. Complementos de Pago (CRÍTICO: debe ir DESPUÉS de Invoice)
+  registerChubbHandler(bot); // 5. Excel CHUBB
+  registerAxaHandler(bot); // 6. Excel AXA
+  registerClubAsistenciaHandler(bot); // 7. Excel CLUB DE ASISTENCIA
+  registerQualitasHandler(bot); // 8. Excel QUALITAS
+  registerOnboardingHandler(bot); // 9. Onboarding
+  registerProductionSetupHandler(bot); // 10. Producción (ÚLTIMO)
 
   logger.info('Bot configurado correctamente');
   return bot;

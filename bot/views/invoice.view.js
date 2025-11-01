@@ -61,8 +61,9 @@ export function invoiceCreatedView(invoice) {
  * @param {Object} invoice - Datos de factura consultada
  * @param {string} estadoFactura - Estado formateado de la factura
  * @param {boolean} estaCancelada - Si la factura está cancelada
+ * @param {Array} complementosPago - Lista de complementos de pago asociados (opcional)
  */
-export function invoiceDetailsView(invoice, estadoFactura, estaCancelada) {
+export function invoiceDetailsView(invoice, estadoFactura, estaCancelada, complementosPago = []) {
   // Determinar si la factura está cancelada basándonos en el estado o cancellation_status
   const cancelada =
     estaCancelada || invoice.status === 'canceled' || invoice.cancellation_status === 'accepted';
@@ -80,6 +81,15 @@ export function invoiceDetailsView(invoice, estadoFactura, estaCancelada) {
     mensaje += `Fecha de cancelación: ${invoice.cancellation_date}\n`;
   }
 
+  // Mostrar complementos de pago si existen
+  if (complementosPago && complementosPago.length > 0) {
+    mensaje += `\n💰 *Complementos de Pago (${complementosPago.length}):*\n`;
+    complementosPago.forEach((comp) => {
+      const fecha = new Date(comp.paymentDate).toLocaleDateString('es-MX');
+      mensaje += `  • ${comp.series}-${comp.folioNumber} - $${parseFloat(comp.totalAmount).toFixed(2)} (${fecha})\n`;
+    });
+  }
+
   mensaje += `\nSeleccione una opción:`;
 
   // Usar el ID de FacturAPI para los botones
@@ -87,9 +97,20 @@ export function invoiceDetailsView(invoice, estadoFactura, estaCancelada) {
 
   // Botones diferentes según si la factura está cancelada o no
   const botonesFactura = [
-    [Markup.button.callback('📄 Descargar PDF', `pdf_${facturaId}_${invoice.folio_number}`)],
-    [Markup.button.callback('🔠 Descargar XML', `xml_${facturaId}_${invoice.folio_number}`)],
+    [Markup.button.callback('📄 PDF Factura', `pdf_${facturaId}_${invoice.folio_number}`)],
+    [Markup.button.callback('🔠 XML Factura', `xml_${facturaId}_${invoice.folio_number}`)],
   ];
+
+  // Agregar botones de descarga para cada complemento de pago
+  if (complementosPago && complementosPago.length > 0) {
+    complementosPago.forEach((comp) => {
+      const label = `💰 Complemento ${comp.series}-${comp.folioNumber}`;
+      botonesFactura.push([
+        Markup.button.callback(`📄 PDF ${label}`, `pago_pdf_${comp.facturapiComplementId}_${comp.folioNumber}`),
+        Markup.button.callback(`📋 XML`, `pago_xml_${comp.facturapiComplementId}_${comp.folioNumber}`),
+      ]);
+    });
+  }
 
   // Solo mostramos el botón de cancelación si la factura NO está cancelada
   if (!cancelada) {

@@ -6,6 +6,7 @@ import { registerAxaHandler } from './axa.handler.js';
 import { registerClubAsistenciaHandler } from './club-asistencia.handler.js';
 import { registerQualitasHandler } from './qualitas.handler.js';
 import { registerOnboardingHandler } from './onboarding.handler.js';
+import { registerPaymentComplementHandler } from './payment-complement.handler.js';
 
 /**
  * Registra todos los handlers en el bot
@@ -16,6 +17,10 @@ export function registerAllHandlers(bot) {
 
   registerClientHandler(bot);
   console.log('✅ Client handler registrado');
+
+  // IMPORTANTE: Payment Complement debe ir ANTES de Invoice para tener prioridad en text handlers
+  registerPaymentComplementHandler(bot);
+  console.log('✅ Payment Complement handler registrado');
 
   registerInvoiceHandler(bot);
   console.log('✅ Invoice handler registrado');
