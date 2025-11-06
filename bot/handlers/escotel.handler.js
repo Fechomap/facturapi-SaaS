@@ -346,6 +346,101 @@ async function procesarArchivoEscotel(ctx, filePath, progressMessageId) {
 }
 
 /**
+ * Genera un Excel de reporte con el mapeo pedido-factura
+ * @param {Array} facturasGeneradas - Array de facturas generadas
+ * @param {string} clienteName - Nombre del cliente
+ * @returns {Buffer} - Buffer del archivo Excel
+ */
+function generarReporteExcel(facturasGeneradas, clienteName) {
+  // Crear un nuevo workbook
+  const wb = XLSX.utils.book_new();
+
+  // Preparar los datos para el Excel
+  const data = [
+    // Encabezados
+    [
+      'No.',
+      'Número de Pedido',
+      'Serie',
+      'Folio',
+      'Total Facturado',
+      'Servicios',
+      'Total Excel',
+      'Discrepancia',
+      'Estado',
+    ],
+  ];
+
+  // Agregar cada factura
+  facturasGeneradas.forEach((f, index) => {
+    const estado = f.tieneDiscrepancia ? 'ALERTA' : 'OK';
+    const discrepanciaTexto = f.tieneDiscrepancia
+      ? `$${f.discrepancia.toFixed(2)}`
+      : 'Sin diferencia';
+
+    data.push([
+      index + 1, // No.
+      f.nombreHoja, // Número de Pedido (nombre de la hoja)
+      f.factura.series, // Serie
+      f.factura.folio_number, // Folio
+      f.totales.total, // Total Facturado
+      f.servicios, // Cantidad de servicios
+      f.totalEsperadoExcel || f.totales.total, // Total Excel
+      discrepanciaTexto, // Discrepancia
+      estado, // Estado
+    ]);
+  });
+
+  // Agregar totales al final
+  const totalGeneral = facturasGeneradas.reduce((sum, f) => sum + f.totales.total, 0);
+  const totalServicios = facturasGeneradas.reduce((sum, f) => sum + f.servicios, 0);
+  const totalDiscrepancias = facturasGeneradas.filter((f) => f.tieneDiscrepancia).length;
+
+  data.push([]);
+  data.push([
+    'TOTALES',
+    '',
+    '',
+    `${facturasGeneradas.length} facturas`,
+    totalGeneral,
+    totalServicios,
+    '',
+    `${totalDiscrepancias} con diferencias`,
+    '',
+  ]);
+
+  // Crear la hoja
+  const ws = XLSX.utils.aoa_to_sheet(data);
+
+  // Configurar anchos de columna
+  ws['!cols'] = [
+    { wch: 5 }, // No.
+    { wch: 18 }, // Número de Pedido
+    { wch: 8 }, // Serie
+    { wch: 10 }, // Folio
+    { wch: 15 }, // Total Facturado
+    { wch: 10 }, // Servicios
+    { wch: 15 }, // Total Excel
+    { wch: 18 }, // Discrepancia
+    { wch: 10 }, // Estado
+  ];
+
+  // Agregar la hoja al workbook
+  XLSX.utils.book_append_sheet(wb, ws, 'Reporte Facturas');
+
+  // Agregar metadatos
+  wb.Props = {
+    Title: `Reporte Facturas ESCOTEL - ${clienteName}`,
+    Subject: 'Mapeo de pedidos y facturas',
+    Author: 'Sistema de Facturación',
+    CreatedDate: new Date(),
+  };
+
+  // Generar el buffer
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+}
+
+/**
  * Envía múltiples facturas a FacturAPI (una por hoja)
  */
 async function enviarFacturasEscotel(ctx) {
@@ -482,7 +577,9 @@ async function enviarFacturasEscotel(ctx) {
 
       await ctx.reply(
         `📥 **Opciones de descarga:**\n\n` +
-          `💡 Descarga todas las facturas en formato ZIP para mayor comodidad.`,
+          `💡 Los ZIPs incluyen automáticamente el reporte Excel con el mapeo:\n` +
+          `   • Número de Pedido → Serie/Folio\n` +
+          `   • Totales y discrepancias`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard(botonesZip),
@@ -504,6 +601,54 @@ async function enviarFacturasEscotel(ctx) {
         discrepancia: f.discrepancia,
         tieneDiscrepancia: f.tieneDiscrepancia,
       }));
+
+      // Generar y enviar el reporte Excel
+      try {
+        const reporteBuffer = generarReporteExcel(facturasGeneradas, escotelData.clienteName);
+        const timestamp = Date.now();
+        const tempDir = path.join(__dirname, '../../temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const reportePath = path.join(tempDir, `reporte_escotel_${timestamp}.xlsx`);
+        fs.writeFileSync(reportePath, reporteBuffer);
+
+        await ctx.replyWithDocument(
+          {
+            source: reportePath,
+            filename: `REPORTE_FACTURAS_ESCOTEL_${timestamp}.xlsx`,
+          },
+          {
+            caption:
+              `📊 **Reporte de Facturas ESCOTEL**\n\n` +
+              `📋 ${facturasGeneradas.length} facturas generadas\n` +
+              `✅ Este archivo contiene el mapeo completo:\n` +
+              `   • Número de Pedido → Serie/Folio\n` +
+              `   • Totales facturados\n` +
+              `   • Discrepancias detectadas`,
+            parse_mode: 'Markdown',
+          }
+        );
+
+        // Limpiar archivo temporal después de 2 minutos
+        setTimeout(
+          () => {
+            try {
+              if (fs.existsSync(reportePath)) {
+                fs.unlinkSync(reportePath);
+                console.log(`🗑️ Reporte Excel temporal eliminado: ${path.basename(reportePath)}`);
+              }
+            } catch (error) {
+              console.error(`Error eliminando reporte ${reportePath}:`, error.message);
+            }
+          },
+          2 * 60 * 1000
+        );
+      } catch (error) {
+        console.error('Error generando reporte Excel:', error);
+        await ctx.reply('⚠️ Las facturas se generaron correctamente, pero hubo un error al crear el reporte Excel.');
+      }
     }
 
     if (errores.length > 0) {
@@ -870,6 +1015,26 @@ async function descargarZipEscotel(ctx, type) {
       }
     }
 
+    // Agregar el reporte Excel al ZIP
+    try {
+      const reporteBuffer = generarReporteExcel(
+        facturasGuardadas.map((f) => ({
+          nombreHoja: f.nombreHoja,
+          factura: f.invoice,
+          servicios: f.servicios,
+          totales: f.totales,
+          totalEsperadoExcel: f.totalEsperadoExcel,
+          discrepancia: f.discrepancia,
+          tieneDiscrepancia: f.tieneDiscrepancia,
+        })),
+        'ESCOTEL'
+      );
+      archive.append(reporteBuffer, { name: `REPORTE_FACTURAS_ESCOTEL.xlsx` });
+      console.log('✅ Reporte Excel agregado al ZIP');
+    } catch (error) {
+      console.error('Error agregando reporte al ZIP:', error);
+    }
+
     // Finalizar el ZIP
     await archive.finalize();
     await new Promise((resolve, reject) => {
@@ -892,7 +1057,14 @@ async function descargarZipEscotel(ctx, type) {
     await ctx.replyWithDocument(
       { source: zipPath, filename: `ESCOTEL_${type.toUpperCase()}S_${timestamp}.zip` },
       {
-        caption: `📦 ${filesAdded} ${type.toUpperCase()}s de facturas ESCOTEL\n${errores > 0 ? `⚠️ ${errores} archivos con errores` : ''}`,
+        caption:
+          `📦 **ZIP de ${type.toUpperCase()}s ESCOTEL**\n\n` +
+          `✅ ${filesAdded} archivos ${type.toUpperCase()}\n` +
+          `📊 Incluye: REPORTE_FACTURAS_ESCOTEL.xlsx\n` +
+          `${errores > 0 ? `⚠️ ${errores} archivos con errores\n` : ''}` +
+          `\n💡 El reporte contiene el mapeo completo:\n` +
+          `   Número de Pedido → Serie/Folio`,
+        parse_mode: 'Markdown',
       }
     );
 
