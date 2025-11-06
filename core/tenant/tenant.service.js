@@ -561,6 +561,9 @@ class TenantService {
         const createdByIdInt =
           createdById && parseInt(createdById) <= 2147483647 ? parseInt(createdById) : null;
 
+        // Mantener el BigInt original para consultas que lo requieran
+        const createdByIdBigInt = createdById ? BigInt(createdById) : null;
+
         // Registrar la factura
         const invoice = await tx.tenantInvoice.create({
           data: {

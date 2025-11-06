@@ -139,22 +139,30 @@ export function cleanupFlowChange(ctx, newFlow) {
   const reason = newFlow === 'menu' ? 'menu_principal' : 'flow_change';
   const pdfCleanup = safeCleanupPdfAnalysis(ctx, reason);
 
-  // Limpieza cruzada existente (mantener el patrón actual)
-  if (newFlow === 'axa') {
-    // Limpiar estado CHUBB
-    delete ctx.userState.chubbGrupos;
-    delete ctx.userState.chubbColumnMappings;
-    delete ctx.userState.chubbMontosPorGrupo;
-    delete ctx.userState.chubbClientId;
-    console.log('🧹 Estado CHUBB limpiado para flujo AXA');
-  } else if (newFlow === 'chubb') {
-    // Limpiar estado AXA
-    delete ctx.userState.axaData;
-    delete ctx.userState.axaColumnMappings;
-    delete ctx.userState.axaClientId;
-    delete ctx.userState.axaSummary;
-    console.log('🧹 Estado AXA limpiado para flujo CHUBB');
-  }
+  // Limpieza cruzada de todos los clientes Excel
+  const clientFields = {
+    axa: ['axaData', 'axaColumnMappings', 'axaClientId', 'axaSummary'],
+    chubb: ['chubbGrupos', 'chubbColumnMappings', 'chubbMontosPorGrupo', 'chubbClientId'],
+    qualitas: ['qualitasClientId', 'qualitasData', 'qualitasColumnMappings'],
+    club_asistencia: ['clubAsistenciaClientId', 'clubAsistenciaData'],
+    escotel: ['escotelClientId', 'escotelData', 'escotelInvoiceResults'],
+  };
+
+  // Limpiar todos los campos EXCEPTO del flujo actual
+  Object.keys(clientFields).forEach((client) => {
+    if (client !== newFlow) {
+      let cleaned = false;
+      clientFields[client].forEach((field) => {
+        if (ctx.userState?.[field]) {
+          delete ctx.userState[field];
+          cleaned = true;
+        }
+      });
+      if (cleaned) {
+        console.log(`🧹 Estado ${client.toUpperCase()} limpiado para flujo ${newFlow}`);
+      }
+    }
+  });
 
   const finalSize = JSON.stringify(ctx.userState || {}).length;
   const improvement = Math.round((1 - finalSize / initialSize) * 100);

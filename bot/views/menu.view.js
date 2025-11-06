@@ -61,8 +61,11 @@ export function clientSelectionMenu(clients, includeChubb = true, includeBackBut
   if (includeChubb) {
     buttons.push([Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')]);
     buttons.push([Markup.button.callback('AXA (Archivo Excel)', 'menu_axa')]);
-    buttons.push([Markup.button.callback('CLUB DE ASISTENCIA (Archivo Excel)', 'menu_club_asistencia')]);
+    buttons.push([
+      Markup.button.callback('CLUB DE ASISTENCIA (Archivo Excel)', 'menu_club_asistencia'),
+    ]);
     buttons.push([Markup.button.callback('QUALITAS (Archivo Excel)', 'menu_qualitas')]);
+    buttons.push([Markup.button.callback('ESCOTEL (Archivo Excel)', 'menu_escotel')]);
   }
 
   // Agregar botón de volver al final

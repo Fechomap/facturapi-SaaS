@@ -5,6 +5,7 @@ import { registerChubbHandler } from './chubb.handler.js';
 import { registerAxaHandler } from './axa.handler.js';
 import { registerClubAsistenciaHandler } from './club-asistencia.handler.js';
 import { registerQualitasHandler } from './qualitas.handler.js';
+import { registerEscotelHandler } from './escotel.handler.js';
 import { registerOnboardingHandler } from './onboarding.handler.js';
 import { registerPaymentComplementHandler } from './payment-complement.handler.js';
 
@@ -36,6 +37,9 @@ export function registerAllHandlers(bot) {
 
   registerQualitasHandler(bot);
   console.log('✅ Qualitas handler registrado');
+
+  registerEscotelHandler(bot);
+  console.log('✅ ESCOTEL handler registrado');
 
   registerOnboardingHandler(bot);
   console.log('✅ Onboarding handler registrado');

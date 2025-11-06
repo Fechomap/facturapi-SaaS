@@ -122,6 +122,23 @@ const CLIENTES_PREDEFINIDOS = [
     email: 'qualitas@example.com',
     phone: '',
   },
+  {
+    legal_name: 'ESCOTEL ESPECIALISTAS EN CONTACTO TELEFONICO',
+    tax_id: 'EEC081222FH8',
+    tax_system: '601',
+    address: {
+      street: 'JOSE MARIA VELASCO',
+      exterior: '13',
+      interior: 'OFICINA 301',
+      neighborhood: 'SAN JOSE INSURGENTES',
+      zip: '03900',
+      municipality: 'BENITO JUAREZ',
+      state: 'CIUDAD DE MEXICO',
+      country: 'MEX',
+    },
+    email: 'escotel@example.com',
+    phone: '',
+  },
 ];
 
 /**
