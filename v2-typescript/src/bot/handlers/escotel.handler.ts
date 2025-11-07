@@ -790,15 +790,8 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
     );
 
     const tenantId = (ctx as any).getTenantId?.();
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { facturapiApiKey: true, businessName: true },
-    });
-
-    if (!tenant || !tenant.facturapiApiKey) {
-      await ctx.reply('❌ No se pudo obtener la configuración del tenant');
-      return;
-    }
+    // REFACTOR: Obtener el cliente de FacturAPI una sola vez usando el servicio
+    const facturapi = await FacturapiService.getFacturapiClient(tenantId);
 
     // Crear directorio temporal (async)
     const tempDir = path.join(__dirname, '../../../temp');
@@ -807,77 +800,86 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
     const timestamp = Date.now();
     const zipPath = path.join(tempDir, `escotel_${type}_${timestamp}.zip`);
     const output = (await import('fs')).createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 6 } });
+
+    // SOLUCIÓN DEFINITIVA: No comprimir PDFs (0), sí comprimir XMLs (8)
+    const compressionLevel = type === 'pdf' ? 0 : 8;
+    logger.info(
+      `Creando ZIP para ${type.toUpperCase()}s con nivel de compresión: ${compressionLevel}`
+    );
+    const archive = archiver('zip', { zlib: { level: compressionLevel } });
 
     archive.pipe(output);
 
-    // OPTIMIZACIÓN: Descargas en CHUNKS (evitar saturar la API con 81 requests)
-    logger.info(`Iniciando descarga de ${facturasGuardadas.length} archivos ${type} en lotes...`);
+    const BATCH_SIZE = 10;
+    let filesAdded = 0;
+    let errores = 0;
 
-    const downloadedFiles: any[] = [];
-    const CHUNK_SIZE = 10; // Descargar 10 a la vez para no saturar FacturAPI
+    for (let i = 0; i < facturasGuardadas.length; i += BATCH_SIZE) {
+      const batch = facturasGuardadas.slice(i, i + BATCH_SIZE);
+      await ctx.telegram
+        .editMessageText(
+          ctx.chat!.id,
+          progressMsg.message_id,
+          undefined,
+          `📦 Procesando lote... (${i + batch.length}/${facturasGuardadas.length})`
+        )
+        .catch(() => {});
 
-    // Procesar en chunks de 10
-    for (let chunkStart = 0; chunkStart < facturasGuardadas.length; chunkStart += CHUNK_SIZE) {
-      const chunk = facturasGuardadas.slice(chunkStart, chunkStart + CHUNK_SIZE);
-
-      // Actualizar progreso
-      await ctx.telegram.editMessageText(
-        ctx.chat!.id,
-        progressMsg.message_id,
-        undefined,
-        `📦 Descargando ${Math.min(chunkStart + CHUNK_SIZE, facturasGuardadas.length)}/${facturasGuardadas.length} ${type.toUpperCase()}s...`
-      ).catch(() => {});
-
-      // Descargar este chunk en paralelo
-      const chunkPromises = chunk.map((factura: any) => {
+      const downloadPromises = batch.map((factura: any) => {
         const facturaId = factura.factura.id;
-        const apiUrl = `https://www.facturapi.io/v2/invoices/${facturaId}/${type}`;
 
-        return axios({
-          method: 'GET',
-          url: apiUrl,
-          responseType: 'arraybuffer',
-          headers: {
-            Authorization: `Bearer ${tenant.facturapiApiKey}`,
-          },
-          timeout: 60000, // Aumentar timeout a 60s
-        })
-          .then((response) => {
-            const fileData = Buffer.from(response.data);
+        // REFACTORIZACIÓN A SDK: Usar el método oficial
+        const downloadAction =
+          type === 'pdf'
+            ? facturapi.invoices.downloadPdf(facturaId)
+            : facturapi.invoices.downloadXml(facturaId);
+
+        return downloadAction
+          .then(async (fileData: any) => {
+            let fileBuffer: Buffer;
+            if (fileData instanceof Blob) {
+              fileBuffer = Buffer.from(await fileData.arrayBuffer());
+            } else if (fileData instanceof ReadableStream) {
+              const chunks: Uint8Array[] = [];
+              for await (const chunk of fileData) {
+                chunks.push(chunk);
+              }
+              fileBuffer = Buffer.concat(chunks);
+            } else {
+              fileBuffer = fileData as unknown as Buffer;
+            }
             const fileName = `${factura.factura.series}${factura.factura.folio_number}.${type}`;
-            return { fileName, fileBuffer: fileData };
+            return { fileName, fileBuffer };
           })
-          .catch((error) => {
-            logger.error({ nombreHoja: factura.nombreHoja, type, error: error.message }, 'Error descargando archivo');
+          .catch((error: any) => {
+            logger.error(
+              { nombreHoja: factura.nombreHoja, type, error: error.message },
+              'Error descargando archivo vía SDK'
+            );
+            errores++;
             return null;
           });
       });
 
-      // Esperar a que termine este chunk antes de continuar con el siguiente
-      const chunkResults = await Promise.all(chunkPromises);
-      downloadedFiles.push(...chunkResults);
-    }
+      const downloadedFiles = await Promise.all(downloadPromises);
 
-    // Añadir archivos descargados al ZIP
-    let filesAdded = 0;
-    for (const file of downloadedFiles) {
-      if (file) {
-        archive.append(file.fileBuffer, { name: file.fileName });
-        filesAdded++;
+      for (const file of downloadedFiles) {
+        if (file) {
+          archive.append(file.fileBuffer, { name: file.fileName });
+          filesAdded++;
+        }
       }
     }
 
-    const errores = downloadedFiles.filter((f) => !f).length;
-    logger.info(`${filesAdded} de ${facturasGuardadas.length} archivos descargados exitosamente.`);
-
-    // Agregar el reporte Excel al ZIP
-    try {
-      const reporteBuffer = generarReporteExcel(facturasGuardadas, 'ESCOTEL');
-      archive.append(reporteBuffer, { name: `REPORTE_FACTURAS_ESCOTEL.xlsx` });
-      logger.info('Reporte Excel agregado al ZIP');
-    } catch (error) {
-      logger.error({ error }, 'Error agregando reporte al ZIP');
+    if (filesAdded > 0) {
+      // Agregar el reporte Excel al ZIP
+      try {
+        const reporteBuffer = generarReporteExcel(facturasGuardadas, 'ESCOTEL');
+        archive.append(reporteBuffer, { name: `REPORTE_FACTURAS_ESCOTEL.xlsx` });
+        logger.info('Reporte Excel agregado al ZIP');
+      } catch (error) {
+        logger.error({ error }, 'Error agregando reporte al ZIP');
+      }
     }
 
     // Finalizar el ZIP
@@ -888,52 +890,31 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
     });
 
     const stats = await fs.stat(zipPath);
-    const sizeMB = Math.round((stats.size / (1024 * 1024)) * 100) / 100;
+    const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
 
-    // Actualizar mensaje
-    if (ctx.chat?.id) {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
+    await ctx.telegram
+      .editMessageText(
+        ctx.chat!.id,
         progressMsg.message_id,
         undefined,
-        `✅ ZIP generado exitosamente\n\n📦 Archivos incluidos: ${filesAdded}\n📁 Tamaño: ${sizeMB} MB\n\n⬇️ Descargando...`
-      );
-    }
+        `✅ ZIP generado (${sizeMB} MB). Enviando...`
+      )
+      .catch(() => {});
 
-    // Enviar el archivo ZIP
     await ctx.replyWithDocument(
       { source: zipPath, filename: `ESCOTEL_${type.toUpperCase()}S_${timestamp}.zip` },
       {
-        caption:
-          `📦 **ZIP de ${type.toUpperCase()}s ESCOTEL**\n\n` +
-          `✅ ${filesAdded} archivos ${type.toUpperCase()}\n` +
-          `📊 Incluye: REPORTE_FACTURAS_ESCOTEL.xlsx\n` +
-          `${errores > 0 ? `⚠️ ${errores} archivos con errores\n` : ''}` +
-          `\n💡 El reporte contiene el mapeo completo:\n` +
-          `   Número de Pedido → Serie/Folio`,
-        parse_mode: 'Markdown',
+        caption: `📦 ZIP con ${filesAdded} archivos ${type.toUpperCase()}.\n${errores > 0 ? `⚠️ ${errores} archivos con errores.` : ''}`,
       }
     );
 
-    // Eliminar mensaje de progreso
-    try {
-      if (ctx.chat?.id) {
-        await ctx.telegram.deleteMessage(ctx.chat.id, progressMsg.message_id);
-      }
-    } catch (e) {
-      logger.debug('No se pudo eliminar mensaje de progreso');
-    }
+    await ctx.telegram.deleteMessage(ctx.chat!.id, progressMsg.message_id).catch(() => {});
 
-    // Limpiar archivo ZIP después de 2 minutos (async)
     setTimeout(
-      async () => {
-        try {
-          await fs.unlink(zipPath);
-          logger.info({ file: path.basename(zipPath) }, 'ZIP temporal eliminado');
-        } catch (error) {
-          logger.error({ file: zipPath, error }, 'Error eliminando ZIP temporal');
-        }
-      },
+      () =>
+        fs
+          .unlink(zipPath)
+          .catch((e) => logger.error({ error: e }, 'Error eliminando ZIP temporal')),
       2 * 60 * 1000
     );
   } catch (error) {
