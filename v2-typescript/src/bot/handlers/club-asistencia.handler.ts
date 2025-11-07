@@ -21,7 +21,14 @@ import redisBatchStateService from '@services/redis-batch-state.service.js'; // 
 import type { ClubAsistenciaBatchData } from '@/types/club-asistencia.types.js';
 
 // Constantes
-import { CLIENT_RFCS, SAT_PRODUCT_KEYS, SAT_UNIT_KEYS, CFDI_USE, PAYMENT_FORM, PAYMENT_METHOD } from '@/constants/clients.js';
+import {
+  CLIENT_RFCS,
+  SAT_PRODUCT_KEYS,
+  SAT_UNIT_KEYS,
+  CFDI_USE,
+  PAYMENT_FORM,
+  PAYMENT_METHOD,
+} from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 const logger = createModuleLogger('bot-club-asistencia-handler');
@@ -141,7 +148,10 @@ function mapColumnNamesCAS(firstRow: Record<string, any>): CASColumnMapping | nu
     };
   }
 
-  logger.warn({ columnMapping }, 'No se encontraron todas las columnas requeridas para Club de Asistencia');
+  logger.warn(
+    { columnMapping },
+    'No se encontraron todas las columnas requeridas para Club de Asistencia'
+  );
   return null;
 }
 
@@ -154,13 +164,27 @@ async function procesarArchivoCAS(
   progressMessageId: number | null
 ): Promise<{ success: boolean; pendingConfirmation?: boolean; error?: string }> {
   try {
-    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      1,
+      6,
+      'Leyendo archivo Excel',
+      'Cargando datos...'
+    );
 
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      2,
+      6,
+      'Detectando columnas',
+      'Analizando estructura...'
+    );
 
     const data = XLSX.utils.sheet_to_json(worksheet);
 
@@ -176,9 +200,19 @@ async function procesarArchivoCAS(
       return { success: false, error: 'Estructura de Excel inválida' };
     }
 
-    logger.info({ columnMappings, sampleRows: data.slice(0, 2) }, 'Mapeado de columnas Club de Asistencia');
+    logger.info(
+      { columnMappings, sampleRows: data.slice(0, 2) },
+      'Mapeado de columnas Club de Asistencia'
+    );
 
-    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Validando datos', `Verificando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      3,
+      6,
+      'Validando datos',
+      `Verificando ${data.length} registros...`
+    );
 
     // Validar datos numéricos
     const erroresNumericos: string[] = [];
@@ -197,7 +231,14 @@ async function procesarArchivoCAS(
       return { success: false, error: 'Datos numéricos inválidos' };
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Calculando totales', `Procesando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      4,
+      6,
+      'Calculando totales',
+      `Procesando ${data.length} registros...`
+    );
 
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
@@ -237,9 +278,13 @@ async function procesarArchivoCAS(
     for (const row of data as any[]) {
       const orden = columnMappings.orden ? row[columnMappings.orden] || '' : '';
       const folio = columnMappings.folio ? row[columnMappings.folio] || '' : '';
-      const autorizacion = columnMappings.autorizacion ? row[columnMappings.autorizacion] || '' : '';
+      const autorizacion = columnMappings.autorizacion
+        ? row[columnMappings.autorizacion] || ''
+        : '';
       const importe = parseFloat(row[columnMappings.importe]) || 0;
-      const descripcion = columnMappings.descripcion ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA' : 'SERVICIO DE GRUA';
+      const descripcion = columnMappings.descripcion
+        ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA'
+        : 'SERVICIO DE GRUA';
 
       subtotal += importe;
 
@@ -311,13 +356,23 @@ async function procesarArchivoCAS(
       throw new Error(`Error guardando datos en Redis: ${saveResult.error}`);
     }
 
-    logger.info({ userId, batchId, totalRecords: data.length }, 'Batch Club de Asistencia guardado en Redis');
+    logger.info(
+      { userId, batchId, totalRecords: data.length },
+      'Batch Club de Asistencia guardado en Redis'
+    );
 
     if (ctx.userState) {
       ctx.userState.clubBatchId = batchId;
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros listos`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      6,
+      6,
+      'Procesamiento completado',
+      `${data.length} registros listos`
+    );
 
     const infoResumen =
       `📊 Resumen de datos procesados:\n\n` +
@@ -325,7 +380,12 @@ async function procesarArchivoCAS(
 
     await ctx.reply(`${infoResumen}\n¿El servicio tiene retención del 4%?`, {
       reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Sí, con retención 4%', `cas_servicios_con_retencion:${batchId}`)],
+        [
+          Markup.button.callback(
+            '✅ Sí, con retención 4%',
+            `cas_servicios_con_retencion:${batchId}`
+          ),
+        ],
         [Markup.button.callback('❌ No, sin retención', `cas_servicios_sin_retencion:${batchId}`)],
         [Markup.button.callback('🔙 Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
       ]).reply_markup,
@@ -334,7 +394,9 @@ async function procesarArchivoCAS(
     return { success: true, pendingConfirmation: true };
   } catch (error) {
     logger.error({ error }, 'Error al procesar archivo Excel Club de Asistencia');
-    await ctx.reply(`❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
@@ -349,7 +411,10 @@ async function enviarFacturaDirectaCAS(
   clienteId: string
 ): Promise<any> {
   try {
-    logger.info({ items: facturaData.items.length }, 'Enviando factura Club de Asistencia a FacturAPI');
+    logger.info(
+      { items: facturaData.items.length },
+      'Enviando factura Club de Asistencia a FacturAPI'
+    );
 
     const tenantId = ctx.getTenantId();
     if (!tenantId) {
@@ -368,7 +433,10 @@ async function enviarFacturaDirectaCAS(
     }
 
     const factura = await facturapi.invoices.create(facturaData);
-    logger.info({ facturaId: factura.id, folio: factura.folio_number }, 'Factura creada exitosamente');
+    logger.info(
+      { facturaId: factura.id, folio: factura.folio_number },
+      'Factura creada exitosamente'
+    );
 
     // Obtener el ID numérico del cliente desde BD
     const cliente = await prisma.tenantCustomer.findFirst({
@@ -387,7 +455,9 @@ async function enviarFacturaDirectaCAS(
       tenantId,
       factura.id,
       factura.series,
-      typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+      typeof factura.folio_number === 'number'
+        ? factura.folio_number
+        : parseInt(factura.folio_number, 10),
       cliente.id,
       factura.total,
       userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -535,13 +605,14 @@ export function registerClubAsistenciaHandler(bot: any): void {
     }
 
     // ✅ FASE 1.5: Usar Redis
-    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data?.facturaConRetencion) {
       logger.info('Datos no disponibles en Redis');
-      await ctx.reply(
-        '❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.'
-      );
+      await ctx.reply('❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.');
       return;
     }
 
@@ -572,7 +643,7 @@ export function registerClubAsistenciaHandler(bot: any): void {
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Confirmar y Generar', 'cas_confirmar_final')],
+          [Markup.button.callback('✅ Confirmar y Generar', `cas_confirmar_final:${batchId}`)],
           [Markup.button.callback('❌ Cancelar', 'cas_cancelar')],
         ]).reply_markup,
       }
@@ -598,13 +669,14 @@ export function registerClubAsistenciaHandler(bot: any): void {
     }
 
     // ✅ FASE 1.5: Usar Redis
-    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data?.facturaSinRetencion) {
       logger.info('Datos no disponibles en Redis');
-      await ctx.reply(
-        '❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.'
-      );
+      await ctx.reply('❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.');
       return;
     }
 
@@ -635,7 +707,7 @@ export function registerClubAsistenciaHandler(bot: any): void {
       {
         parse_mode: 'Markdown',
         reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Confirmar y Generar', 'cas_confirmar_final')],
+          [Markup.button.callback('✅ Confirmar y Generar', `cas_confirmar_final:${batchId}`)],
           [Markup.button.callback('❌ Cancelar', 'cas_cancelar')],
         ]).reply_markup,
       }
@@ -662,7 +734,10 @@ export function registerClubAsistenciaHandler(bot: any): void {
     );
 
     // ✅ FASE 1.5: Recuperar desde Redis
-    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<ClubAsistenciaBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data) {
       await ctx.telegram.editMessageText(
@@ -739,8 +814,18 @@ export function registerClubAsistenciaHandler(bot: any): void {
           {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
-              [Markup.button.callback('📄 Descargar PDF', `pdf_${factura.id}_${factura.folio_number}`)],
-              [Markup.button.callback('🔠 Descargar XML', `xml_${factura.id}_${factura.folio_number}`)],
+              [
+                Markup.button.callback(
+                  '📄 Descargar PDF',
+                  `pdf_${factura.id}_${factura.folio_number}`
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  '🔠 Descargar XML',
+                  `xml_${factura.id}_${factura.folio_number}`
+                ),
+              ],
             ]).reply_markup,
           }
         );

@@ -150,7 +150,9 @@ export function registerTestHandlers(bot: any): void {
       await ctx.reply('✅ Archivo de prueba eliminado correctamente');
     } catch (error) {
       logger.error({ error }, 'Error en test de archivos');
-      await ctx.reply(`❌ Error en test de archivos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      await ctx.reply(
+        `❌ Error en test de archivos: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
     }
   });
 

@@ -400,7 +400,10 @@ class SessionService {
 
       ctx.loadFullState = async () => {
         if (ctx.userState._isPartialState) {
-          sessionLogger.debug({ telegramId: userId }, 'Cargando estado completo desde estado parcial');
+          sessionLogger.debug(
+            { telegramId: userId },
+            'Cargando estado completo desde estado parcial'
+          );
           ctx.userState = await this.getUserState(userId);
           return true;
         }

@@ -66,7 +66,10 @@ export async function tenantContextMiddleware(ctx: TenantBotContext, next: () =>
         `[TENANT_METRICS] Usuario ${telegramId} - DB query findUserByTelegramId tomó ${tenantQueryDuration}ms, userFound=${!!user}`
       );
 
-      middlewareLogger.debug({ telegramId: telegramId, userFound: !!user }, 'Información de usuario consultada');
+      middlewareLogger.debug(
+        { telegramId: telegramId, userFound: !!user },
+        'Información de usuario consultada'
+      );
 
       if (user && user.tenant) {
         ctx.userState.tenantId = user.tenant.id;

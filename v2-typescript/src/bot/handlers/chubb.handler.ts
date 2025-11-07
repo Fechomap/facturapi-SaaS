@@ -22,7 +22,14 @@ import FacturapiService from '@services/facturapi.service.js';
 import TenantService from '@core/tenant/tenant.service.js';
 import redisBatchStateService from '@services/redis-batch-state.service.js';
 import type { ChubbBatchData, ChubbGrupos } from '@/types/chubb.types.js';
-import { CLIENT_RFCS, SAT_PRODUCT_KEYS, SAT_UNIT_KEYS, CFDI_USE, PAYMENT_FORM, PAYMENT_METHOD } from '@/constants/clients.js';
+import {
+  CLIENT_RFCS,
+  SAT_PRODUCT_KEYS,
+  SAT_UNIT_KEYS,
+  CFDI_USE,
+  PAYMENT_FORM,
+  PAYMENT_METHOD,
+} from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 const logger = createModuleLogger('ChubbHandler');
@@ -153,13 +160,27 @@ async function procesarArchivoChubb(
   progressMessageId: number | undefined
 ): Promise<{ success: boolean; pendingConfirmation?: boolean; error?: string }> {
   try {
-    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      1,
+      6,
+      'Leyendo archivo Excel',
+      'Cargando datos...'
+    );
 
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      2,
+      6,
+      'Detectando columnas',
+      'Analizando estructura...'
+    );
 
     const data = XLSX.utils.sheet_to_json(worksheet);
 
@@ -179,7 +200,14 @@ async function procesarArchivoChubb(
 
     logger.info({ columnMappings, sampleRows: data.slice(0, 2) }, 'Mapeado de columnas CHUBB');
 
-    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Validando datos', `Verificando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      3,
+      6,
+      'Validando datos',
+      `Verificando ${data.length} registros...`
+    );
 
     // Validar datos numéricos
     const erroresNumericos: string[] = [];
@@ -198,7 +226,14 @@ async function procesarArchivoChubb(
       return { success: false, error: 'Datos numéricos inválidos' };
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Agrupando servicios', `Clasificando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      4,
+      6,
+      'Agrupando servicios',
+      `Clasificando ${data.length} registros...`
+    );
 
     // Agrupar servicios según tipo
     const grupos: ChubbGrupos = {
@@ -213,12 +248,14 @@ async function procesarArchivoChubb(
       const monto = parseFloat(row[columnMappings.monto]) || 0;
 
       // Determinar si es servicio de grúa
-      const esGrua = servicio.includes('GRUA') || servicio.includes('ARRASTRE') || servicio.includes('REMOLQUE');
+      const esGrua =
+        servicio.includes('GRUA') || servicio.includes('ARRASTRE') || servicio.includes('REMOLQUE');
 
       // Determinar si tiene retención (4%)
       const tieneRetencion = columnMappings.retencion
-        ? String(row[columnMappings.retencion] || '').toLowerCase().includes('si') ||
-          String(row[columnMappings.retencion] || '') === '1'
+        ? String(row[columnMappings.retencion] || '')
+            .toLowerCase()
+            .includes('si') || String(row[columnMappings.retencion] || '') === '1'
         : false;
 
       const item = {
@@ -265,7 +302,14 @@ async function procesarArchivoChubb(
       throw new Error('No se encontró el cliente CHUBB');
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 5, 6, 'Calculando totales', 'Preparando facturas...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      5,
+      6,
+      'Calculando totales',
+      'Preparando facturas...'
+    );
 
     // Calcular totales por grupo
     const montosPorGrupo = {
@@ -305,7 +349,14 @@ async function procesarArchivoChubb(
       ctx.userState.chubbBatchId = batchId;
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros agrupados`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      6,
+      6,
+      'Procesamiento completado',
+      `${data.length} registros agrupados`
+    );
 
     // Construir resumen
     let resumenText = `📊 **Resumen de servicios CHUBB agrupados:**\n\n`;
@@ -339,7 +390,12 @@ async function procesarArchivoChubb(
     await ctx.reply(resumenText, {
       parse_mode: 'Markdown',
       reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback(`✅ Confirmar y Generar ${totalFacturas} Facturas`, `chubb_confirmar:${batchId}`)],
+        [
+          Markup.button.callback(
+            `✅ Confirmar y Generar ${totalFacturas} Facturas`,
+            `chubb_confirmar:${batchId}`
+          ),
+        ],
         [Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
       ]).reply_markup,
     });
@@ -347,7 +403,9 @@ async function procesarArchivoChubb(
     return { success: true, pendingConfirmation: true };
   } catch (error) {
     logger.error({ error }, 'Error al procesar archivo Excel CHUBB');
-    await ctx.reply(`❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
@@ -424,7 +482,9 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           tenantId,
           factura.id,
           factura.series,
-          typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+          typeof factura.folio_number === 'number'
+            ? factura.folio_number
+            : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -439,7 +499,10 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
         logger.info({ facturaId: factura.id, tipo: 'gruaConRetencion' }, 'Factura CHUBB generada');
       } catch (error) {
         logger.error({ error, tipo: 'gruaConRetencion' }, 'Error generando factura CHUBB');
-        errores.push({ tipo: 'Grúa con Retención', error: error instanceof Error ? error.message : 'Error desconocido' });
+        errores.push({
+          tipo: 'Grúa con Retención',
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
       }
     }
 
@@ -463,7 +526,9 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           tenantId,
           factura.id,
           factura.series,
-          typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+          typeof factura.folio_number === 'number'
+            ? factura.folio_number
+            : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -478,7 +543,10 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
         logger.info({ facturaId: factura.id, tipo: 'gruaSinRetencion' }, 'Factura CHUBB generada');
       } catch (error) {
         logger.error({ error, tipo: 'gruaSinRetencion' }, 'Error generando factura CHUBB');
-        errores.push({ tipo: 'Grúa sin Retención', error: error instanceof Error ? error.message : 'Error desconocido' });
+        errores.push({
+          tipo: 'Grúa sin Retención',
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
       }
     }
 
@@ -502,7 +570,9 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           tenantId,
           factura.id,
           factura.series,
-          typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+          typeof factura.folio_number === 'number'
+            ? factura.folio_number
+            : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -517,7 +587,10 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
         logger.info({ facturaId: factura.id, tipo: 'otrosServicios' }, 'Factura CHUBB generada');
       } catch (error) {
         logger.error({ error, tipo: 'otrosServicios' }, 'Error generando factura CHUBB');
-        errores.push({ tipo: 'Otros Servicios', error: error instanceof Error ? error.message : 'Error desconocido' });
+        errores.push({
+          tipo: 'Otros Servicios',
+          error: error instanceof Error ? error.message : 'Error desconocido',
+        });
       }
     }
 
@@ -569,7 +642,9 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
     }
   } catch (error) {
     logger.error({ error }, 'Error enviando facturas CHUBB');
-    await ctx.reply(`❌ Error al generar las facturas: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al generar las facturas: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
   }
 }
 
@@ -602,7 +677,9 @@ export function registerChubbHandler(bot: any): void {
       if (!chubbClient) {
         await ctx.reply('⚠️ Cliente CHUBB no encontrado. Configurando...');
 
-        const { default: CustomerSetupService } = await import('@services/customer-setup.service.js');
+        const { default: CustomerSetupService } = await import(
+          '@services/customer-setup.service.js'
+        );
         await CustomerSetupService.setupPredefinedCustomers(tenantId, false);
 
         const chubbClientRetry = await prisma.tenantCustomer.findFirst({
@@ -616,7 +693,9 @@ export function registerChubbHandler(bot: any): void {
         if (!chubbClientRetry) {
           await ctx.reply(
             '❌ No se pudo configurar el cliente CHUBB.',
-            Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', BOT_ACTIONS.MENU_PRINCIPAL)]])
+            Markup.inlineKeyboard([
+              [Markup.button.callback('🔙 Volver', BOT_ACTIONS.MENU_PRINCIPAL)],
+            ])
           );
           return;
         }
@@ -638,7 +717,9 @@ export function registerChubbHandler(bot: any): void {
           '⏱️ Esperando archivo...',
         {
           parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)]]),
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ]),
         }
       );
     } catch (error) {
@@ -688,7 +769,9 @@ export function registerChubbHandler(bot: any): void {
         await ctx.reply(
           `❌ El archivo es demasiado grande (${Math.round(document.file_size / (1024 * 1024))} MB).\n` +
             `El tamaño máximo permitido es ${MAX_FILE_SIZE_MB} MB.`,
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
@@ -700,13 +783,17 @@ export function registerChubbHandler(bot: any): void {
       if (!isExcel) {
         await ctx.reply(
           '❌ El archivo debe ser un Excel (.xlsx o .xls)',
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
 
       // Mensaje de progreso inicial
-      const receivingMessage = await ctx.reply('📥 Recibiendo archivo Excel de CHUBB...\n⏳ Validando archivo...');
+      const receivingMessage = await ctx.reply(
+        '📥 Recibiendo archivo Excel de CHUBB...\n⏳ Validando archivo...'
+      );
       const receivingMessageId = receivingMessage.message_id;
 
       await ctx.telegram.editMessageText(
@@ -749,7 +836,9 @@ export function registerChubbHandler(bot: any): void {
       }
     } catch (error) {
       logger.error({ error }, 'Error al procesar el archivo Excel CHUBB');
-      await ctx.reply(`❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      await ctx.reply(
+        `❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
 
       if (ctx.userState) {
         ctx.userState.esperando = null;

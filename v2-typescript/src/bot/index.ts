@@ -10,7 +10,7 @@ import { sessionMiddleware } from '../core/auth/session.service.js';
 import { tenantContextMiddleware } from '../core/tenant/tenant.middleware.js';
 import errorHandler from './middlewares/error.middleware.js';
 import tenantMiddlewareBot from './middlewares/tenant.middleware.js';
-import authMiddlewareBot from './middlewares/auth.middleware.js';
+import multiUserAuthMiddleware from './middlewares/multi-auth.middleware.js';
 
 // Importar comandos
 import { registerStartCommand } from './commands/start.command.js';
@@ -34,6 +34,7 @@ import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerTestHandlers } from './handlers/test.handler.js';
 import { registerExcelReportHandlers } from './handlers/excel-report.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
+import { registerPaymentComplementHandler } from './handlers/payment-complement.handler.js';
 
 export async function createBot(botLogger: Logger): Promise<Bot> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -59,8 +60,8 @@ export async function createBot(botLogger: Logger): Promise<Bot> {
   // 4. Middleware de Tenant específico del bot (validaciones adicionales)
   bot.use(tenantMiddlewareBot);
 
-  // 5. Middleware de Autenticación del bot
-  bot.use(authMiddlewareBot);
+  // 5. Middleware de Autenticación Multi-Usuario (reemplaza auth.middleware.js)
+  bot.use(multiUserAuthMiddleware);
 
   // 6. Registro de Comandos (en orden de prioridad)
   botLogger.info('Registrando comandos básicos...');
@@ -82,6 +83,7 @@ export async function createBot(botLogger: Logger): Promise<Bot> {
   registerClientHandler(bot);
   registerInvoiceHandler(bot);
   registerPDFInvoiceHandler(bot);
+  registerPaymentComplementHandler(bot);
   registerClubAsistenciaHandler(bot);
   registerQualitasHandler(bot);
   registerEscotelHandler(bot);

@@ -182,7 +182,9 @@ export function registerSubscriptionCommand(bot: Bot): void {
       // const paymentLink = await TenantService.generatePaymentLink(tenantId);
 
       // Temporalmente lanzar error hasta que se implemente la funcionalidad
-      throw new Error('Funcionalidad de pago en desarrollo. Contacta a soporte para reactivar tu suscripción.');
+      throw new Error(
+        'Funcionalidad de pago en desarrollo. Contacta a soporte para reactivar tu suscripción.'
+      );
     } catch (error) {
       logger.error({ error }, 'Error al generar enlace de pago');
       await ctx.reply(

@@ -601,10 +601,7 @@ class TenantService {
       createdById?: bigint | string | number | null;
     }>
   ) {
-    tenantLogger.info(
-      { tenantId, count: invoices.length },
-      'Registrando lote de facturas'
-    );
+    tenantLogger.info({ tenantId, count: invoices.length }, 'Registrando lote de facturas');
 
     return withTransaction(
       async (tx) => {

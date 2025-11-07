@@ -21,7 +21,13 @@ import redisBatchStateService from '@services/redis-batch-state.service.js'; // 
 import type { QualitasBatchData } from '@/types/qualitas.types.js';
 
 // Constantes
-import { SAT_PRODUCT_KEYS, SAT_UNIT_KEYS, CFDI_USE, PAYMENT_FORM, PAYMENT_METHOD } from '@/constants/clients.js';
+import {
+  SAT_PRODUCT_KEYS,
+  SAT_UNIT_KEYS,
+  CFDI_USE,
+  PAYMENT_FORM,
+  PAYMENT_METHOD,
+} from '@/constants/clients.js';
 import { BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 const logger = createModuleLogger('bot-qualitas-handler');
@@ -170,13 +176,27 @@ async function procesarArchivoQualitas(
   progressMessageId: number | null
 ): Promise<{ success: boolean; pendingConfirmation?: boolean; error?: string }> {
   try {
-    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      1,
+      6,
+      'Leyendo archivo Excel',
+      'Cargando datos...'
+    );
 
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      2,
+      6,
+      'Detectando columnas',
+      'Analizando estructura...'
+    );
 
     const data = XLSX.utils.sheet_to_json(worksheet);
 
@@ -194,7 +214,14 @@ async function procesarArchivoQualitas(
 
     logger.info({ columnMappings, sampleRows: data.slice(0, 2) }, 'Mapeado de columnas Qualitas');
 
-    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Validando datos', `Verificando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      3,
+      6,
+      'Validando datos',
+      `Verificando ${data.length} registros...`
+    );
 
     const erroresNumericos: string[] = [];
     data.forEach((row: any, index: number) => {
@@ -212,7 +239,14 @@ async function procesarArchivoQualitas(
       return { success: false, error: 'Datos numéricos inválidos' };
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Calculando totales', `Procesando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      4,
+      6,
+      'Calculando totales',
+      `Procesando ${data.length} registros...`
+    );
 
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
@@ -252,7 +286,9 @@ async function procesarArchivoQualitas(
       const folio = columnMappings.folio ? row[columnMappings.folio] || '' : '';
       const servicio = columnMappings.servicio ? row[columnMappings.servicio] || '' : '';
       const importe = parseFloat(row[columnMappings.importe]) || 0;
-      const descripcion = columnMappings.descripcion ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA QUALITAS' : 'SERVICIO DE GRUA QUALITAS';
+      const descripcion = columnMappings.descripcion
+        ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA QUALITAS'
+        : 'SERVICIO DE GRUA QUALITAS';
 
       subtotal += importe;
 
@@ -330,7 +366,14 @@ async function procesarArchivoQualitas(
       ctx.userState.qualitasBatchId = batchId;
     }
 
-    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros listos`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      6,
+      6,
+      'Procesamiento completado',
+      `${data.length} registros listos`
+    );
 
     const infoResumen =
       `📊 Resumen de datos procesados:\n\n` +
@@ -347,7 +390,9 @@ async function procesarArchivoQualitas(
     return { success: true, pendingConfirmation: true };
   } catch (error) {
     logger.error({ error }, 'Error al procesar archivo Excel Qualitas');
-    await ctx.reply(`❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
@@ -381,7 +426,10 @@ async function enviarFacturaDirectaQualitas(
     }
 
     const factura = await facturapi.invoices.create(facturaData);
-    logger.info({ facturaId: factura.id, folio: factura.folio_number }, 'Factura creada exitosamente');
+    logger.info(
+      { facturaId: factura.id, folio: factura.folio_number },
+      'Factura creada exitosamente'
+    );
 
     const cliente = await prisma.tenantCustomer.findFirst({
       where: {
@@ -399,7 +447,9 @@ async function enviarFacturaDirectaQualitas(
       tenantId,
       factura.id,
       factura.series,
-      typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+      typeof factura.folio_number === 'number'
+        ? factura.folio_number
+        : parseInt(factura.folio_number, 10),
       cliente.id,
       factura.total,
       userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -530,12 +580,13 @@ export function registerQualitasHandler(bot: any): void {
     }
 
     // ✅ FASE 1.5: Usar Redis en lugar de global cache
-    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data?.facturaConRetencion) {
-      await ctx.reply(
-        '❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.'
-      );
+      await ctx.reply('❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.');
       return;
     }
 
@@ -583,12 +634,13 @@ export function registerQualitasHandler(bot: any): void {
     }
 
     // ✅ FASE 1.5: Usar Redis en lugar de global cache
-    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data?.facturaSinRetencion) {
-      await ctx.reply(
-        '❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.'
-      );
+      await ctx.reply('❌ Los datos han expirado. Por favor, suba nuevamente el archivo Excel.');
       return;
     }
 
@@ -640,7 +692,10 @@ export function registerQualitasHandler(bot: any): void {
     );
 
     // ✅ FASE 1.5: Recuperar datos desde Redis
-    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(ctx.from.id, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<QualitasBatchData>(
+      ctx.from.id,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data) {
       await ctx.telegram.editMessageText(
@@ -716,8 +771,18 @@ export function registerQualitasHandler(bot: any): void {
           {
             parse_mode: 'Markdown',
             reply_markup: Markup.inlineKeyboard([
-              [Markup.button.callback('📄 Descargar PDF', `pdf_${factura.id}_${factura.folio_number}`)],
-              [Markup.button.callback('🔠 Descargar XML', `xml_${factura.id}_${factura.folio_number}`)],
+              [
+                Markup.button.callback(
+                  '📄 Descargar PDF',
+                  `pdf_${factura.id}_${factura.folio_number}`
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  '🔠 Descargar XML',
+                  `xml_${factura.id}_${factura.folio_number}`
+                ),
+              ],
             ]).reply_markup,
           }
         );

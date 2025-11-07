@@ -29,7 +29,14 @@ import redisBatchStateService from '@services/redis-batch-state.service.js';
 import type { AxaBatchData, AxaTipoServicio } from '@/types/axa.types.js';
 
 // Constantes
-import { CLIENT_RFCS, SAT_PRODUCT_KEYS, SAT_UNIT_KEYS, CFDI_USE, PAYMENT_FORM, PAYMENT_METHOD } from '@/constants/clients.js';
+import {
+  CLIENT_RFCS,
+  SAT_PRODUCT_KEYS,
+  SAT_UNIT_KEYS,
+  CFDI_USE,
+  PAYMENT_FORM,
+  PAYMENT_METHOD,
+} from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 // Logger
@@ -156,15 +163,23 @@ function mapColumnNamesAxa(firstRow: Record<string, any>): AxaColumnMapping | nu
   });
 
   // Verificar que encontramos todas las columnas necesarias
-  const requiredKeys: (keyof AxaColumnMapping)[] = ['factura', 'orden', 'folio', 'autorizacion', 'importe'];
+  const requiredKeys: (keyof AxaColumnMapping)[] = [
+    'factura',
+    'orden',
+    'folio',
+    'autorizacion',
+    'importe',
+  ];
   const allRequiredFound = requiredKeys.every((key) => columnMapping[key]);
 
-  if (allRequiredFound &&
-      columnMapping.factura &&
-      columnMapping.orden &&
-      columnMapping.folio &&
-      columnMapping.autorizacion &&
-      columnMapping.importe) {
+  if (
+    allRequiredFound &&
+    columnMapping.factura &&
+    columnMapping.orden &&
+    columnMapping.folio &&
+    columnMapping.autorizacion &&
+    columnMapping.importe
+  ) {
     return {
       factura: columnMapping.factura,
       orden: columnMapping.orden,
@@ -192,14 +207,28 @@ async function procesarArchivoAxa(
 ): Promise<{ success: boolean; pendingConfirmation?: boolean; error?: string }> {
   try {
     // PASO 1: Leer archivo Excel
-    await updateProgressMessage(ctx, progressMessageId, 1, 6, 'Leyendo archivo Excel', 'Cargando datos...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      1,
+      6,
+      'Leyendo archivo Excel',
+      'Cargando datos...'
+    );
 
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
     // PASO 2: Detectar columnas
-    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Detectando columnas', 'Analizando estructura...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      2,
+      6,
+      'Detectando columnas',
+      'Analizando estructura...'
+    );
 
     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
     const columnNames: (string | undefined)[] = [];
@@ -211,24 +240,47 @@ async function procesarArchivoAxa(
     logger.info({ columnNames }, 'Columnas detectadas en el Excel AXA');
 
     // PASO 3: Convertir a JSON
-    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Procesando datos', 'Convirtiendo a formato interno...');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      3,
+      6,
+      'Procesando datos',
+      'Convirtiendo a formato interno...'
+    );
 
     const data = XLSX.utils.sheet_to_json(worksheet);
 
     if (data.length === 0) {
       await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Error: Archivo vacío', '');
-      await ctx.reply('❌ El archivo Excel no contiene datos. Por favor, revisa el archivo e intenta de nuevo.');
+      await ctx.reply(
+        '❌ El archivo Excel no contiene datos. Por favor, revisa el archivo e intenta de nuevo.'
+      );
       return { success: false, error: 'Excel sin datos' };
     }
 
     // PASO 4: Validar estructura
-    await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Validando estructura', `Verificando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      4,
+      6,
+      'Validando estructura',
+      `Verificando ${data.length} registros...`
+    );
 
     // Mapear nombres de columnas que pueden variar
     const columnMappings = mapColumnNamesAxa(data[0] as Record<string, any>);
 
     if (!columnMappings) {
-      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Estructura inválida', 'Columnas requeridas faltantes');
+      await updateProgressMessage(
+        ctx,
+        progressMessageId,
+        4,
+        6,
+        'Error: Estructura inválida',
+        'Columnas requeridas faltantes'
+      );
       await ctx.reply(
         '❌ El archivo Excel no tiene todas las columnas requeridas. Se necesitan columnas para: FACTURA, No. ORDEN, No. FOLIO, AUTORIZACION e IMPORTE.'
       );
@@ -248,7 +300,14 @@ async function procesarArchivoAxa(
 
     if (erroresNumericos.length > 0) {
       const erroresMostrados = erroresNumericos.slice(0, 5);
-      await updateProgressMessage(ctx, progressMessageId, 4, 6, 'Error: Datos numéricos inválidos', `${erroresNumericos.length} errores encontrados`);
+      await updateProgressMessage(
+        ctx,
+        progressMessageId,
+        4,
+        6,
+        'Error: Datos numéricos inválidos',
+        `${erroresNumericos.length} errores encontrados`
+      );
       await ctx.reply(
         `❌ Se encontraron errores en los datos numéricos:\n${erroresMostrados.join('\n')}\n${erroresNumericos.length > 5 ? `...y ${erroresNumericos.length - 5} más.` : ''}`
       );
@@ -256,7 +315,14 @@ async function procesarArchivoAxa(
     }
 
     // PASO 5: Calcular totales
-    await updateProgressMessage(ctx, progressMessageId, 5, 6, 'Calculando totales', `Procesando ${data.length} registros...`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      5,
+      6,
+      'Calculando totales',
+      `Procesando ${data.length} registros...`
+    );
 
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
@@ -413,7 +479,14 @@ async function procesarArchivoAxa(
     }
 
     // PASO 6: Completado
-    await updateProgressMessage(ctx, progressMessageId, 6, 6, 'Procesamiento completado', `${data.length} registros listos para facturar`);
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      6,
+      6,
+      'Procesamiento completado',
+      `${data.length} registros listos para facturar`
+    );
 
     // Construir resumen de datos
     const infoResumen =
@@ -423,8 +496,18 @@ async function procesarArchivoAxa(
     // Preguntar sobre el tipo de servicios
     await ctx.reply(`${infoResumen}\n¿Qué tipo de servicios son?`, {
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('🚛 Servicios Realizados (con retención 4%)', `axa_servicios_realizados:${batchId}`)],
-        [Markup.button.callback('💀 Servicios Muertos (sin retención)', `axa_servicios_muertos:${batchId}`)],
+        [
+          Markup.button.callback(
+            '🚛 Servicios Realizados (con retención 4%)',
+            `axa_servicios_realizados:${batchId}`
+          ),
+        ],
+        [
+          Markup.button.callback(
+            '💀 Servicios Muertos (sin retención)',
+            `axa_servicios_muertos:${batchId}`
+          ),
+        ],
         [Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
       ]),
     });
@@ -432,7 +515,9 @@ async function procesarArchivoAxa(
     return { success: true, pendingConfirmation: true };
   } catch (error) {
     logger.error({ error }, 'Error al procesar archivo Excel AXA');
-    await ctx.reply(`❌ Error al procesar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al procesar el archivo Excel: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
     return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' };
   }
 }
@@ -472,7 +557,10 @@ async function enviarFacturaDirectaAxa(
     logger.info('Enviando solicitud directa a FacturAPI...');
     const factura = await facturapi.invoices.create(facturaData);
 
-    logger.info({ facturaId: factura.id, folio: factura.folio_number }, 'Factura creada exitosamente');
+    logger.info(
+      { facturaId: factura.id, folio: factura.folio_number },
+      'Factura creada exitosamente'
+    );
 
     // Registrar factura en BD
     logger.info('Registrando factura en BD...');
@@ -482,7 +570,9 @@ async function enviarFacturaDirectaAxa(
       tenantId,
       factura.id,
       factura.series,
-      typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+      typeof factura.folio_number === 'number'
+        ? factura.folio_number
+        : parseInt(factura.folio_number, 10),
       clienteId,
       factura.total,
       userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -536,9 +626,13 @@ export function registerAxaHandler(bot: any): void {
 
       // Si no existe, configurar cliente
       if (!axaClient) {
-        await ctx.reply('⚠️ No se encontró el cliente AXA. Intentando configurar clientes predefinidos...');
+        await ctx.reply(
+          '⚠️ No se encontró el cliente AXA. Intentando configurar clientes predefinidos...'
+        );
 
-        const { default: CustomerSetupService } = await import('@services/customer-setup.service.js');
+        const { default: CustomerSetupService } = await import(
+          '@services/customer-setup.service.js'
+        );
         await CustomerSetupService.setupPredefinedCustomers(tenantId, false);
 
         // Buscar nuevamente el cliente AXA
@@ -553,14 +647,22 @@ export function registerAxaHandler(bot: any): void {
         if (!axaClient) {
           await ctx.reply(
             '❌ Error: No se pudo encontrar o configurar el cliente AXA. Por favor, contacta al administrador.',
-            Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+            Markup.inlineKeyboard([
+              [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+            ])
           );
           return;
         }
 
-        logger.info({ clientName: axaClient.legalName, clientId: axaClient.facturapiCustomerId }, 'Cliente AXA configurado y encontrado');
+        logger.info(
+          { clientName: axaClient.legalName, clientId: axaClient.facturapiCustomerId },
+          'Cliente AXA configurado y encontrado'
+        );
       } else {
-        logger.info({ clientName: axaClient.legalName, clientId: axaClient.facturapiCustomerId }, 'Cliente AXA cargado exitosamente');
+        logger.info(
+          { clientName: axaClient.legalName, clientId: axaClient.facturapiCustomerId },
+          'Cliente AXA cargado exitosamente'
+        );
       }
 
       // Marcar que estamos esperando el archivo Excel de AXA
@@ -570,10 +672,14 @@ export function registerAxaHandler(bot: any): void {
         (ctx as any).userState.clienteNombre = axaClient.legalName;
       }
 
-      await ctx.reply('Por favor, sube el archivo Excel con los datos de AXA para generar las facturas.');
+      await ctx.reply(
+        'Por favor, sube el archivo Excel con los datos de AXA para generar las facturas.'
+      );
     } catch (error) {
       logger.error({ error }, 'Error al buscar cliente AXA');
-      await ctx.reply(`❌ Error al buscar cliente AXA: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      await ctx.reply(
+        `❌ Error al buscar cliente AXA: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
     }
   });
 
@@ -608,11 +714,16 @@ export function registerAxaHandler(bot: any): void {
       const tempData = batchResult.data;
 
       if (!tempData.facturaConRetencion || !tempData.facturaConRetencion.facturaData) {
-        await ctx.reply('❌ No hay datos de factura CON retención precalculados. Por favor, suba nuevamente el archivo Excel.');
+        await ctx.reply(
+          '❌ No hay datos de factura CON retención precalculados. Por favor, suba nuevamente el archivo Excel.'
+        );
         return;
       }
 
-      logger.info({ totalConRetencion: tempData.facturaConRetencion.total }, 'Usando datos precalculados CON retención');
+      logger.info(
+        { totalConRetencion: tempData.facturaConRetencion.total },
+        'Usando datos precalculados CON retención'
+      );
 
       // Actualizar selección en Redis
       tempData.seleccionUsuario = {
@@ -684,11 +795,16 @@ export function registerAxaHandler(bot: any): void {
       const tempData = batchResult.data;
 
       if (!tempData.facturaSinRetencion || !tempData.facturaSinRetencion.facturaData) {
-        await ctx.reply('❌ No hay datos de factura SIN retención precalculados. Por favor, suba nuevamente el archivo Excel.');
+        await ctx.reply(
+          '❌ No hay datos de factura SIN retención precalculados. Por favor, suba nuevamente el archivo Excel.'
+        );
         return;
       }
 
-      logger.info({ totalSinRetencion: tempData.facturaSinRetencion.total }, 'Usando datos precalculados SIN retención');
+      logger.info(
+        { totalSinRetencion: tempData.facturaSinRetencion.total },
+        'Usando datos precalculados SIN retención'
+      );
 
       // Actualizar selección en Redis
       tempData.seleccionUsuario = {
@@ -750,7 +866,9 @@ export function registerAxaHandler(bot: any): void {
       }
 
       // Feedback inmediato
-      const facturaProgressMsg = await ctx.reply('⚡ Procesando factura AXA...\n⏳ Validando datos precalculados...');
+      const facturaProgressMsg = await ctx.reply(
+        '⚡ Procesando factura AXA...\n⏳ Validando datos precalculados...'
+      );
 
       // Obtener datos desde Redis
       const batchResult = await redisBatchStateService.getBatchData<AxaBatchData>(userId, batchId);
@@ -789,7 +907,10 @@ export function registerAxaHandler(bot: any): void {
       }
 
       if (tipoServicio === undefined || conRetencion === undefined) {
-        logger.warn({ tipoServicio, conRetencion }, 'No se encontró selección en userState ni Redis');
+        logger.warn(
+          { tipoServicio, conRetencion },
+          'No se encontró selección en userState ni Redis'
+        );
         await ctx.telegram.editMessageText(
           ctx.chat?.id,
           facturaProgressMsg.message_id,
@@ -804,7 +925,9 @@ export function registerAxaHandler(bot: any): void {
       await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
 
       // Seleccionar datos precalculados según tipo
-      const facturaData = conRetencion ? tempData.facturaConRetencion : tempData.facturaSinRetencion;
+      const facturaData = conRetencion
+        ? tempData.facturaConRetencion
+        : tempData.facturaSinRetencion;
 
       logger.info(
         {
@@ -846,8 +969,18 @@ export function registerAxaHandler(bot: any): void {
           {
             parse_mode: 'Markdown',
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('📄 Descargar PDF', `pdf_${factura.id}_${factura.folio_number}`)],
-              [Markup.button.callback('🔠 Descargar XML', `xml_${factura.id}_${factura.folio_number}`)],
+              [
+                Markup.button.callback(
+                  '📄 Descargar PDF',
+                  `pdf_${factura.id}_${factura.folio_number}`
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  '🔠 Descargar XML',
+                  `xml_${factura.id}_${factura.folio_number}`
+                ),
+              ],
             ]),
           }
         );
@@ -870,7 +1003,9 @@ export function registerAxaHandler(bot: any): void {
       logger.info({ duration }, 'Confirmación completada exitosamente');
     } catch (error) {
       logger.error({ error }, 'Error al confirmar factura');
-      await ctx.reply(`❌ Error al generar factura: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      await ctx.reply(
+        `❌ Error al generar factura: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
 
       if ((ctx as any).userState) {
         (ctx as any).userState.esperando = null;
@@ -897,7 +1032,9 @@ export function registerAxaHandler(bot: any): void {
         await ctx.reply(
           `❌ El archivo es demasiado grande (${Math.round(document.file_size / (1024 * 1024))} MB).\n` +
             `El tamaño máximo permitido es ${MAX_FILE_SIZE_MB} MB.`,
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
@@ -909,13 +1046,17 @@ export function registerAxaHandler(bot: any): void {
       if (!isExcel) {
         await ctx.reply(
           '❌ El archivo debe ser un Excel (.xlsx o .xls)',
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
 
       // Mensaje de progreso inicial
-      const receivingMessage = await ctx.reply('📥 Recibiendo archivo Excel de AXA...\n⏳ Validando archivo...');
+      const receivingMessage = await ctx.reply(
+        '📥 Recibiendo archivo Excel de AXA...\n⏳ Validando archivo...'
+      );
       const receivingMessageId = receivingMessage.message_id;
 
       // Actualizar que el archivo es válido
@@ -960,7 +1101,9 @@ export function registerAxaHandler(bot: any): void {
       }
     } catch (error) {
       logger.error({ error }, 'Error al procesar el archivo Excel AXA');
-      await ctx.reply(`❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      await ctx.reply(
+        `❌ Error al procesar el archivo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      );
 
       if ((ctx as any).userState) {
         (ctx as any).userState.esperando = null;

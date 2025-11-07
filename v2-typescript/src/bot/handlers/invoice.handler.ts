@@ -20,6 +20,9 @@ import SafeOperationsService from '@services/safe-operations.service.js';
 import CustomerSetupService from '@services/customer-setup.service.js';
 import FacturapiService from '@services/facturapi.service.js';
 
+// View imports
+import { clientSelectionMenu } from '../views/menu.view.js';
+
 const logger = createModuleLogger('bot-invoice-handler');
 
 // SAT cancellation reasons for reference
@@ -77,7 +80,6 @@ export async function descargarFactura(
   }
 
   try {
-
     // Get FacturAPI client for this tenant
     const facturapi = await FacturapiService.getFacturapiClient(tenantId);
 
@@ -196,30 +198,72 @@ export function registerInvoiceHandler(bot: any): void {
     await ctx.answerCbQuery('✓ Seleccionado');
 
     try {
-      // Show loading state while checking customers
-      await ctx.editMessageText('📝 *Cargando clientes para facturación...*', {
+      await ctx.editMessageText('📝 *Cargando opciones de facturación...*', {
         parse_mode: 'Markdown',
       });
 
-      // Check if tenant has configured customers
-      const hasCustomers = await CustomerSetupService.hasConfiguredCustomers(ctx.getTenantId());
-
-      if (!hasCustomers) {
-        // If no configured customers, try to set them up automatically
-        await ctx.editMessageText(
-          '🏠 Menú Principal → 📝 **Generar Factura**\n\n⚠️ No tienes clientes configurados en tu cuenta. Vamos a intentar configurarlos automáticamente.',
-          {
-            parse_mode: 'Markdown',
-            reply_markup: Markup.inlineKeyboard([
-              [Markup.button.callback('Configurar Clientes', 'configure_clients')],
-              [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
-            ]).reply_markup,
-          }
-        );
+      const tenantId = ctx.getTenantId();
+      if (!tenantId) {
+        await ctx.reply('❌ Error: No se pudo obtener la información de tu empresa.');
         return;
       }
 
-      // Get available customers for this tenant
+      // 1. Obtener clientes "normales" (que NO son de flujo Excel)
+      const specialRfcs = [
+        'EEC081222FH8', // ESCOTEL
+        'AAM850528H51', // AXA
+        'CSE990527I53', // CHUBB
+        'QCS931209G49', // QUALITAS
+        'CAS981016P46', // CLUB DE ASISTENCIA
+      ];
+
+      const manualClients = await prisma.tenantCustomer.findMany({
+        where: {
+          tenantId: tenantId,
+          isActive: true,
+          rfc: {
+            notIn: specialRfcs,
+          },
+        },
+        select: {
+          legalName: true,
+          facturapiCustomerId: true,
+        },
+      });
+
+      const clientsForMenu = manualClients.map((customer) => ({
+        id: customer.facturapiCustomerId,
+        name: customer.legalName,
+      }));
+
+      // 2. Generar el menú usando la función CORRECTA de la vista
+      const keyboard = clientSelectionMenu(clientsForMenu, true, true);
+
+      // 3. Mostrar el menú corregido
+      await ctx.editMessageText(
+        '🏠 Menú Principal → 📝 **Generar Factura**\n\nSeleccione el cliente o el tipo de facturación:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard.reply_markup,
+        }
+      );
+    } catch (error) {
+      logger.error('Error al generar el menú de facturación:', error);
+      await ctx.reply('❌ Ocurrió un error al cargar las opciones de facturación.');
+      return;
+    }
+  });
+
+  // Handler for manual invoice (with order number)
+  bot.action('menu_factura_manual', async (ctx: BotContext): Promise<void> => {
+    await ctx.answerCbQuery('✓ Seleccionado');
+
+    try {
+      await ctx.editMessageText('📝 *Cargando clientes...*', {
+        parse_mode: 'Markdown',
+      });
+
+      // Get available customers
       const availableCustomers = await prisma.tenantCustomer.findMany({
         where: {
           tenantId: ctx.getTenantId(),
@@ -232,89 +276,68 @@ export function registerInvoiceHandler(bot: any): void {
         },
       });
 
-      // If no customers available
-      if (availableCustomers.length === 0) {
-        await ctx.editMessageText(
-          '🏠 Menú Principal → 📝 **Generar Factura**\n\n⚠️ No hay clientes disponibles para facturar. Por favor, contacta a soporte.',
-          {
-            parse_mode: 'Markdown',
-            reply_markup: Markup.inlineKeyboard([
-              [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
-            ]).reply_markup,
-          }
-        );
-        return;
-      }
-
       // Function to shorten long names
       const shortenName = (name: string): string => {
         const maxClienteLength = 30;
-
         if (!name || name.length <= maxClienteLength) return name;
-
         const words = name.split(' ');
         let shortened = words[0];
         let i = 1;
-
         while (i < words.length && shortened.length + words[i].length + 1 <= maxClienteLength - 3) {
           shortened += ' ' + words[i];
           i++;
         }
-
         return shortened + '...';
       };
 
-      // Map short names to full names
-      const shortToFullNameMap: Record<string, string> = {};
-
-      // Build buttons for available customers
-      availableCustomers.forEach((customer) => {
-        const shortName = shortenName(customer.legalName);
-        shortToFullNameMap[shortName] = customer.legalName;
-
-        // Save FacturAPI ID in global state for later use
-        if (!ctx.clientIds) ctx.clientIds = {};
-        ctx.clientIds[customer.legalName] = customer.facturapiCustomerId;
-      });
-
-      // Save name map in context state
-      ctx.clientNameMap = shortToFullNameMap;
-
-      // Mostrar TODOS los clientes disponibles (sin filtrar)
       const clientsForMenu = availableCustomers.map((customer) => ({
         id: customer.facturapiCustomerId,
         name: shortenName(customer.legalName),
       }));
 
-      // Build inline keyboard
       const keyboard = Markup.inlineKeyboard([
         ...clientsForMenu.map((client) => [
           Markup.button.callback(client.name, `cliente_${client.id}`),
         ]),
-        [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
+        [Markup.button.callback('🔙 Volver', 'menu_generar')],
       ]);
 
       await ctx.editMessageText(
-        '🏠 Menú Principal → 📝 **Generar Factura**\n\nSeleccione el cliente para generar la factura:',
+        '🏠 Menú Principal → 📝 **Factura Manual**\n\nSeleccione el cliente:',
         {
           parse_mode: 'Markdown',
           reply_markup: keyboard.reply_markup,
         }
       );
     } catch (error) {
-      logger.error('Error al verificar clientes:', error);
-
-      await ctx.editMessageText(
-        '🏠 Menú Principal → 📝 **Generar Factura**\n\n❌ Ocurrió un error al obtener los clientes disponibles. Por favor, intente nuevamente más tarde.',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: Markup.inlineKeyboard([
-            [Markup.button.callback('🔄 Reintentar', 'menu_generar')],
-            [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
-          ]).reply_markup,
-        }
-      );
+      logger.error('Error cargando clientes para factura manual:', error);
+      await ctx.editMessageText('❌ Error al cargar clientes. Por favor, intente nuevamente.', {
+        reply_markup: Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver', 'menu_generar')]])
+          .reply_markup,
+      });
     }
+  });
+
+  // Handler for Excel-based invoice
+  bot.action('menu_factura_excel', async (ctx: BotContext): Promise<void> => {
+    await ctx.answerCbQuery('✓ Seleccionado');
+
+    const keyboard = Markup.inlineKeyboard([
+      [Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')],
+      [Markup.button.callback('AXA (Archivo Excel)', 'menu_axa')],
+      [Markup.button.callback('ESCOTEL (Archivo Excel)', 'menu_escotel')],
+      [Markup.button.callback('CLUB DE ASISTENCIA (Archivo Excel)', 'menu_club_asistencia')],
+      [Markup.button.callback('QUALITAS (Archivo Excel)', 'menu_qualitas')],
+      [Markup.button.callback('🔙 Volver', 'menu_generar')],
+    ]);
+
+    await ctx.editMessageText(
+      '🏠 Menú Principal → 📊 **Factura desde Excel**\n\nSeleccione el cliente:',
+      {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard.reply_markup,
+      }
+    );
   });
 
   // Handle invoice consultation

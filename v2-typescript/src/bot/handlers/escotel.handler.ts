@@ -41,7 +41,14 @@ import type {
 } from '../../types/escotel.types.js';
 
 // Constantes
-import { CLIENT_RFCS, SAT_PRODUCT_KEYS, SAT_UNIT_KEYS, CFDI_USE, PAYMENT_FORM, PAYMENT_METHOD } from '@/constants/clients.js';
+import {
+  CLIENT_RFCS,
+  SAT_PRODUCT_KEYS,
+  SAT_UNIT_KEYS,
+  CFDI_USE,
+  PAYMENT_FORM,
+  PAYMENT_METHOD,
+} from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 // Logger
@@ -130,13 +137,34 @@ function procesarHojaEscotel(worksheet: XLSX.WorkSheet, sheetName: string): Esco
       // Extraer datos del servicio (siguiente 8 filas)
       const servicio: EscotelServicio = {
         id: String(row[0]),
-        claveSat: data[index + 1] && Array.isArray(data[index + 1]) ? String(data[index + 1][0] || '') : null,
-        descripcion: data[index + 2] && Array.isArray(data[index + 2]) ? String(data[index + 2][0] || '') : null,
-        ubicacion: data[index + 3] && Array.isArray(data[index + 3]) ? String(data[index + 3][0] || '') : null,
-        subtotal: data[index + 4] && Array.isArray(data[index + 4]) ? parseFloat(String(data[index + 4][0] || '0')) : 0,
-        iva: data[index + 5] && Array.isArray(data[index + 5]) ? parseFloat(String(data[index + 5][0] || '0')) : 0,
-        retencion: data[index + 6] && Array.isArray(data[index + 6]) ? parseFloat(String(data[index + 6][0] || '0')) : 0,
-        total: data[index + 8] && Array.isArray(data[index + 8]) ? parseFloat(String(data[index + 8][0] || '0')) : 0,
+        claveSat:
+          data[index + 1] && Array.isArray(data[index + 1])
+            ? String(data[index + 1][0] || '')
+            : null,
+        descripcion:
+          data[index + 2] && Array.isArray(data[index + 2])
+            ? String(data[index + 2][0] || '')
+            : null,
+        ubicacion:
+          data[index + 3] && Array.isArray(data[index + 3])
+            ? String(data[index + 3][0] || '')
+            : null,
+        subtotal:
+          data[index + 4] && Array.isArray(data[index + 4])
+            ? parseFloat(String(data[index + 4][0] || '0'))
+            : 0,
+        iva:
+          data[index + 5] && Array.isArray(data[index + 5])
+            ? parseFloat(String(data[index + 5][0] || '0'))
+            : 0,
+        retencion:
+          data[index + 6] && Array.isArray(data[index + 6])
+            ? parseFloat(String(data[index + 6][0] || '0'))
+            : 0,
+        total:
+          data[index + 8] && Array.isArray(data[index + 8])
+            ? parseFloat(String(data[index + 8][0] || '0'))
+            : 0,
       };
 
       // Validar que tenga datos válidos
@@ -261,7 +289,9 @@ async function procesarArchivoEscotel(
       });
 
       if (!clienteFallback) {
-        throw new Error('No se pudo configurar el cliente ESCOTEL. Por favor, configúralo manualmente.');
+        throw new Error(
+          'No se pudo configurar el cliente ESCOTEL. Por favor, configúralo manualmente.'
+        );
       }
     }
 
@@ -332,7 +362,14 @@ async function procesarArchivoEscotel(
       };
     });
 
-    await updateProgressMessage(ctx, progressMessageId, 5, 6, 'Finalizando...', 'Preparando confirmación');
+    await updateProgressMessage(
+      ctx,
+      progressMessageId,
+      5,
+      6,
+      'Finalizando...',
+      'Preparando confirmación'
+    );
 
     // Generar ID único para este batch
     const batchId = redisBatchStateService.generateBatchId();
@@ -364,7 +401,10 @@ async function procesarArchivoEscotel(
       throw new Error(`Error guardando datos en Redis: ${saveResult.error}`);
     }
 
-    logger.info({ userId, batchId, totalHojas: hojasConDatos.length }, 'Batch ESCOTEL guardado en Redis');
+    logger.info(
+      { userId, batchId, totalHojas: hojasConDatos.length },
+      'Batch ESCOTEL guardado en Redis'
+    );
 
     // Guardar batchId en userState para acceso posterior
     if ((ctx as any).userState) {
@@ -381,7 +421,10 @@ async function procesarArchivoEscotel(
 /**
  * Genera un Excel de reporte con el mapeo pedido-factura
  */
-function generarReporteExcel(facturasGeneradas: EscotelFacturaGenerada[], clienteName: string): Buffer {
+function generarReporteExcel(
+  facturasGeneradas: EscotelFacturaGenerada[],
+  clienteName: string
+): Buffer {
   const wb = XLSX.utils.book_new();
 
   // Preparar los datos
@@ -401,7 +444,9 @@ function generarReporteExcel(facturasGeneradas: EscotelFacturaGenerada[], client
 
   facturasGeneradas.forEach((f, index) => {
     const estado = f.tieneDiscrepancia ? 'ALERTA' : 'OK';
-    const discrepanciaTexto = f.tieneDiscrepancia ? `$${f.discrepancia.toFixed(2)}` : 'Sin diferencia';
+    const discrepanciaTexto = f.tieneDiscrepancia
+      ? `$${f.discrepancia.toFixed(2)}`
+      : 'Sin diferencia';
 
     data.push([
       index + 1,
@@ -477,7 +522,10 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
     }
 
     // Obtener datos del batch desde Redis
-    const batchResult = await redisBatchStateService.getBatchData<EscotelBatchData>(userId, batchId);
+    const batchResult = await redisBatchStateService.getBatchData<EscotelBatchData>(
+      userId,
+      batchId
+    );
 
     if (!batchResult.success || !batchResult.data) {
       throw new Error('Los datos han expirado. Por favor, sube el archivo nuevamente.');
@@ -508,7 +556,9 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
           tenantId,
           factura.id,
           factura.series,
-          typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+          typeof factura.folio_number === 'number'
+            ? factura.folio_number
+            : parseInt(factura.folio_number, 10),
           escotelData.clienteId,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null
@@ -519,7 +569,10 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
           factura: {
             id: factura.id,
             series: factura.series,
-            folio_number: typeof factura.folio_number === 'number' ? factura.folio_number : parseInt(factura.folio_number, 10),
+            folio_number:
+              typeof factura.folio_number === 'number'
+                ? factura.folio_number
+                : parseInt(factura.folio_number, 10),
             total: factura.total,
           },
           servicios: facturaInfo.servicios.length,
@@ -531,10 +584,15 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
 
         // Actualizar progreso cada 5 facturas
         if ((i + 1) % 5 === 0 || i + 1 === escotelData.facturas.length) {
-          await ctx.reply(`⏳ Progreso: ${i + 1}/${escotelData.facturas.length} facturas generadas...`);
+          await ctx.reply(
+            `⏳ Progreso: ${i + 1}/${escotelData.facturas.length} facturas generadas...`
+          );
         }
       } catch (error) {
-        logger.error({ nombreHoja: facturaInfo.nombreHoja, error }, 'Error generando factura ESCOTEL');
+        logger.error(
+          { nombreHoja: facturaInfo.nombreHoja, error },
+          'Error generando factura ESCOTEL'
+        );
         errores.push({
           nombreHoja: facturaInfo.nombreHoja,
           error: error instanceof Error ? error.message : 'Error desconocido',
@@ -578,8 +636,14 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
       // Botones de descarga masiva en ZIP
       const botonesZip = [
         [
-          Markup.button.callback('📦 Descargar Todos los PDFs (ZIP)', BOT_ACTIONS.ESCOTEL_DOWNLOAD_PDFS_ZIP),
-          Markup.button.callback('🗂️ Descargar Todos los XMLs (ZIP)', BOT_ACTIONS.ESCOTEL_DOWNLOAD_XMLS_ZIP),
+          Markup.button.callback(
+            '📦 Descargar Todos los PDFs (ZIP)',
+            BOT_ACTIONS.ESCOTEL_DOWNLOAD_PDFS_ZIP
+          ),
+          Markup.button.callback(
+            '🗂️ Descargar Todos los XMLs (ZIP)',
+            BOT_ACTIONS.ESCOTEL_DOWNLOAD_XMLS_ZIP
+          ),
         ],
         [Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL)],
       ];
@@ -630,14 +694,17 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
         );
 
         // Limpiar archivo temporal después de 2 minutos (async cleanup)
-        setTimeout(async () => {
-          try {
-            await fs.unlink(reportePath);
-            logger.info({ file: path.basename(reportePath) }, 'Reporte Excel temporal eliminado');
-          } catch (error) {
-            logger.error({ file: reportePath, error }, 'Error eliminando reporte temporal');
-          }
-        }, 2 * 60 * 1000);
+        setTimeout(
+          async () => {
+            try {
+              await fs.unlink(reportePath);
+              logger.info({ file: path.basename(reportePath) }, 'Reporte Excel temporal eliminado');
+            } catch (error) {
+              logger.error({ file: reportePath, error }, 'Error eliminando reporte temporal');
+            }
+          },
+          2 * 60 * 1000
+        );
       } catch (error) {
         logger.error({ error }, 'Error generando reporte Excel');
         await ctx.reply(
@@ -666,11 +733,18 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
     logger.error({ error }, 'Error enviando facturas ESCOTEL');
 
     const errorMsg =
-      error instanceof Error && 'response' in error && typeof error.response === 'object' && error.response !== null && 'data' in error.response && typeof error.response.data === 'object' && error.response.data !== null && 'message' in error.response.data
+      error instanceof Error &&
+      'response' in error &&
+      typeof error.response === 'object' &&
+      error.response !== null &&
+      'data' in error.response &&
+      typeof error.response.data === 'object' &&
+      error.response.data !== null &&
+      'message' in error.response.data
         ? String(error.response.data.message)
         : error instanceof Error
-        ? error.message
-        : 'Error desconocido';
+          ? error.message
+          : 'Error desconocido';
 
     const shortError = errorMsg.length > 200 ? errorMsg.substring(0, 200) + '...' : errorMsg;
 
@@ -680,7 +754,9 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
         `Por favor, verifica los datos e inténtalo nuevamente.`,
       {
         parse_mode: 'Markdown',
-        ...Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]]),
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+        ]),
       }
     );
 
@@ -766,7 +842,10 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
         archive.append(fileData, { name: fileName });
         filesAdded++;
       } catch (error) {
-        logger.error({ nombreHoja: factura.nombreHoja, type, error }, 'Error descargando archivo para ZIP');
+        logger.error(
+          { nombreHoja: factura.nombreHoja, type, error },
+          'Error descargando archivo para ZIP'
+        );
         errores++;
       }
     }
@@ -825,17 +904,22 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
     }
 
     // Limpiar archivo ZIP después de 2 minutos (async)
-    setTimeout(async () => {
-      try {
-        await fs.unlink(zipPath);
-        logger.info({ file: path.basename(zipPath) }, 'ZIP temporal eliminado');
-      } catch (error) {
-        logger.error({ file: zipPath, error }, 'Error eliminando ZIP temporal');
-      }
-    }, 2 * 60 * 1000);
+    setTimeout(
+      async () => {
+        try {
+          await fs.unlink(zipPath);
+          logger.info({ file: path.basename(zipPath) }, 'ZIP temporal eliminado');
+        } catch (error) {
+          logger.error({ file: zipPath, error }, 'Error eliminando ZIP temporal');
+        }
+      },
+      2 * 60 * 1000
+    );
   } catch (error) {
     logger.error({ error }, 'Error generando ZIP ESCOTEL');
-    await ctx.reply(`❌ Error al generar el ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    await ctx.reply(
+      `❌ Error al generar el ZIP: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    );
   }
 }
 
@@ -869,7 +953,9 @@ export function registerEscotelHandler(bot: any): void {
       if (!clienteFallback) {
         await ctx.reply('⚠️ Cliente ESCOTEL no encontrado. Configurando automáticamente...');
 
-        const { default: CustomerSetupService } = await import('@services/customer-setup.service.js');
+        const { default: CustomerSetupService } = await import(
+          '@services/customer-setup.service.js'
+        );
         await CustomerSetupService.setupPredefinedCustomers(tenantId, false);
 
         clienteFallback = await prisma.tenantCustomer.findFirst({
@@ -885,7 +971,9 @@ export function registerEscotelHandler(bot: any): void {
         } else {
           await ctx.reply(
             '❌ No se pudo configurar el cliente ESCOTEL. Por favor, usa el comando /configure_clients para configurar los clientes predefinidos.',
-            Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+            Markup.inlineKeyboard([
+              [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+            ])
           );
           return;
         }
@@ -908,7 +996,9 @@ export function registerEscotelHandler(bot: any): void {
           `⏱️ Esperando archivo...`,
         {
           parse_mode: 'Markdown',
-          ...Markup.inlineKeyboard([[Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)]]),
+          ...Markup.inlineKeyboard([
+            [Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ]),
         }
       );
     } catch (error) {
@@ -928,7 +1018,9 @@ export function registerEscotelHandler(bot: any): void {
       if (!batchId) {
         await ctx.reply(
           '❌ Error: No se pudo obtener el ID del lote.',
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
@@ -938,7 +1030,9 @@ export function registerEscotelHandler(bot: any): void {
       logger.error({ error }, 'Error confirmando facturas ESCOTEL');
       await ctx.reply(
         '❌ Ocurrió un error al generar las facturas. Por favor, intenta nuevamente.',
-        Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+        ])
       );
     }
   });
@@ -962,7 +1056,9 @@ export function registerEscotelHandler(bot: any): void {
         await ctx.reply(
           `❌ El archivo es demasiado grande (${Math.round(document.file_size / (1024 * 1024))} MB).\n` +
             `El tamaño máximo permitido es ${MAX_FILE_SIZE_MB} MB.`,
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
@@ -974,7 +1070,9 @@ export function registerEscotelHandler(bot: any): void {
       if (!isExcel) {
         await ctx.reply(
           '❌ El archivo debe ser un Excel (.xlsx o .xls)',
-          Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+          Markup.inlineKeyboard([
+            [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+          ])
         );
         return;
       }
@@ -1018,7 +1116,10 @@ export function registerEscotelHandler(bot: any): void {
           throw new Error('No se pudo obtener userId o batchId');
         }
 
-        const batchResult = await redisBatchStateService.getBatchData<EscotelBatchData>(userId, batchId);
+        const batchResult = await redisBatchStateService.getBatchData<EscotelBatchData>(
+          userId,
+          batchId
+        );
 
         if (!batchResult.success || !batchResult.data) {
           throw new Error('Error recuperando datos del batch');
@@ -1028,9 +1129,15 @@ export function registerEscotelHandler(bot: any): void {
 
         // Calcular totales generales
         const totalGeneral = escotelData.facturas.reduce((sum, f) => sum + f.totales.total, 0);
-        const subtotalGeneral = escotelData.facturas.reduce((sum, f) => sum + f.totales.subtotal, 0);
+        const subtotalGeneral = escotelData.facturas.reduce(
+          (sum, f) => sum + f.totales.subtotal,
+          0
+        );
         const ivaGeneral = escotelData.facturas.reduce((sum, f) => sum + f.totales.iva, 0);
-        const retencionGeneral = escotelData.facturas.reduce((sum, f) => sum + f.totales.retencion, 0);
+        const retencionGeneral = escotelData.facturas.reduce(
+          (sum, f) => sum + f.totales.retencion,
+          0
+        );
 
         // Mostrar resumen y botón de confirmación
         let resumenText =
@@ -1087,7 +1194,9 @@ export function registerEscotelHandler(bot: any): void {
       logger.error({ error }, 'Error procesando archivo ESCOTEL');
       await ctx.reply(
         `❌ Error al procesar el archivo:\n\n${error instanceof Error ? error.message : 'Error desconocido'}`,
-        Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)]])
+        Markup.inlineKeyboard([
+          [Markup.button.callback('🔙 Volver al menú', BOT_ACTIONS.MENU_PRINCIPAL)],
+        ])
       );
 
       // Limpiar estado
