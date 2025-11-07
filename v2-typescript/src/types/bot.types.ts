@@ -9,6 +9,7 @@ import { Context, Telegraf } from 'telegraf';
  */
 export interface BotContext extends Context {
   match?: RegExpExecArray;
+  mediaGroup?: any[]; // Media group messages from telegraf-media-group middleware
   session?: {
     step?: string;
     data?: Record<string, unknown>;
@@ -22,6 +23,18 @@ export interface BotContext extends Context {
     folioFactura?: number | string;
     facturaGenerada?: boolean;
     pdfAnalysis?: any;
+    batchAnalysis?: {
+      results: any[];
+      failedCount: number;
+      totalProcessed: number;
+      timestamp: number;
+    };
+    invoiceResults?: Array<{
+      fileName: string;
+      success: boolean;
+      invoice?: any;
+      error?: string;
+    }>;
   };
   tenant?: {
     id: string;

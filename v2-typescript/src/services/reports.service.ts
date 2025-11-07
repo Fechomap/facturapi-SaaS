@@ -2,7 +2,6 @@
 import { prisma } from '../config/database';
 import logger from '../core/utils/logger';
 import NotificationService from './notification.service';
-import type { Tenant, TenantInvoice, TenantCustomer, TenantUser } from '@prisma/client';
 
 // Logger específico para el servicio de reportes
 const reportsLogger = logger.child({ module: 'reports-service' });

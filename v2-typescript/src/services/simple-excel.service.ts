@@ -1,7 +1,6 @@
 // services/simple-excel.service.ts
 // Generación de reportes Excel SIMPLE y ASÍNCRONA
 import logger from '../core/utils/logger';
-import fs from 'fs/promises';
 
 const simpleLogger = logger.child({ module: 'simple-excel' });
 
