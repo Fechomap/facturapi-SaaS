@@ -959,31 +959,33 @@ export function registerAxaHandler(bot: any): void {
 
       // Resultado final CON BOTONES DE DESCARGA
       if (factura) {
-        await ctx.reply(
-          `🎯 *Proceso AXA completado exitosamente*\n\n` +
-            `✅ Factura generada: ${factura.id}\n` +
-            `📊 ${facturaData.items.length} servicios procesados\n` +
-            `💰 Total: $${facturaData.total.toFixed(2)}\n` +
-            `📋 Folio: ${factura.folio_number}\n\n` +
-            `📥 Seleccione una opción para descargar:`,
-          {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-              [
-                Markup.button.callback(
-                  '📄 Descargar PDF',
-                  `pdf_${factura.id}_${factura.folio_number}`
-                ),
-              ],
-              [
-                Markup.button.callback(
-                  '🔠 Descargar XML',
-                  `xml_${factura.id}_${factura.folio_number}`
-                ),
-              ],
-            ]),
-          }
-        );
+        const folio = `${factura.series}-${factura.folio_number}`;
+
+        let resumenText = `🎯 *Proceso AXA completado exitosamente*\n\n`;
+        resumenText += `✅ Factura generada:\n\n`;
+        resumenText += `📋 Factura: ${folio} ($${factura.total.toFixed(2)})\n`;
+        resumenText += `📊 ${facturaData.items.length} servicios procesados\n`;
+        resumenText += `💰 Total: $${facturaData.total.toFixed(2)}\n\n`;
+        resumenText += `📥 Seleccione una opción para descargar:`;
+
+        // Crear botones de descarga
+        const botonesDescarga: any[] = [];
+
+        // Par de botones PDF/XML
+        botonesDescarga.push([
+          Markup.button.callback(`📄 PDF ${folio}`, `pdf_${factura.id}_${factura.folio_number}`),
+          Markup.button.callback(`🔠 XML ${folio}`, `xml_${factura.id}_${factura.folio_number}`),
+        ]);
+
+        // Botón de volver al menú
+        botonesDescarga.push([
+          Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL),
+        ]);
+
+        await ctx.reply(resumenText, {
+          parse_mode: 'Markdown',
+          reply_markup: Markup.inlineKeyboard(botonesDescarga).reply_markup,
+        });
       } else {
         await ctx.reply('⚠️ No se generó la factura. Error en FacturAPI.');
       }

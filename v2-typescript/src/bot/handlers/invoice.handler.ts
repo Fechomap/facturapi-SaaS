@@ -20,9 +20,6 @@ import SafeOperationsService from '@services/safe-operations.service.js';
 import CustomerSetupService from '@services/customer-setup.service.js';
 import FacturapiService from '@services/facturapi.service.js';
 
-// View imports
-import { clientSelectionMenu } from '../views/menu.view.js';
-
 const logger = createModuleLogger('bot-invoice-handler');
 
 // SAT cancellation reasons for reference
@@ -212,7 +209,7 @@ export function registerInvoiceHandler(bot: any): void {
       const specialRfcs = [
         'EEC081222FH8', // ESCOTEL
         'AAM850528H51', // AXA
-        'CSE990527I53', // CHUBB
+        'CDS211206J20', // CHUBB (RFC correcto)
         'QCS931209G49', // QUALITAS
         'CAS981016P46', // CLUB DE ASISTENCIA
       ];
@@ -231,17 +228,35 @@ export function registerInvoiceHandler(bot: any): void {
         },
       });
 
+      // Función para acortar nombres largos (igual que V1)
+      const shortenName = (name: string): string => {
+        const maxClienteLength = 30;
+        if (!name || name.length <= maxClienteLength) return name;
+
+        const words = name.split(' ');
+        let shortened = words[0];
+        let i = 1;
+
+        while (i < words.length && shortened.length + words[i].length + 1 <= maxClienteLength - 3) {
+          shortened += ' ' + words[i];
+          i++;
+        }
+
+        return shortened + '...';
+      };
+
       const clientsForMenu = manualClients.map((customer) => ({
         id: customer.facturapiCustomerId,
-        name: customer.legalName,
+        name: shortenName(customer.legalName),
       }));
 
-      // 2. Generar el menú usando la función CORRECTA de la vista
+      // 2. Importar la función de la vista y usarla IGUAL que V1
+      const { clientSelectionMenu } = await import('../views/menu.view.js');
       const keyboard = clientSelectionMenu(clientsForMenu, true, true);
 
-      // 3. Mostrar el menú corregido
+      // 3. Mostrar el menú como V1 (TODOS los clientes juntos)
       await ctx.editMessageText(
-        '🏠 Menú Principal → 📝 **Generar Factura**\n\nSeleccione el cliente o el tipo de facturación:',
+        '🏠 Menú Principal → 📝 **Generar Factura**\n\nSeleccione el cliente para generar la factura:',
         {
           parse_mode: 'Markdown',
           reply_markup: keyboard.reply_markup,
@@ -552,13 +567,8 @@ export function registerInvoiceHandler(bot: any): void {
         ctx.userState.folioFactura = factura.folio_number;
         ctx.userState.facturaGenerada = true;
 
-        // CRITICAL: Also save in session for persistence between workers
-        if (ctx.session) {
-          ctx.session.facturaId = factura.id;
-          ctx.session.series = factura.series;
-          ctx.session.folioFactura = factura.folio_number;
-          ctx.session.facturaGenerada = true;
-        }
+        // REGLA DE ORO: Solo usar ctx.userState, no ctx.session
+        // ctx.userState ya fue actualizado arriba con toda la información necesaria
 
         // Show created invoice
         await ctx.reply(
@@ -675,11 +685,8 @@ export function registerInvoiceHandler(bot: any): void {
     if (!facturaId || !folioNumero) return;
 
     // Try to get series from userState or session
+    // REGLA DE ORO: Solo leer de ctx.userState
     let series = ctx.userState?.series;
-    if (!series && ctx.session?.series) {
-      series = ctx.session.series;
-      ctx.userState.series = series;
-    }
 
     logger.info('Estado del usuario al descargar PDF:', ctx.userState);
     logger.info('ID de factura solicitado:', facturaId);
@@ -733,11 +740,8 @@ export function registerInvoiceHandler(bot: any): void {
     const folioNumero = ctx.match?.[2];
     if (!facturaId || !folioNumero) return;
 
+    // REGLA DE ORO: Solo leer de ctx.userState
     let series = ctx.userState?.series;
-    if (!series && ctx.session?.series) {
-      series = ctx.session.series;
-      ctx.userState.series = series;
-    }
 
     logger.info('Estado del usuario al descargar XML:', ctx.userState);
     logger.info('ID de factura solicitado:', facturaId);

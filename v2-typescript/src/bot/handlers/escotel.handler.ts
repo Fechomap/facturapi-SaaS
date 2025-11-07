@@ -638,6 +638,35 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
 
       await ctx.reply(resumenText, { parse_mode: 'Markdown' });
 
+      // Crear botones de descarga individuales para cada factura
+      const botonesDescarga: any[] = [];
+
+      facturasGeneradas.forEach((f, idx) => {
+        const folio = `${f.factura.series}-${f.factura.folio_number}`;
+
+        // Par de botones PDF/XML por cada factura
+        botonesDescarga.push([
+          Markup.button.callback(
+            `📄 PDF ${folio}`,
+            `pdf_${f.factura.id}_${f.factura.folio_number}`
+          ),
+          Markup.button.callback(
+            `🔠 XML ${folio}`,
+            `xml_${f.factura.id}_${f.factura.folio_number}`
+          ),
+        ]);
+      });
+
+      // Agregar botón de volver al final
+      botonesDescarga.push([
+        Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL),
+      ]);
+
+      await ctx.reply(`📥 **Descargas Individuales:**\n\nSeleccione PDF o XML de cada factura:`, {
+        parse_mode: 'Markdown',
+        reply_markup: Markup.inlineKeyboard(botonesDescarga).reply_markup,
+      });
+
       // Botones de descarga masiva en ZIP
       const botonesZip = [
         [

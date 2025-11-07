@@ -86,7 +86,7 @@ interface MultipleAccess {
  * Estructura: { telegramId: { tenantId, role, permissions, lastUpdated } }
  */
 const permissionsCache = new Map<string, CachedPermissions>();
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const CACHE_DURATION = 1 * 60 * 1000; // 1 minuto (reducido para mayor seguridad)
 
 /**
  * Middleware de autorización multiusuario
@@ -425,16 +425,21 @@ export function invalidateUserCache(telegramId: string | number): boolean {
 }
 
 /**
- * Limpiar cache periódicamente
+ * Limpiar cache periódicamente (cada 30 segundos para mayor frecuencia)
  */
 setInterval(() => {
   const now = Date.now();
+  let cleaned = 0;
   for (const [telegramId, data] of permissionsCache.entries()) {
     if (now - data.lastUpdated > CACHE_DURATION) {
       permissionsCache.delete(telegramId);
+      cleaned++;
     }
   }
-}, CACHE_DURATION);
+  if (cleaned > 0) {
+    logger.debug({ cleaned }, 'Cache de permisos limpiado');
+  }
+}, 30000); // Cada 30 segundos
 
 logger.info('Middleware de autorización multiusuario inicializado');
 

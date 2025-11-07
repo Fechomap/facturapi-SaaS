@@ -16,13 +16,15 @@ export interface TenantRequest extends Request {
     facturapiApiKey: string | null;
   };
   user?: {
-    id: string | number;
-    telegramId?: number;
+    id: string;
+    telegramId?: bigint | number; // Soportar ambos tipos para compatibilidad
     username?: string;
     email?: string;
     role?: string;
     tenantId?: string;
+    permissions?: string[]; // Agregado para soporte de permisos
   };
+  token?: string; // JWT token si fue proporcionado
   getApiKey?: () => Promise<string>;
 }
 

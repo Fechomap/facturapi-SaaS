@@ -50,16 +50,93 @@ interface QueueStats {
 
 // Excel report queue processing
 excelReportQueue.process('generate-excel-report', 3, async (job) => {
-  // TODO: Implement when jobs are migrated
-  logger.info({ jobId: job.id }, 'Processing excel report job (placeholder)');
-  return { success: true, placeholder: true };
+  const { tenantId, userId, filters, config } = job.data;
+
+  logger.info({ jobId: job.id, tenantId, userId }, 'Procesando job de reporte Excel');
+
+  try {
+    // Importar el servicio de Excel Reports
+    const ExcelReportService = (await import('./excel-report.service.js')).default;
+
+    // Actualizar progreso: iniciando
+    await job.progress(10);
+
+    // Generar el reporte
+    const result = await ExcelReportService.generateInvoiceReport(tenantId, {
+      ...config,
+      filters,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Error generando reporte');
+    }
+
+    // Actualizar progreso: completado
+    await job.progress(100);
+
+    logger.info(
+      { jobId: job.id, tenantId, filePath: result.filePath },
+      'Reporte Excel generado exitosamente'
+    );
+
+    return {
+      success: true,
+      filePath: result.filePath,
+      fileName: result.fileName,
+      rowCount: result.rowCount,
+    };
+  } catch (error: unknown) {
+    logger.error(
+      {
+        jobId: job.id,
+        tenantId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Error procesando job de Excel'
+    );
+
+    throw error; // Bull marcará el job como failed
+  }
 });
 
 // File cleanup queue processing
 fileCleanupQueue.process('cleanup-temp-file', 5, async (job) => {
-  // TODO: Implement when jobs are migrated
-  logger.info({ jobId: job.id }, 'Processing file cleanup job (placeholder)');
-  return { success: true, placeholder: true };
+  const { filePath, fileName } = job.data;
+
+  logger.info({ jobId: job.id, filePath, fileName }, 'Procesando limpieza de archivo temporal');
+
+  try {
+    const fs = await import('fs/promises');
+
+    // Verificar que el archivo existe
+    try {
+      await fs.access(filePath);
+    } catch {
+      logger.warn({ filePath }, 'Archivo no existe, considerando limpieza exitosa');
+      return { success: true, alreadyDeleted: true };
+    }
+
+    // Eliminar el archivo
+    await fs.unlink(filePath);
+
+    logger.info({ jobId: job.id, filePath }, 'Archivo temporal eliminado');
+
+    return { success: true, filePath, deletedAt: new Date() };
+  } catch (error: unknown) {
+    logger.error(
+      {
+        jobId: job.id,
+        filePath,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Error eliminando archivo temporal'
+    );
+
+    // No re-lanzar - los archivos temporales no son críticos
+    // Si falla, el sistema operativo eventualmente los limpiará
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 });
 
 // Event listeners for monitoring

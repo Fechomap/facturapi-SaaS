@@ -601,27 +601,45 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
       logger.debug('No se pudo eliminar mensaje de progreso');
     }
 
-    // Mostrar resultados
+    // Mostrar resultados CON BOTONES DE DESCARGA (como V1)
     if (facturasGeneradas.length > 0) {
-      let resumenText = `🎯 **Facturas CHUBB generadas exitosamente**\n\n`;
-      resumenText += `🏢 Cliente: ${chubbData.clienteName}\n\n`;
+      let resumenText = `🎉 **Facturas CHUBB generadas exitosamente**\n\n`;
+      resumenText += `✅ Se generaron ${facturasGeneradas.length} facturas:\n\n`;
+
+      // Crear botones para cada factura (como V1)
+      const botonesDescarga: any[] = [];
 
       facturasGeneradas.forEach((f, idx) => {
-        resumenText += `**${idx + 1}. ${f.tipo}**\n`;
-        resumenText += `   • Folio: ${f.factura.folio_number}\n`;
-        resumenText += `   • Servicios: ${f.servicios}\n`;
-        resumenText += `   • Total: $${f.factura.total.toFixed(2)}\n\n`;
+        const folio = `${f.factura.series}-${f.factura.folio_number}`;
+        resumenText += `📋 Factura ${idx + 1}: ${folio} ($${f.factura.total.toFixed(2)})\n`;
+
+        // Agregar par de botones PDF/XML para esta factura
+        botonesDescarga.push([
+          Markup.button.callback(
+            `📄 PDF ${folio}`,
+            `pdf_${f.factura.id}_${f.factura.folio_number}`
+          ),
+          Markup.button.callback(
+            `🔠 XML ${folio}`,
+            `xml_${f.factura.id}_${f.factura.folio_number}`
+          ),
+        ]);
       });
 
       if (errores.length > 0) {
-        resumenText += `⚠️ ${errores.length} facturas con errores\n\n`;
+        resumenText += `\n⚠️ ${errores.length} facturas con errores\n`;
       }
+
+      resumenText += `\n📥 Seleccione una opción para descargar:`;
+
+      // Agregar botón de volver al final
+      botonesDescarga.push([
+        Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL),
+      ]);
 
       await ctx.reply(resumenText, {
         parse_mode: 'Markdown',
-        reply_markup: Markup.inlineKeyboard([
-          [Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL)],
-        ]).reply_markup,
+        reply_markup: Markup.inlineKeyboard(botonesDescarga).reply_markup,
       });
     }
 

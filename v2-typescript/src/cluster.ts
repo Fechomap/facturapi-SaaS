@@ -142,15 +142,49 @@ if (cluster.isPrimary) {
     }
   });
 
-  process.on('unhandledRejection', (reason: any) => {
-    clusterLogger.error(`🚫 Promesa rechazada no manejada en worker ${process.pid}:`, {
-      reason: reason?.message || reason,
-      stack: reason?.stack,
-      timestamp: new Date().toISOString(),
-    });
+  // Contador de unhandled rejections para recovery
+  let rejectionCount = 0;
+  const MAX_REJECTIONS = 10; // Reiniciar después de 10 rejections
 
-    clusterLogger.warn('Continuando operación después de promesa rechazada');
+  process.on('unhandledRejection', (reason: any) => {
+    rejectionCount++;
+
+    clusterLogger.error(
+      `🚫 Promesa rechazada no manejada en worker ${process.pid} (${rejectionCount}/${MAX_REJECTIONS}):`,
+      {
+        reason: reason?.message || reason,
+        stack: reason?.stack,
+        timestamp: new Date().toISOString(),
+        rejectionCount,
+      }
+    );
+
+    if (rejectionCount >= MAX_REJECTIONS) {
+      clusterLogger.error(
+        `Worker ${process.pid} alcanzó el límite de ${MAX_REJECTIONS} unhandled rejections. Reiniciando worker por seguridad...`
+      );
+
+      // Esperar 1 segundo para que se registren los logs
+      setTimeout(() => {
+        process.exit(1); // El cluster automáticamente creará un nuevo worker
+      }, 1000);
+    } else {
+      clusterLogger.warn(
+        `Continuando operación (${MAX_REJECTIONS - rejectionCount} rejections restantes antes de reinicio)`
+      );
+    }
   });
+
+  // Resetear contador cada hora (si el worker sigue activo)
+  setInterval(
+    () => {
+      if (rejectionCount > 0) {
+        clusterLogger.info(`Reseteando contador de rejections (era: ${rejectionCount})`);
+        rejectionCount = 0;
+      }
+    },
+    60 * 60 * 1000
+  ); // Cada hora
 }
 
 export default cluster;

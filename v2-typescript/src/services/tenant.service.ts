@@ -326,6 +326,172 @@ class TenantService {
       return 0;
     }
   }
+
+  /**
+   * Extend subscription by adding days
+   * For manual subscription management without Stripe
+   */
+  static async extendSubscription(
+    tenantId: string,
+    days: number
+  ): Promise<{ success: boolean; newEndDate?: Date; newStatus?: string; error?: string }> {
+    try {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: {
+          subscriptions: {
+            where: {
+              OR: [
+                { status: 'active' },
+                { status: 'trial' },
+                { status: 'suspended' },
+                { status: 'payment_pending' },
+              ],
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!tenant) {
+        return { success: false, error: 'Tenant no encontrado' };
+      }
+
+      let subscription = tenant.subscriptions[0];
+      const now = new Date();
+
+      if (!subscription) {
+        // Create new subscription if none exists
+        const plan = await prisma.subscriptionPlan.findFirst({
+          where: { name: 'basico' },
+        });
+
+        if (!plan) {
+          return { success: false, error: 'Plan básico no encontrado' };
+        }
+
+        subscription = await prisma.tenantSubscription.create({
+          data: {
+            tenantId,
+            planId: plan.id,
+            status: 'active',
+            currentPeriodEndsAt: new Date(now.getTime() + days * 24 * 60 * 60 * 1000),
+            invoicesUsed: 0,
+          },
+        });
+
+        logger.info(
+          { tenantId, days, subscriptionId: subscription.id },
+          'New subscription created'
+        );
+        return {
+          success: true,
+          newEndDate: subscription.currentPeriodEndsAt!,
+          newStatus: 'active',
+        };
+      }
+
+      // Extend existing subscription
+      const currentEndDate = subscription.currentPeriodEndsAt || now;
+      const baseDate = currentEndDate > now ? currentEndDate : now;
+      const newEndDate = new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000);
+
+      const updatedSubscription = await prisma.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          currentPeriodEndsAt: newEndDate,
+          status: 'active',
+        },
+      });
+
+      logger.info(
+        { tenantId, days, oldEndDate: currentEndDate, newEndDate },
+        'Subscription extended'
+      );
+
+      return {
+        success: true,
+        newEndDate: updatedSubscription.currentPeriodEndsAt!,
+        newStatus: 'active',
+      };
+    } catch (error: unknown) {
+      logger.error({ tenantId, days, error }, 'Error extending subscription');
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Suspend subscription
+   * For manual subscription management
+   */
+  static async suspendSubscription(
+    tenantId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const subscription = await prisma.tenantSubscription.findFirst({
+        where: {
+          tenantId,
+          OR: [{ status: 'active' }, { status: 'trial' }, { status: 'payment_pending' }],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!subscription) {
+        return { success: false, error: 'No se encontró suscripción activa' };
+      }
+
+      await prisma.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: { status: 'suspended' },
+      });
+
+      logger.info({ tenantId, subscriptionId: subscription.id }, 'Subscription suspended');
+      return { success: true };
+    } catch (error: unknown) {
+      logger.error({ tenantId, error }, 'Error suspending subscription');
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Change subscription plan
+   * For manual subscription management
+   */
+  static async changePlan(
+    tenantId: string,
+    planName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const plan = await prisma.subscriptionPlan.findFirst({
+        where: { name: planName },
+      });
+
+      if (!plan) {
+        return { success: false, error: `Plan '${planName}' no encontrado` };
+      }
+
+      const subscription = await prisma.tenantSubscription.findFirst({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!subscription) {
+        return { success: false, error: 'No se encontró suscripción' };
+      }
+
+      await prisma.tenantSubscription.update({
+        where: { id: subscription.id },
+        data: { planId: plan.id },
+      });
+
+      logger.info({ tenantId, oldPlanId: subscription.planId, newPlanId: plan.id }, 'Plan changed');
+      return { success: true };
+    } catch (error: unknown) {
+      logger.error({ tenantId, planName, error }, 'Error changing plan');
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
 }
 
 export default TenantService;

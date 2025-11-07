@@ -6,7 +6,9 @@ import facturapiQueueService from '../../services/facturapi-queue.service';
 
 const sessionLogger = logger.child({ module: 'session-service' });
 
-const activeProcesses = new Set<string>();
+// Map con TTL para procesos activos: { processId: { timestamp, expires } }
+const activeProcesses = new Map<string, { timestamp: number; expires: number }>();
+const PROCESS_TTL = 5 * 60 * 1000; // 5 minutos de TTL para procesos
 
 interface SessionState {
   esperando?: string | null;
@@ -348,17 +350,51 @@ class SessionService {
   }
 
   static isProcessActive(processId: string): boolean {
-    return activeProcesses.has(processId);
+    const process = activeProcesses.get(processId);
+    if (!process) return false;
+
+    // Verificar si expiró
+    if (Date.now() > process.expires) {
+      activeProcesses.delete(processId);
+      return false;
+    }
+
+    return true;
   }
 
   static markProcessActive(processId: string): void {
+    const now = Date.now();
     sessionLogger.debug({ processId }, 'Marcando proceso como activo');
-    activeProcesses.add(processId);
+    activeProcesses.set(processId, {
+      timestamp: now,
+      expires: now + PROCESS_TTL,
+    });
   }
 
   static markProcessInactive(processId: string): void {
     sessionLogger.debug({ processId }, 'Marcando proceso como inactivo');
     activeProcesses.delete(processId);
+  }
+
+  /**
+   * Limpia procesos expirados
+   */
+  static cleanExpiredProcesses(): number {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [processId, process] of activeProcesses.entries()) {
+      if (now > process.expires) {
+        activeProcesses.delete(processId);
+        cleaned++;
+      }
+    }
+
+    if (cleaned > 0) {
+      sessionLogger.debug({ cleaned }, 'Procesos expirados limpiados');
+    }
+
+    return cleaned;
   }
 
   static isSignificantStateChange(oldState: SessionState, newState: SessionState): boolean {
@@ -445,6 +481,16 @@ class SessionService {
 }
 
 const sessionMiddleware = SessionService.createMiddleware();
+
+// Limpiar procesos expirados cada 2 minutos
+setInterval(
+  () => {
+    SessionService.cleanExpiredProcesses();
+  },
+  2 * 60 * 1000
+);
+
+sessionLogger.info('SessionService inicializado con limpieza automática de procesos');
 
 export { SessionService, sessionMiddleware };
 export default SessionService;

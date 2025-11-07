@@ -86,12 +86,18 @@ function authMiddleware(req: TenantRequest, res: Response, next: NextFunction): 
         }
       }
 
-      req.user = user || {
-        id: decoded.userId || 0,
-        email: decoded.email,
-        role: decoded.role || 'admin',
-        tenantId: decoded.tenantId,
-      };
+      req.user = user
+        ? {
+            id: String(user.id),
+            role: user.role,
+            tenantId: user.tenantId,
+          }
+        : {
+            id: String(decoded.userId || 0),
+            email: decoded.email,
+            role: decoded.role || 'admin',
+            tenantId: decoded.tenantId,
+          };
 
       if (decoded.tenantId) {
         req.tenant = {

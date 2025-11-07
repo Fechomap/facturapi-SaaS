@@ -321,45 +321,39 @@ export function registerPaymentComplementHandler(bot: any): void {
               }
             )) as PaymentComplementResult;
 
-            // Save to database
-            try {
-              const totalAmount = facturas.reduce(
-                (sum, f) => sum + parseFloat(f.total.toString()),
-                0
-              );
+            // Save to database - OBLIGATORIO para auditoría y tracking
+            const totalAmount = facturas.reduce(
+              (sum, f) => sum + parseFloat(f.total.toString()),
+              0
+            );
 
-              await prisma.paymentComplement.create({
-                data: {
-                  tenantId,
-                  facturapiComplementId: resultado.id,
-                  uuid: resultado.id, // SAT UUID
-                  series: resultado.series || 'P',
-                  folioNumber:
-                    typeof resultado.folio_number === 'string'
-                      ? parseInt(resultado.folio_number, 10)
-                      : resultado.folio_number,
-                  customerId: clienteIdKey, // Use the correct customer key
-                  customerName,
-                  paymentForm: '03',
-                  totalAmount,
-                  relatedInvoices: facturas.map((f) => ({
-                    uuid: f.uuid,
-                    folio: f.folio,
-                    amount: f.total,
-                  })),
-                  paymentDate: new Date(),
-                },
-              });
-
-              logger.info('Complemento guardado en BD', {
+            await prisma.paymentComplement.create({
+              data: {
                 tenantId,
-                complementoId: resultado.id,
-              });
-            } catch (dbError) {
-              logger.warn('No se pudo guardar complemento en BD (no crítico)', {
-                error: (dbError as Error).message,
-              });
-            }
+                facturapiComplementId: resultado.id,
+                uuid: resultado.id, // SAT UUID
+                series: resultado.series || 'P',
+                folioNumber:
+                  typeof resultado.folio_number === 'string'
+                    ? parseInt(resultado.folio_number, 10)
+                    : resultado.folio_number,
+                customerId: clienteIdKey, // Use the correct customer key
+                customerName,
+                paymentForm: '03',
+                totalAmount,
+                relatedInvoices: facturas.map((f) => ({
+                  uuid: f.uuid,
+                  folio: f.folio,
+                  amount: f.total,
+                })),
+                paymentDate: new Date(),
+              },
+            });
+
+            logger.info('Complemento guardado en BD exitosamente', {
+              tenantId,
+              complementoId: resultado.id,
+            });
 
             resultados.push({
               success: true,
