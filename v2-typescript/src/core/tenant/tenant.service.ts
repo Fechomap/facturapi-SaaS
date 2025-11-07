@@ -587,6 +587,91 @@ class TenantService {
   }
 
   /**
+   * Registra múltiples facturas en lote (operación optimizada)
+   * Usa Prisma createMany para mejor performance
+   */
+  static async registerInvoicesBatch(
+    tenantId: string,
+    invoices: Array<{
+      facturapiInvoiceId: string;
+      series: string;
+      folioNumber: number;
+      customerId: number | null;
+      total: number;
+      createdById?: bigint | string | number | null;
+    }>
+  ) {
+    tenantLogger.info(
+      { tenantId, count: invoices.length },
+      'Registrando lote de facturas'
+    );
+
+    return withTransaction(
+      async (tx) => {
+        // Preparar datos para createMany
+        const invoiceData = invoices.map((inv) => {
+          const createdByIdInt =
+            inv.createdById && parseInt(inv.createdById.toString()) <= 2147483647
+              ? parseInt(inv.createdById.toString())
+              : null;
+
+          return {
+            tenantId,
+            facturapiInvoiceId: inv.facturapiInvoiceId,
+            series: inv.series,
+            folioNumber: inv.folioNumber,
+            customerId: inv.customerId,
+            total: inv.total,
+            status: 'valid' as const,
+            createdById: createdByIdInt,
+            invoiceDate: new Date(),
+          };
+        });
+
+        // Inserción masiva (mucho más rápido que bucle)
+        const result = await tx.tenantInvoice.createMany({
+          data: invoiceData,
+          skipDuplicates: true, // Evita errores si hay duplicados
+        });
+
+        // Incrementar contador de facturas
+        await this.incrementInvoiceCountBy(tenantId, result.count);
+
+        // Audit log del lote
+        await auditLog(tx, {
+          tenantId,
+          userId: null,
+          action: 'invoice:batch_create',
+          entityType: 'tenant_invoice',
+          entityId: 'batch',
+          details: {
+            count: result.count,
+            invoiceIds: invoices.map((i) => i.facturapiInvoiceId),
+          },
+        });
+
+        tenantLogger.info(
+          { tenantId, count: result.count },
+          'Lote de facturas registrado exitosamente'
+        );
+
+        return result;
+      },
+      { description: 'Registrar lote de facturas' }
+    );
+  }
+
+  /**
+   * Incrementa el contador de facturas por una cantidad específica
+   */
+  private static async incrementInvoiceCountBy(tenantId: string, count: number) {
+    // Incrementar el contador para cada factura en el lote
+    for (let i = 0; i < count; i++) {
+      await this.incrementInvoiceCount(tenantId);
+    }
+  }
+
+  /**
    * Obtiene una API key para un tenant
    */
   static async getApiKey(tenantId: string): Promise<string> {

@@ -1,13 +1,13 @@
 // bot/handlers/production-setup.handler.ts
 // Handler para configuración de facturación real
-import { Telegraf } from 'telegraf';
+import type { Bot } from '@/types/bot.types.js';
 
 /**
  * Registra los manejadores para el proceso de configuración productiva
  * NOTA: Este es un stub temporal para permitir la compilación
  * TODO: Migrar la implementación completa desde production-setup.handler.js
  */
-export function registerProductionSetupHandler(bot: Telegraf): void {
+export function registerProductionSetupHandler(bot: Bot): void {
   // Stub temporal - implementación pendiente
   bot.action('setup_production', async (ctx) => {
     await ctx.answerCbQuery();

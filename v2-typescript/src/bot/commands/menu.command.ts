@@ -113,6 +113,7 @@ export async function registerMenuCommand(bot: Bot): Promise<void> {
         ]),
       }
     );
+    return;
   });
 
   // Acción para generar reporte de facturas - Ejecuta directamente
@@ -145,7 +146,7 @@ export async function registerMenuCommand(bot: Bot): Promise<void> {
         format: 'text',
       });
 
-      await ctx.reply(reportResult.formatted, {
+      await ctx.reply(reportResult.formatted ?? 'No se pudo generar el reporte', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [
@@ -157,12 +158,14 @@ export async function registerMenuCommand(bot: Bot): Promise<void> {
           [Markup.button.callback('🔙 Volver al menú', 'menu_principal')],
         ]),
       });
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al generar reporte de facturas desde menú');
       await ctx.reply(
         `❌ Error al generar el reporte: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', 'menu_principal')]])
       );
+      return;
     }
   });
 
@@ -222,6 +225,7 @@ export async function registerMenuCommand(bot: Bot): Promise<void> {
         parse_mode: 'Markdown',
         ...keyboard,
       });
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al mostrar usuarios desde menú');
       await ctx.editMessageText('👥 *Usuarios*\n\n❌ Error al obtener la lista de usuarios.', {
@@ -231,6 +235,7 @@ export async function registerMenuCommand(bot: Bot): Promise<void> {
           [Markup.button.callback('🔙 Volver al Menú', 'menu_principal')],
         ]),
       });
+      return;
     }
   });
 

@@ -371,9 +371,11 @@ export function registerAdminCommands(bot: Bot): void {
           ]),
         }
       );
+      return;
     } catch (error) {
       logger.error({ error, telegramId }, 'Error al reparar sesión');
       await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      return;
     }
   });
 
@@ -417,9 +419,11 @@ export function registerAdminCommands(bot: Bot): void {
         `✅ Sesión reiniciada exitosamente.\n\n` +
           `El usuario puede continuar normalmente sus actividades.`
       );
+      return;
     } catch (error) {
       logger.error({ error, telegramId }, 'Error al reiniciar sesión');
       await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      return;
     }
   });
 
@@ -715,9 +719,11 @@ export function registerAdminCommands(bot: Bot): void {
           [Markup.button.callback('❌ Cancelar', 'cancel_delete')],
         ]),
       });
+      return;
     } catch (error) {
       logger.error({ error, tenantId }, 'Error verificando tenant');
       await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      return;
     }
   });
 

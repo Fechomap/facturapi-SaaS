@@ -36,6 +36,8 @@ function tenantMiddleware(req: TenantRequest, res: Response, next: NextFunction)
         select: {
           id: true,
           businessName: true,
+          email: true,
+          facturapiApiKey: true,
           isActive: true,
         },
       });

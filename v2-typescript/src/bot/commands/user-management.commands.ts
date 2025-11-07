@@ -81,6 +81,7 @@ export function registerUserManagementCommands(bot: Bot): void {
       ]);
 
       ctx.reply(message, { parse_mode: 'Markdown', ...keyboard });
+      return;
     } catch (error) {
       logger.error(
         {
@@ -90,6 +91,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         'Error al listar usuarios'
       );
       ctx.reply('❌ Error al obtener la lista de usuarios.');
+      return;
     }
   });
 
@@ -139,6 +141,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(keyboard),
       });
+      return;
     } catch (error) {
       logger.error(
         {
@@ -148,6 +151,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         'Error al mostrar usuarios para gestionar'
       );
       ctx.reply('❌ Error al cargar usuarios.');
+      return;
     }
   });
 
@@ -264,6 +268,7 @@ export function registerUserManagementCommands(bot: Bot): void {
           ...Markup.inlineKeyboard(keyboard),
         }
       );
+      return;
     } catch (error) {
       logger.error(
         {
@@ -274,6 +279,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         'Error al cargar usuario para gestionar'
       );
       ctx.reply('❌ Error al cargar usuario.');
+      return;
     }
   });
 
@@ -340,6 +346,7 @@ export function registerUserManagementCommands(bot: Bot): void {
           ]),
         }
       );
+      return;
     } catch (error) {
       logger.error(
         {
@@ -350,6 +357,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         'Error al mostrar confirmación de eliminación'
       );
       ctx.reply('❌ Error al cargar usuario para eliminar.');
+      return;
     }
   });
 
@@ -393,6 +401,7 @@ export function registerUserManagementCommands(bot: Bot): void {
         },
         'Usuario removido exitosamente'
       );
+      return;
     } catch (error) {
       logger.error(
         {
@@ -405,6 +414,7 @@ export function registerUserManagementCommands(bot: Bot): void {
       ctx.reply(
         `❌ Error al remover usuario: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
+      return;
     }
   });
 

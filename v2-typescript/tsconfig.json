@@ -21,11 +21,10 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
 
-    /* Type Checking - Empezamos permisivo, luego activamos strict */
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "noImplicitReturns": false,
+    /* Type Checking - STRICT MODE ACTIVADO */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
     "strictPropertyInitialization": false,

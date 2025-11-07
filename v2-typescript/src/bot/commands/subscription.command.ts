@@ -180,22 +180,9 @@ export function registerSubscriptionCommand(bot: Bot): void {
 
       // TODO: Implementar generatePaymentLink en TenantService
       // const paymentLink = await TenantService.generatePaymentLink(tenantId);
-      const paymentLink = null;
 
-      if (paymentLink && (paymentLink as any).url) {
-        await ctx.reply(
-          `🔗 Enlace de pago generado correctamente\n\n` +
-            `Para reactivar tu suscripción, realiza el pago a través del siguiente enlace:\n\n` +
-            `${(paymentLink as any).url}\n\n` +
-            `Una vez completado el pago, tu suscripción se actualizará automáticamente.`,
-          Markup.inlineKeyboard([
-            [Markup.button.url('💳 Realizar Pago', paymentLink.url)],
-            [Markup.button.callback('↩️ Volver', 'menu_suscripcion')],
-          ])
-        );
-      } else {
-        throw new Error('No se pudo generar el enlace de pago');
-      }
+      // Temporalmente lanzar error hasta que se implemente la funcionalidad
+      throw new Error('Funcionalidad de pago en desarrollo. Contacta a soporte para reactivar tu suscripción.');
     } catch (error) {
       logger.error({ error }, 'Error al generar enlace de pago');
       await ctx.reply(

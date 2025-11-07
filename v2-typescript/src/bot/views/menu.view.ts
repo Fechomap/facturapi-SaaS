@@ -75,6 +75,7 @@ export function clientSelectionMenu(
   if (includeChubb) {
     buttons.push([Markup.button.callback('CHUBB (Archivo Excel)', 'menu_chubb')]);
     buttons.push([Markup.button.callback('AXA (Archivo Excel)', 'menu_axa')]);
+    buttons.push([Markup.button.callback('ESCOTEL (Archivo Excel)', 'menu_escotel')]);
     buttons.push([
       Markup.button.callback('CLUB DE ASISTENCIA (Archivo Excel)', 'menu_club_asistencia'),
     ]);

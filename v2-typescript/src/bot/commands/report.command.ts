@@ -56,7 +56,7 @@ export function registerReportCommands(bot: Bot): void {
         format: 'text',
       });
 
-      await ctx.reply(reportResult.formatted, {
+      await ctx.reply(reportResult.formatted ?? 'Reporte generado exitosamente', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [
@@ -68,12 +68,14 @@ export function registerReportCommands(bot: Bot): void {
           [Markup.button.callback('🔙 Volver al menú', 'menu_principal')],
         ]),
       });
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al generar reporte de facturas');
       await ctx.reply(
         `❌ Error al generar el reporte: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', 'menu_principal')]])
       );
+      return;
     }
   });
 
@@ -124,16 +126,18 @@ export function registerReportCommands(bot: Bot): void {
 
       buttons.push([Markup.button.callback('🔙 Volver al menú', 'menu_principal')]);
 
-      await ctx.reply(reportResult.formatted, {
+      await ctx.reply(reportResult.formatted ?? 'Reporte generado exitosamente', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard(buttons),
       });
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al generar reporte de mes específico');
       await ctx.reply(
         `❌ Error al generar el reporte: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', 'menu_principal')]])
       );
+      return;
     }
   });
 
@@ -151,19 +155,21 @@ export function registerReportCommands(bot: Bot): void {
         format: 'text',
       });
 
-      await ctx.reply(reportResult.formatted, {
+      await ctx.reply(reportResult.formatted ?? 'Reporte de suscripción generado', {
         parse_mode: 'Markdown',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('💳 Actualizar suscripción', 'menu_suscripcion')],
           [Markup.button.callback('🔙 Volver al menú', 'menu_principal')],
         ]),
       });
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al generar reporte de suscripción');
       await ctx.reply(
         `❌ Error al generar el reporte: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         Markup.inlineKeyboard([[Markup.button.callback('🔙 Volver al menú', 'menu_principal')]])
       );
+      return;
     }
   });
 
@@ -274,11 +280,13 @@ export function registerReportCommands(bot: Bot): void {
           (results.failed > 10 ? `\n... y ${results.failed - 10} más.` : ''),
         { parse_mode: 'Markdown' }
       );
+      return;
     } catch (error) {
       logger.error({ error }, 'Error al enviar reportes masivos');
       await ctx.reply(
         `❌ Error al enviar reportes: ${error instanceof Error ? error.message : 'Error desconocido'}`
       );
+      return;
     }
   });
 

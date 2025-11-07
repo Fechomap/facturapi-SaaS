@@ -5,7 +5,7 @@
 
 import { Markup } from 'telegraf';
 import axios from 'axios';
-import fs from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { BotContext } from '@/types/bot.types.js';
@@ -35,13 +35,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * Ensures the temporary directory exists
+ * Ensures the temporary directory exists (async)
  */
-function ensureTempDirExists(): string {
+async function ensureTempDirExists(): Promise<string> {
   const tempDir = path.join(__dirname, '../../../temp');
-  if (!fs.existsSync(tempDir)) {
+  try {
+    await fs.access(tempDir);
+  } catch {
     try {
-      fs.mkdirSync(tempDir, { recursive: true });
+      await fs.mkdir(tempDir, { recursive: true });
       logger.debug({ tempDir }, 'Directorio temporal creado');
     } catch (err) {
       logger.error(
@@ -65,15 +67,16 @@ export async function descargarFactura(
 ): Promise<string> {
   logger.info(`Descargando factura ${facturaId} en formato ${formato}`);
 
-  const tempDir = ensureTempDirExists();
+  const tempDir = await ensureTempDirExists();
   const folioStr = folio?.toString() || 'unknown';
 
+  // Get tenant ID from user context (declarar FUERA del try para que sea accesible en catch)
+  const tenantId = ctx.userState?.tenantId || ctx.getTenantId();
+  if (!tenantId) {
+    throw new Error('No se encontró el tenant ID en el estado del usuario');
+  }
+
   try {
-    // Get tenant ID from user context
-    const tenantId = ctx.userState?.tenantId;
-    if (!tenantId) {
-      throw new Error('No se encontró el tenant ID en el estado del usuario');
-    }
 
     // Get FacturAPI client for this tenant
     const facturapi = await FacturapiService.getFacturapiClient(tenantId);
@@ -110,8 +113,6 @@ export async function descargarFactura(
     const filePath = `${tempDir}/${series}${folioStr}.${formato}`;
     logger.info('Creando archivo temporal en:', filePath);
 
-    fs.createWriteStream(filePath);
-
     logger.info(`Cliente FacturAPI obtenido para tenant ${tenantId}, descargando ${formato}...`);
 
     // Use axios to download directly from FacturAPI API
@@ -130,7 +131,7 @@ export async function descargarFactura(
 
       console.log('🔍 DEBUG - Antes de descargar de FacturAPI');
       console.log('URL:', apiUrl);
-      console.log('API Key (primeros 20 chars):', tenant.facturapiApiKey?.substring(0, 20));
+      console.log('API Key presente:', !!tenant.facturapiApiKey);
       logger.info(`Descargando desde URL de FacturAPI: ${apiUrl}`);
 
       // Make request with axios
@@ -145,8 +146,8 @@ export async function descargarFactura(
 
       console.log('✅ Respuesta recibida de FacturAPI, status:', response.status);
 
-      // Write file
-      fs.writeFileSync(filePath, response.data);
+      // Write file (async)
+      await fs.writeFile(filePath, response.data);
       logger.info('Archivo descargado exitosamente:', filePath);
       return filePath;
     } else {
@@ -177,11 +178,9 @@ export async function descargarFactura(
 
     const filePath = `${tempDir}/${folio}.${formato}`;
     try {
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      await fs.unlink(filePath);
     } catch (e) {
-      // Silenciar
+      // Silenciar si el archivo no existe
     }
 
     throw error;
@@ -531,10 +530,12 @@ export function registerInvoiceHandler(bot: any): void {
         ctx.userState.facturaGenerada = true;
 
         // CRITICAL: Also save in session for persistence between workers
-        ctx.session.facturaId = factura.id;
-        ctx.session.series = factura.series;
-        ctx.session.folioFactura = factura.folio_number;
-        ctx.session.facturaGenerada = true;
+        if (ctx.session) {
+          ctx.session.facturaId = factura.id;
+          ctx.session.series = factura.series;
+          ctx.session.folioFactura = factura.folio_number;
+          ctx.session.facturaGenerada = true;
+        }
 
         // Show created invoice
         await ctx.reply(
@@ -675,11 +676,13 @@ export function registerInvoiceHandler(bot: any): void {
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
       const filePath = await descargarFactura(facturaId, 'pdf', folioNumero, clienteStr, ctx);
 
-      if (fs.existsSync(filePath)) {
-        await ctx.replyWithDocument({ source: filePath });
-        fs.unlinkSync(filePath);
-      } else {
-        throw new Error('No se pudo generar el archivo PDF');
+      await ctx.replyWithDocument({ source: filePath });
+
+      // Limpiar archivo temporal (async)
+      try {
+        await fs.unlink(filePath);
+      } catch (e) {
+        logger.debug('No se pudo eliminar archivo temporal (puede que no exista)');
       }
     } catch (error) {
       logger.error('Error al descargar PDF:', error);
@@ -731,11 +734,13 @@ export function registerInvoiceHandler(bot: any): void {
       const clienteStr = ctx.userState?.clienteNombre || 'Cliente';
       const filePath = await descargarFactura(facturaId, 'xml', folioNumero, clienteStr, ctx);
 
-      if (fs.existsSync(filePath)) {
-        await ctx.replyWithDocument({ source: filePath });
-        fs.unlinkSync(filePath);
-      } else {
-        throw new Error('No se pudo generar el archivo XML');
+      await ctx.replyWithDocument({ source: filePath });
+
+      // Limpiar archivo temporal (async)
+      try {
+        await fs.unlink(filePath);
+      } catch (e) {
+        logger.debug('No se pudo eliminar archivo temporal (puede que no exista)');
       }
     } catch (error) {
       logger.error('Error al descargar XML:', error);
@@ -759,7 +764,7 @@ export function registerInvoiceHandler(bot: any): void {
 
   // Text handler for queries, order data, etc.
   bot.on('text', async (ctx: BotContext, next: () => Promise<void>) => {
-    if (!('text' in ctx.message)) {
+    if (!ctx.message || !('text' in ctx.message)) {
       return next();
     }
     const texto = ctx.message.text;

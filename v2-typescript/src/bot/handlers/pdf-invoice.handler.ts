@@ -142,7 +142,7 @@ export function registerPDFInvoiceHandler(bot: any): void {
   bot.on('document', async (ctx: BotContext, next: () => Promise<void>) => {
     logger.info('========== HANDLER PDF SIMPLIFICADO ==========');
 
-    if (!('document' in ctx.message)) {
+    if (!ctx.message || !('document' in ctx.message)) {
       return next();
     }
 
@@ -223,7 +223,9 @@ export function registerPDFInvoiceHandler(bot: any): void {
       );
 
       // Validate extracted data
-      const validation = PDFAnalysisService.validateExtractedData(analysisResult.analysis);
+      const validation = analysisResult.analysis
+        ? PDFAnalysisService.validateExtractedData(analysisResult.analysis)
+        : { isValid: false, errors: ['No se pudo extraer información del PDF'] };
 
       // STEP 4: Completed
       await updateProgressMessage(
@@ -253,22 +255,26 @@ export function registerPDFInvoiceHandler(bot: any): void {
       }
 
       // Show results
-      await showSimpleAnalysisResults(
-        ctx,
-        {
-          confidence: analysisResult.analysis.confidence,
-          client:
-            typeof analysisResult.analysis.client === 'boolean'
-              ? analysisResult.analysis.client
-              : analysisResult.analysis.client === 'true',
-          clientName: analysisResult.analysis.clientName,
-          clientCode: analysisResult.analysis.clientCode,
-          orderNumber: analysisResult.analysis.orderNumber,
-          totalAmount: analysisResult.analysis.totalAmount,
-          errors: analysisResult.analysis.errors,
-        },
-        validation
-      );
+      if (analysisResult.analysis) {
+        await showSimpleAnalysisResults(
+          ctx,
+          {
+            confidence: analysisResult.analysis.confidence,
+            client:
+              typeof analysisResult.analysis.client === 'boolean'
+                ? analysisResult.analysis.client
+                : analysisResult.analysis.client === 'true',
+            clientName: analysisResult.analysis.clientName ?? '',
+            clientCode: analysisResult.analysis.clientCode ?? '',
+            orderNumber: analysisResult.analysis.orderNumber ?? '',
+            totalAmount: analysisResult.analysis.totalAmount ?? 0,
+            errors: analysisResult.analysis.errors,
+          },
+          validation
+        );
+      } else {
+        await ctx.reply('❌ No se pudo extraer información del PDF.');
+      }
     } catch (error) {
       logger.error('Error procesando PDF:', {
         error: (error as Error).message,

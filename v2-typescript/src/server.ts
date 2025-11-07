@@ -8,7 +8,6 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { Telegraf } from 'telegraf';
 import { config } from '@config/index.js';
 import { connectDatabase } from '@config/database.js';
 import { createModuleLogger } from '@core/utils/logger.js';
@@ -27,6 +26,7 @@ import SafeOperationsService from '@services/safe-operations.service.js';
 import { startJobs } from '@jobs/index.js';
 import NotificationService from '@services/notification.service.js';
 import { createBot } from '@bot/index.js';
+import type { Bot } from '@/types/bot.types.js';
 
 // Define __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -36,12 +36,12 @@ const __dirname = path.dirname(__filename);
 const serverLogger = createModuleLogger('Server');
 
 // Variable for Telegram bot
-let telegramBot: Telegraf | null = null;
+let telegramBot: Bot | null = null;
 
 /**
  * Initialize Telegram bot
  */
-async function initializeTelegramBot(): Promise<Telegraf | null> {
+async function initializeTelegramBot(): Promise<Bot | null> {
   try {
     if (!config.telegram.token) {
       serverLogger.warn('Telegram token not configured');
@@ -91,7 +91,7 @@ async function initializeApp(): Promise<Application> {
   // === TELEGRAM WEBHOOK ===
   app.post('/telegram-webhook', async (req: Request, res: Response) => {
     try {
-      if (telegramBot) {
+      if (telegramBot && telegramBot.handleUpdate) {
         await telegramBot.handleUpdate(req.body);
       }
       res.status(200).json({ ok: true });
