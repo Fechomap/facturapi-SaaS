@@ -96,11 +96,12 @@ const multiUserAuthMiddleware: BotMiddleware = async (
   ctx: BotContext,
   next: () => Promise<void>
 ) => {
-  const telegramId = ctx.from?.id;
+  // Extraer telegramId de forma robusta (mensajes Y callback queries)
+  const telegramId = ctx.from?.id || ctx.message?.from?.id || ctx.callbackQuery?.from?.id;
 
   if (!telegramId) {
-    logger.warn('Request sin telegram ID');
-    await ctx.reply('⛔ Error de autenticación');
+    logger.warn('Request sin telegram ID en ningún contexto (from, message, callbackQuery)');
+    // Para eventos sin usuario (ej. actualizaciones de canal), simplemente los ignoramos
     return;
   }
 

@@ -4,11 +4,9 @@
  */
 
 import { Telegraf } from 'telegraf';
-import { MediaGroup } from '@dietime/telegraf-media-group';
 import type { Logger } from 'pino';
 import type { Bot, BotContext } from '@/types/bot.types.js';
 import { sessionMiddleware } from '../core/auth/session.service.js';
-import { tenantContextMiddleware } from '../core/tenant/tenant.middleware.js';
 import errorHandler from './middlewares/error.middleware.js';
 import tenantMiddlewareBot from './middlewares/tenant.middleware.js';
 import multiUserAuthMiddleware from './middlewares/multi-auth.middleware.js';
@@ -36,10 +34,7 @@ import { registerTestHandlers } from './handlers/test.handler.js';
 import { registerExcelReportHandlers } from './handlers/excel-report.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerPaymentComplementHandler } from './handlers/payment-complement.handler.js';
-import {
-  registerMediaGroupHandler,
-  registerBatchActionHandlers,
-} from './handlers/pdf-batch.handler.js';
+import { registerBatchActionHandlers } from './handlers/pdf-batch.handler.js';
 
 export async function createBot(botLogger: Logger): Promise<Bot> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -56,23 +51,17 @@ export async function createBot(botLogger: Logger): Promise<Bot> {
   // 1. Middleware de Errores (el más externo - catch all)
   errorHandler(bot);
 
-  // 2. Middleware de Media Groups (CRÍTICO: debe ir ANTES de sesión/auth)
-  bot.use(new MediaGroup().middleware());
-  botLogger.info('✅ Middleware de media groups registrado');
-
-  // 3. Middleware de Contexto de Tenant (añade info del tenant al contexto)
-  bot.use(tenantContextMiddleware);
-
-  // 4. Middleware de Sesión (maneja el estado del usuario)
+  // 2. Middleware de Sesión (maneja el estado del usuario)
   bot.use(sessionMiddleware);
 
-  // 5. Middleware de Tenant específico del bot (validaciones adicionales)
+  // 3. Middleware de Tenant específico del bot (validaciones adicionales)
   bot.use(tenantMiddlewareBot);
 
-  // 6. Middleware de Autenticación Multi-Usuario (reemplaza auth.middleware.js)
+  // 4. Middleware de Autenticación Multi-Usuario (maneja tenant + roles + permisos)
+  // NOTA: Este middleware reemplaza tenantContextMiddleware (redundante y conflictivo)
   bot.use(multiUserAuthMiddleware);
 
-  // 7. Registro de Comandos (en orden de prioridad)
+  // 6. Registro de Comandos (en orden de prioridad)
   botLogger.info('Registrando comandos básicos...');
   registerStartCommand(bot);
   registerHelpCommand(bot);
@@ -87,12 +76,11 @@ export async function createBot(botLogger: Logger): Promise<Bot> {
   registerAdminCommands(bot);
   registerUserManagementCommands(bot);
 
-  // 8. Registro de Handlers (procesamiento de documentos y eventos)
+  // 7. Registro de Handlers (procesamiento de documentos y eventos)
   botLogger.info('Registrando handlers...');
   registerClientHandler(bot);
   registerInvoiceHandler(bot);
-  registerMediaGroupHandler(bot); // Handler para lotes de PDFs (media groups)
-  registerPDFInvoiceHandler(bot); // Handler para PDFs individuales
+  registerPDFInvoiceHandler(bot); // Handler para PDFs (individual y lotes)
   registerBatchActionHandlers(bot); // Acciones de botones de lotes
   registerPaymentComplementHandler(bot);
   registerClubAsistenciaHandler(bot);

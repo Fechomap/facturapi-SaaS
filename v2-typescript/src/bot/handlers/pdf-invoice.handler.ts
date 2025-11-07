@@ -17,6 +17,9 @@ import PDFAnalysisService from '@services/pdf-analysis.service.js';
 import InvoiceService from '@services/invoice.service.js';
 import FacturapiService from '@services/facturapi.service.js';
 
+// Batch handler import
+import { handlePdfBatch } from './pdf-batch.handler.js';
+
 const logger = createModuleLogger('bot-pdf-invoice-handler');
 
 // Progress visual utilities
@@ -168,8 +171,11 @@ export function registerPDFInvoiceHandler(bot: any): void {
       return;
     }
 
-    // NOTE: Media groups are now handled by registerMediaGroupHandler() via 'media_group' event
-    // This handler only processes individual PDFs
+    // Route to batch handler if it's part of a media group
+    if (ctx.message.media_group_id) {
+      handlePdfBatch(ctx);
+      return; // CRÍTICO: Detener ejecución para que no se procese como PDF individual
+    }
 
     // Immediate feedback: Show progress as soon as PDF is detected
     const progressMessage = await ctx.reply('📥 Recibiendo PDF...\n⏳ Validando archivo...');

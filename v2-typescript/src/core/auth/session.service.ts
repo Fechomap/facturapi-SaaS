@@ -371,7 +371,9 @@ class SessionService {
    */
   static createMiddleware() {
     return async (ctx: any, next: () => Promise<void>) => {
-      const userId = ctx.from?.id;
+      // Extraer userId de forma robusta (mensajes Y callback queries)
+      const userId = ctx.from?.id || ctx.message?.from?.id || ctx.callbackQuery?.from?.id;
+
       if (!userId) return next();
 
       const isStartCommand =

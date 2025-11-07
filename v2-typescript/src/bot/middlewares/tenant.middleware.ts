@@ -15,8 +15,9 @@ const tenantContextMiddleware: BotMiddleware = async (
   ctx: BotContext,
   next: () => Promise<void>
 ) => {
-  // Asegurar que el ID del usuario esté disponible
-  const telegramId = ctx.from?.id;
+  // Extraer telegramId de forma robusta (mensajes Y callback queries)
+  const telegramId = ctx.from?.id || ctx.message?.from?.id || ctx.callbackQuery?.from?.id;
+
   if (!telegramId) return next();
 
   try {

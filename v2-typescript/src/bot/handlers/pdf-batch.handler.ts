@@ -15,73 +15,115 @@ import { downloadTelegramFile, ensureTempDirExists } from './pdf-invoice.handler
 import PDFAnalysisService from '@services/pdf-analysis.service.js';
 import InvoiceService from '@services/invoice.service.js';
 import FacturapiService from '@services/facturapi.service.js';
+import SessionService from '@/core/auth/session.service.js';
 
 const logger = createModuleLogger('bot-pdf-batch-handler');
 
+// Map para agrupar PDFs por media_group_id
+const pdfGroups = new Map<
+  string,
+  {
+    documents: any[];
+    messageId: number;
+    chatId: number;
+    timeout: NodeJS.Timeout;
+  }
+>();
+
 /**
- * Registra el handler que escucha el evento 'media_group' del middleware
+ * Maneja PDFs que son parte de un media group (lote)
+ * Esta función se llama desde pdf-invoice.handler cuando detecta media_group_id
  */
-export function registerMediaGroupHandler(bot: any): void {
-  logger.info('Registrando handler de media groups...');
+export async function handlePdfBatch(ctx: BotContext) {
+  if (!ctx.message || !('media_group_id' in ctx.message) || !ctx.message.media_group_id) return;
+  if (!('document' in ctx.message) || !ctx.message.document) return;
 
-  bot.on('media_group', async (ctx: BotContext) => {
-    logger.info('========== MEDIA GROUP RECIBIDO ==========');
+  const mediaGroupId = ctx.message.media_group_id;
+  const document = ctx.message.document;
 
-    // El middleware nos da todos los mensajes en ctx.mediaGroup
-    const messages = ctx.mediaGroup;
+  logger.info(`📊 PDF agregado al lote ${mediaGroupId}`);
 
-    if (!messages || messages.length === 0) {
-      logger.warn('Media group vacío recibido');
-      return;
-    }
-
-    // Filtrar solo documentos PDF
-    const pdfMessages = messages.filter((msg: any) => {
-      const doc = msg.document;
-      return doc && doc.file_name && doc.file_name.match(/\.pdf$/i);
+  // Inicialización atómica del grupo
+  if (!pdfGroups.has(mediaGroupId)) {
+    // Crear grupo INMEDIATAMENTE antes de cualquier operación async
+    pdfGroups.set(mediaGroupId, {
+      documents: [],
+      messageId: 0, // Temporal, se actualizará después
+      chatId: ctx.chat!.id,
+      timeout: null as any,
     });
 
-    if (pdfMessages.length === 0) {
-      logger.info('Media group no contiene PDFs, ignorando');
-      return;
-    }
+    // DESPUÉS de crear el grupo, hacer la operación async
+    const msg = await ctx.reply('📥 Recibiendo lote de PDFs...');
+    const group = pdfGroups.get(mediaGroupId)!;
+    group.messageId = msg.message_id;
 
-    logger.info(`📦 Lote de ${pdfMessages.length} PDFs recibido del middleware`);
+    // Configurar timeout SOLO en la primera llamada
+    group.timeout = setTimeout(() => {
+      processPdfGroup(mediaGroupId, ctx).catch((err) => {
+        logger.error({ err, mediaGroupId }, 'Error procesando lote');
+      });
+    }, 2500);
+  }
 
-    // Validar tenant
-    if (!ctx.hasTenant || !ctx.hasTenant()) {
-      await ctx.reply('❌ Para procesar lotes de PDFs, primero debes registrar tu empresa.');
-      return;
-    }
+  // Obtener grupo (ya existe garantizado)
+  const group = pdfGroups.get(mediaGroupId)!;
 
+  // Limpiar timeout anterior y crear uno nuevo
+  if (group.timeout) {
+    clearTimeout(group.timeout);
+  }
+
+  // Agregar documento
+  group.documents.push(document);
+
+  // Actualizar progreso solo si ya tenemos messageId
+  if (group.messageId > 0) {
+    await ctx.telegram
+      .editMessageText(
+        group.chatId,
+        group.messageId,
+        undefined,
+        `📥 Recibiendo PDFs... (${group.documents.length} archivos)`
+      )
+      .catch(() => {});
+  }
+
+  // Recrear timeout
+  group.timeout = setTimeout(() => {
+    processPdfGroup(mediaGroupId, ctx).catch((err) => {
+      logger.error({ err, mediaGroupId }, 'Error procesando lote');
+    });
+  }, 2500);
+}
+
+/**
+ * Procesa el grupo completo de PDFs después del timeout
+ */
+async function processPdfGroup(mediaGroupId: string, ctx: BotContext) {
+  const group = pdfGroups.get(mediaGroupId);
+  if (!group) return;
+
+  // Extraer y eliminar grupo inmediatamente
+  const { documents, messageId, chatId } = group;
+  pdfGroups.delete(mediaGroupId);
+
+  logger.info(`🚀 Procesando lote ${mediaGroupId} con ${documents.length} PDFs`);
+
+  try {
     const tenantId = ctx.getTenantId();
     if (!tenantId) {
-      logger.error('tenantId es undefined después de validación hasTenant()');
-      await ctx.reply('❌ Error: No se pudo identificar tu empresa.');
+      await ctx.telegram.sendMessage(chatId, '❌ Error: No se pudo identificar tu empresa.');
       return;
     }
 
-    logger.info(`✅ tenantId confirmado: ${tenantId}`);
-
-    // Mensaje de progreso inicial
-    const progressMsg = await ctx.reply(
-      `📥 Lote de ${pdfMessages.length} PDFs recibido\n⏳ Iniciando análisis...`
-    );
-
-    try {
-      await processPdfBatch(ctx, pdfMessages, tenantId, progressMsg.message_id);
-    } catch (error: any) {
-      logger.error({ error, tenantId }, 'Error procesando lote de PDFs');
-      await ctx.telegram.editMessageText(
-        ctx.chat!.id,
-        progressMsg.message_id,
-        undefined,
-        `❌ Error procesando el lote: ${error.message}`
-      );
-    }
-  });
-
-  logger.info('✅ Handler de media groups registrado');
+    await processPdfBatch(ctx, documents, tenantId, messageId, chatId);
+  } catch (error: any) {
+    logger.error({ error, mediaGroupId }, 'Error fatal procesando lote');
+    await ctx.telegram
+      .sendMessage(chatId, `❌ Error procesando el lote: ${error.message}`)
+      .catch(() => {});
+  }
 }
 
 /**
@@ -89,13 +131,11 @@ export function registerMediaGroupHandler(bot: any): void {
  */
 async function processPdfBatch(
   ctx: BotContext,
-  pdfMessages: any[],
+  documents: any[],
   tenantId: string,
-  progressMessageId: number
+  progressMessageId: number,
+  chatId: number
 ): Promise<void> {
-  const chatId = ctx.chat!.id;
-  const documents = pdfMessages.map((msg) => msg.document);
-
   logger.info({
     event: 'batch_processing_started',
     tenantId,
@@ -114,16 +154,33 @@ async function processPdfBatch(
   const analysisResults = [];
   const startTime = Date.now();
 
+  // Definir los frames de la barra de progreso
+  const PROGRESS_BARS = [
+    '▱▱▱▱▱▱▱▱▱▱',
+    '▰▱▱▱▱▱▱▱▱▱',
+    '▰▰▰▱▱▱▱▱▱▱',
+    '▰▰▰▰▰▱▱▱▱▱',
+    '▰▰▰▰▰▰▰▱▱▱',
+    '▰▰▰▰▰▰▰▰▰▱',
+    '▰▰▰▰▰▰▰▰▰▰',
+  ];
+
   // Procesar cada PDF secuencialmente
   for (let i = 0; i < documents.length; i++) {
     const doc = documents[i];
 
+    // Barra de progreso simplificada (sin mostrar nombre de archivo)
+    const progress = (i + 1) / documents.length;
+    const barIndex = Math.min(
+      Math.floor(progress * (PROGRESS_BARS.length - 1)),
+      PROGRESS_BARS.length - 1
+    );
     await ctx.telegram
       .editMessageText(
         chatId,
         progressMessageId,
         undefined,
-        `🔄 Analizando PDF ${i + 1} de ${documents.length}: ${doc.file_name}`
+        `🔄 Analizando lote... ${PROGRESS_BARS[barIndex]} (${i + 1}/${documents.length})`
       )
       .catch(() => {});
 
@@ -160,8 +217,30 @@ async function processPdfBatch(
     timestamp: Date.now(),
   };
 
+  // Asegurar que ambos objetos de estado existan
   if (!ctx.session) ctx.session = {};
+  if (!ctx.userState) ctx.userState = {};
+
+  // Asignar los resultados a ambos por consistencia
   ctx.session.batchAnalysis = batchData;
+  ctx.userState.batchAnalysis = batchData;
+
+  const userId = ctx.from?.id || ctx.callbackQuery?.from?.id;
+  if (userId) {
+    // ESTRATEGIA DE FUSIÓN DE V1
+    // Crear el estado unificado para asegurar que no se pierda nada (especialmente tenantId)
+    const stateToSave = {
+      ...ctx.userState,
+      ...ctx.session,
+    };
+
+    // Guardar el estado unificado INMEDIATAMENTE en BD (sin skip logic)
+    await SessionService.saveUserStateImmediate(userId, stateToSave);
+    logger.info(
+      { tenantId, userId },
+      'Sesión del lote de análisis guardada INMEDIATAMENTE en BD usando estrategia de fusión.'
+    );
+  }
 
   const processingTime = Date.now() - startTime;
   logger.info({
@@ -173,22 +252,27 @@ async function processPdfBatch(
     processingTimeMs: processingTime,
   });
 
-  // Mostrar resumen
-  let summaryText = `✅ *Análisis de Lote Completado*\\n\\n`;
-  summaryText += `📊 Total de PDFs: ${batchData.totalProcessed}\\n`;
-  summaryText += `✅ Exitosos: ${batchData.results.length}\\n`;
+  // Mostrar resumen simplificado
+  const successfulCount = batchData.results.length;
+  let summaryText = `✅ *Análisis completado*\\n\\n`;
+  summaryText += `Se procesaron ${batchData.totalProcessed} PDFs\\. De ellos, ${successfulCount} están listos para facturar\\.`;
+
   if (batchData.failedCount > 0) {
-    summaryText += `❌ Fallidos: ${batchData.failedCount}\\n`;
+    summaryText += `\\n\\n⚠️ ${batchData.failedCount} archivos no pudieron ser analizados\\.`;
   }
-  summaryText += `\\nAhora puedes generar las facturas para los PDFs exitosos\\.`;
+
+  // Botones simplificados y más informativos
+  const buttons = [
+    [{ text: `📄 Generar ${successfulCount} Facturas`, callback_data: 'batch_generate_invoices' }],
+  ];
+  if (successfulCount > 0) {
+    buttons.push([{ text: '❌ Cancelar', callback_data: 'batch_cancel' }]);
+  }
 
   await ctx.telegram.editMessageText(chatId, progressMessageId, undefined, summaryText, {
     parse_mode: 'MarkdownV2',
     reply_markup: {
-      inline_keyboard: [
-        [{ text: '📄 Generar Facturas', callback_data: 'batch_generate_invoices' }],
-        [{ text: '❌ Cancelar', callback_data: 'batch_cancel' }],
-      ],
+      inline_keyboard: buttons,
     },
   });
 }
@@ -203,7 +287,7 @@ export function registerBatchActionHandlers(bot: any): void {
   bot.action('batch_generate_invoices', async (ctx: BotContext): Promise<void> => {
     await ctx.answerCbQuery('Iniciando generación de facturas...');
 
-    const batchData = ctx.session?.batchAnalysis;
+    const batchData = ctx.session?.batchAnalysis || (ctx.userState as any)?.batchAnalysis;
     if (!batchData || !batchData.results || batchData.results.length === 0) {
       await ctx.reply(
         '❌ No hay datos de análisis de lote disponibles. Por favor, envía los PDFs de nuevo.'
@@ -226,32 +310,90 @@ export function registerBatchActionHandlers(bot: any): void {
     const invoiceResults: any[] = [];
     const startTime = Date.now();
 
+    // Barra de progreso para generación
+    const PROGRESS_BARS = [
+      '▱▱▱▱▱▱▱▱▱▱',
+      '▰▱▱▱▱▱▱▱▱▱',
+      '▰▰▰▱▱▱▱▱▱▱',
+      '▰▰▰▰▰▱▱▱▱▱',
+      '▰▰▰▰▰▰▰▱▱▱',
+      '▰▰▰▰▰▰▰▰▰▱',
+      '▰▰▰▰▰▰▰▰▰▰',
+    ];
+
     for (let i = 0; i < batchData.results.length; i++) {
       const result = batchData.results[i];
+
+      // Barra de progreso simplificada
+      const progress = (i + 1) / batchData.results.length;
+      const barIndex = Math.min(
+        Math.floor(progress * (PROGRESS_BARS.length - 1)),
+        PROGRESS_BARS.length - 1
+      );
       await ctx.telegram
         .editMessageText(
           ctx.chat!.id,
           progressMsg.message_id,
           undefined,
-          `🔄 Generando factura ${i + 1} de ${batchData.results.length}: ${result.fileName}`
+          `🔄 Generando facturas... ${PROGRESS_BARS[barIndex]} (${i + 1}/${batchData.results.length})`
         )
         .catch(() => {});
 
       try {
         const analysis = result.data;
-        const customer = await prisma.tenantCustomer.findFirst({
-          where: { tenantId, legalName: { equals: analysis.clientName, mode: 'insensitive' } },
+
+        // ESTRATEGIA HÍBRIDA DE V1: BD local + fallback a FacturAPI
+        let clienteId: string;
+        let localCustomerDbId: number | null = null;
+        let clienteNombre: string;
+
+        // 1. Buscar en BD local con 'contains' (más flexible que 'equals')
+        const localCustomer = await prisma.tenantCustomer.findFirst({
+          where: {
+            tenantId,
+            legalName: { contains: analysis.clientName, mode: 'insensitive' },
+          },
         });
 
-        if (!customer) {
-          throw new Error(`Cliente no encontrado: ${analysis.clientName}`);
+        if (localCustomer) {
+          // Cliente encontrado localmente
+          clienteId = localCustomer.facturapiCustomerId;
+          localCustomerDbId = Number(localCustomer.id);
+          clienteNombre = localCustomer.legalName;
+          logger.info(
+            { customerName: localCustomer.legalName, fileName: result.fileName },
+            'Cliente encontrado en BD local.'
+          );
+        } else {
+          // 2. Fallback: Buscar en FacturAPI
+          logger.warn(
+            { customerName: analysis.clientName, fileName: result.fileName },
+            'Cliente no encontrado en BD local, buscando en FacturAPI como fallback.'
+          );
+          const facturapi = await FacturapiService.getFacturapiClient(tenantId);
+          const clientes = await facturapi.customers.list({ q: analysis.clientName });
+
+          if (clientes?.data?.length > 0) {
+            // Cliente encontrado en FacturAPI
+            clienteId = clientes.data[0].id;
+            clienteNombre = clientes.data[0].legal_name;
+            logger.info(
+              { customerName: clientes.data[0].legal_name, fileName: result.fileName },
+              'Cliente encontrado en FacturAPI.'
+            );
+            // localCustomerDbId se mantiene como null
+          } else {
+            // Si no se encuentra en ningún lado, lanzar error
+            throw new Error(`Cliente no encontrado: ${analysis.clientName}`);
+          }
         }
 
+        // Proceder a generar la factura con el clienteId encontrado
         const invoice = await InvoiceService.generateInvoice(
           {
-            clienteId: customer.facturapiCustomerId,
-            localCustomerDbId: Number(customer.id),
-            clienteNombre: customer.legalName,
+            clienteId: clienteId,
+            localCustomerDbId: localCustomerDbId ?? undefined,
+            clienteNombre: clienteNombre,
             numeroPedido: analysis.orderNumber,
             claveProducto: '78101803',
             monto: analysis.totalAmount,
@@ -265,13 +407,51 @@ export function registerBatchActionHandlers(bot: any): void {
           invoice,
         });
       } catch (error: any) {
-        logger.error({ error, fileName: result.fileName }, 'Error generando factura');
-        invoiceResults.push({ fileName: result.fileName, success: false, error: error.message });
+        // Logging detallado del error
+        logger.error(
+          {
+            error: error,
+            errorMessage: error?.message,
+            errorStack: error?.stack,
+            errorName: error?.name,
+            fileName: result.fileName,
+            analysisData: result.data,
+          },
+          'Error generando factura del lote'
+        );
+        invoiceResults.push({
+          fileName: result.fileName,
+          success: false,
+          error: error?.message || error?.toString() || 'Error desconocido',
+        });
       }
     }
 
+    // Asegurar que ambos objetos de estado existan
     if (!ctx.session) ctx.session = {};
+    if (!ctx.userState) ctx.userState = {};
+
+    // Asignar los resultados a ambos por consistencia
     ctx.session.invoiceResults = invoiceResults;
+    ctx.userState.invoiceResults = invoiceResults;
+
+    const userId = ctx.from?.id || ctx.callbackQuery?.from?.id;
+    if (userId) {
+      // ESTRATEGIA DE FUSIÓN DE V1
+      // Crear el estado unificado para asegurar que no se pierda nada (especialmente tenantId)
+      const stateToSave = {
+        ...ctx.userState,
+        ...ctx.session,
+        invoiceResults: invoiceResults,
+      };
+
+      // Guardar el estado unificado INMEDIATAMENTE en BD (sin skip logic)
+      await SessionService.saveUserStateImmediate(userId, stateToSave);
+      logger.info(
+        { tenantId, userId },
+        'Sesión de resultados de facturación guardada INMEDIATAMENTE en BD usando estrategia de fusión.'
+      );
+    }
 
     const successCount = invoiceResults.filter((r) => r.success).length;
     const failCount = invoiceResults.filter((r) => !r.success).length;
@@ -285,9 +465,13 @@ export function registerBatchActionHandlers(bot: any): void {
       totalTimeMs: totalTime,
     });
 
-    let summaryText = `*Resumen de Facturación de Lote*\\n\\n`;
-    summaryText += `✅ Facturas generadas: ${successCount}\\n`;
-    summaryText += `❌ Errores: ${failCount}\\n`;
+    // Resumen simplificado
+    let summaryText = `✅ *Facturación completada*\\n\\n`;
+    summaryText += `Se generaron ${successCount} facturas exitosamente\\.`;
+
+    if (failCount > 0) {
+      summaryText += `\\n\\n⚠️ ${failCount} facturas no pudieron generarse\\.`;
+    }
 
     await ctx.telegram.editMessageText(
       ctx.chat!.id,
@@ -345,8 +529,19 @@ export function registerBatchActionHandlers(bot: any): void {
  * Descarga facturas del lote en formato ZIP
  */
 async function downloadBatchZip(ctx: BotContext, type: 'pdf' | 'xml'): Promise<void> {
-  const invoiceResults = ctx.session?.invoiceResults;
+  // Los datos pueden estar en ctx.session O ctx.userState (depende de cómo se cargó)
+  const invoiceResults = ctx.session?.invoiceResults || (ctx.userState as any)?.invoiceResults;
+
   if (!invoiceResults) {
+    logger.error(
+      {
+        hasSession: !!ctx.session,
+        hasUserState: !!ctx.userState,
+        sessionKeys: ctx.session ? Object.keys(ctx.session) : 'null',
+        userStateKeys: ctx.userState ? Object.keys(ctx.userState) : 'null',
+      },
+      'No se encontraron invoiceResults'
+    );
     await ctx.reply('❌ No se encontraron resultados de facturación en la sesión.');
     return;
   }
