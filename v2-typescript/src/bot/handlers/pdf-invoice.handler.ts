@@ -16,6 +16,7 @@ import { prisma } from '@/config/database.js';
 import PDFAnalysisService from '@services/pdf-analysis.service.js';
 import InvoiceService from '@services/invoice.service.js';
 import FacturapiService from '@services/facturapi.service.js';
+import SessionService from '@/core/auth/session.service.js';
 
 // Batch handler import
 import { handlePdfBatch } from './pdf-batch.handler.js';
@@ -310,29 +311,8 @@ export function registerPDFInvoiceHandler(bot: any): void {
     // Answer callback query immediately
     await ctx.answerCbQuery();
 
-    // Retry if data not ready
-    let retries = 3;
-    let analysisData: AnalysisData | null = null;
-
-    while (retries > 0) {
-      analysisData = ctx.userState?.pdfAnalysis;
-
-      if (analysisData && analysisData.id === analysisId) {
-        break;
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      if (ctx.reloadSession) {
-        try {
-          await ctx.reloadSession();
-        } catch (error) {
-          logger.error('Error recargando sesión:', error);
-        }
-      }
-
-      retries--;
-    }
+    // REGLA DE ORO: Lectura simple y directa de ctx.userState
+    const analysisData: AnalysisData | null = ctx.userState?.pdfAnalysis;
 
     if (!analysisData || analysisData.id !== analysisId) {
       await ctx.telegram.editMessageText(
@@ -356,24 +336,12 @@ export function registerPDFInvoiceHandler(bot: any): void {
       return;
     }
 
-    if (!ctx.userState) {
-      ctx.userState = {};
-    }
-    if (!ctx.session) {
-      ctx.session = {};
-    }
-
-    let analysisData: AnalysisData | null = ctx.userState?.pdfAnalysis;
+    // REGLA DE ORO: Solo leer de ctx.userState
+    const analysisData: AnalysisData | null = ctx.userState?.pdfAnalysis;
 
     if (!analysisData || analysisData.id !== analysisId) {
-      analysisData = ctx.session?.pdfAnalysis;
-
-      if (!analysisData || analysisData.id !== analysisId) {
-        await ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
-        return;
-      }
-
-      ctx.userState.pdfAnalysis = analysisData;
+      await ctx.reply('❌ Los datos han expirado. Sube el PDF nuevamente.');
+      return;
     }
 
     await startManualEditFlow(ctx, analysisData);
@@ -393,9 +361,6 @@ async function showSimpleAnalysisResults(
   if (!ctx.userState) {
     ctx.userState = {};
   }
-  if (!ctx.session) {
-    ctx.session = {};
-  }
 
   const analysisData: AnalysisData = {
     id: analysisId,
@@ -404,15 +369,14 @@ async function showSimpleAnalysisResults(
     timestamp: Date.now(),
   };
 
+  // REGLA DE ORO: Solo escribir en ctx.userState
   ctx.userState.pdfAnalysis = analysisData;
-  ctx.session.pdfAnalysis = analysisData;
 
-  try {
-    if (ctx.saveSession && typeof ctx.saveSession === 'function') {
-      await ctx.saveSession();
-    }
-  } catch (error) {
-    logger.error('Error guardando análisis PDF en sesión:', error);
+  // CRÍTICO: Forzar guardado inmediato del estado
+  const userId = ctx.from?.id || ctx.callbackQuery?.from?.id;
+  if (userId) {
+    await SessionService.saveUserStateImmediate(userId, ctx.userState);
+    logger.info({ userId }, 'Análisis de PDF individual guardado en userState.');
   }
 
   let message = '🔍 **Análisis Completado**\n\n';

@@ -536,7 +536,7 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
     // Obtener cliente de FacturAPI
     const facturapi = await FacturapiService.getFacturapiClient(tenantId);
 
-    await ctx.reply(
+    const progressMsg = await ctx.reply(
       `📤 Generando ${escotelData.totalHojas} facturas en FacturAPI...\n⏱️ Por favor espere...`
     );
 
@@ -582,11 +582,16 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
           tieneDiscrepancia: facturaInfo.tieneDiscrepancia,
         });
 
-        // Actualizar progreso cada 5 facturas
+        // Actualizar progreso cada 5 facturas (editar el MISMO mensaje)
         if ((i + 1) % 5 === 0 || i + 1 === escotelData.facturas.length) {
-          await ctx.reply(
-            `⏳ Progreso: ${i + 1}/${escotelData.facturas.length} facturas generadas...`
-          );
+          await ctx.telegram
+            .editMessageText(
+              ctx.chat!.id,
+              progressMsg.message_id,
+              undefined,
+              `⏳ Progreso: ${i + 1}/${escotelData.facturas.length} facturas generadas...`
+            )
+            .catch(() => {}); // Ignorar errores si el mensaje no cambió
         }
       } catch (error) {
         logger.error(
@@ -806,49 +811,65 @@ async function descargarZipEscotel(ctx: Context, type: 'pdf' | 'xml'): Promise<v
 
     archive.pipe(output);
 
-    let filesAdded = 0;
-    let errores = 0;
+    // OPTIMIZACIÓN: Descargas en CHUNKS (evitar saturar la API con 81 requests)
+    logger.info(`Iniciando descarga de ${facturasGuardadas.length} archivos ${type} en lotes...`);
 
-    // Descargar y agregar cada factura al ZIP
-    for (let i = 0; i < facturasGuardadas.length; i++) {
-      const factura = facturasGuardadas[i];
+    const downloadedFiles: any[] = [];
+    const CHUNK_SIZE = 10; // Descargar 10 a la vez para no saturar FacturAPI
 
-      // Actualizar progreso cada 5 facturas
-      if (i % 5 === 0 && ctx.chat?.id) {
-        await ctx.telegram.editMessageText(
-          ctx.chat.id,
-          progressMsg.message_id,
-          undefined,
-          `📦 Descargando ${i + 1}/${facturasGuardadas.length} ${type.toUpperCase()}s...\n⏱️ Por favor espere...`
-        );
-      }
+    // Procesar en chunks de 10
+    for (let chunkStart = 0; chunkStart < facturasGuardadas.length; chunkStart += CHUNK_SIZE) {
+      const chunk = facturasGuardadas.slice(chunkStart, chunkStart + CHUNK_SIZE);
 
-      try {
+      // Actualizar progreso
+      await ctx.telegram.editMessageText(
+        ctx.chat!.id,
+        progressMsg.message_id,
+        undefined,
+        `📦 Descargando ${Math.min(chunkStart + CHUNK_SIZE, facturasGuardadas.length)}/${facturasGuardadas.length} ${type.toUpperCase()}s...`
+      ).catch(() => {});
+
+      // Descargar este chunk en paralelo
+      const chunkPromises = chunk.map((factura: any) => {
         const facturaId = factura.factura.id;
         const apiUrl = `https://www.facturapi.io/v2/invoices/${facturaId}/${type}`;
 
-        const response = await axios({
+        return axios({
           method: 'GET',
           url: apiUrl,
           responseType: 'arraybuffer',
           headers: {
             Authorization: `Bearer ${tenant.facturapiApiKey}`,
           },
-          timeout: 30000,
-        });
+          timeout: 60000, // Aumentar timeout a 60s
+        })
+          .then((response) => {
+            const fileData = Buffer.from(response.data);
+            const fileName = `${factura.factura.series}${factura.factura.folio_number}.${type}`;
+            return { fileName, fileBuffer: fileData };
+          })
+          .catch((error) => {
+            logger.error({ nombreHoja: factura.nombreHoja, type, error: error.message }, 'Error descargando archivo');
+            return null;
+          });
+      });
 
-        const fileData = Buffer.from(response.data);
-        const fileName = `${factura.factura.series}${factura.factura.folio_number}.${type}`;
-        archive.append(fileData, { name: fileName });
+      // Esperar a que termine este chunk antes de continuar con el siguiente
+      const chunkResults = await Promise.all(chunkPromises);
+      downloadedFiles.push(...chunkResults);
+    }
+
+    // Añadir archivos descargados al ZIP
+    let filesAdded = 0;
+    for (const file of downloadedFiles) {
+      if (file) {
+        archive.append(file.fileBuffer, { name: file.fileName });
         filesAdded++;
-      } catch (error) {
-        logger.error(
-          { nombreHoja: factura.nombreHoja, type, error },
-          'Error descargando archivo para ZIP'
-        );
-        errores++;
       }
     }
+
+    const errores = downloadedFiles.filter((f) => !f).length;
+    logger.info(`${filesAdded} de ${facturasGuardadas.length} archivos descargados exitosamente.`);
 
     // Agregar el reporte Excel al ZIP
     try {

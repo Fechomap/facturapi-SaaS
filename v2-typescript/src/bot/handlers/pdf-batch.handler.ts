@@ -217,28 +217,19 @@ async function processPdfBatch(
     timestamp: Date.now(),
   };
 
-  // Asegurar que ambos objetos de estado existan
-  if (!ctx.session) ctx.session = {};
+  // REGLA DE ORO: ctx.userState es la única fuente de verdad
   if (!ctx.userState) ctx.userState = {};
 
-  // Asignar los resultados a ambos por consistencia
-  ctx.session.batchAnalysis = batchData;
+  // Guardar resultados en userState (única fuente de verdad)
   ctx.userState.batchAnalysis = batchData;
 
   const userId = ctx.from?.id || ctx.callbackQuery?.from?.id;
   if (userId) {
-    // ESTRATEGIA DE FUSIÓN DE V1
-    // Crear el estado unificado para asegurar que no se pierda nada (especialmente tenantId)
-    const stateToSave = {
-      ...ctx.userState,
-      ...ctx.session,
-    };
-
-    // Guardar el estado unificado INMEDIATAMENTE en BD (sin skip logic)
-    await SessionService.saveUserStateImmediate(userId, stateToSave);
+    // Guardar userState completo INMEDIATAMENTE en BD
+    await SessionService.saveUserStateImmediate(userId, ctx.userState);
     logger.info(
       { tenantId, userId },
-      'Sesión del lote de análisis guardada INMEDIATAMENTE en BD usando estrategia de fusión.'
+      'Sesión del lote de análisis guardada en BD (solo userState según POST_MORTEM).'
     );
   }
 
@@ -287,7 +278,8 @@ export function registerBatchActionHandlers(bot: any): void {
   bot.action('batch_generate_invoices', async (ctx: BotContext): Promise<void> => {
     await ctx.answerCbQuery('Iniciando generación de facturas...');
 
-    const batchData = ctx.session?.batchAnalysis || (ctx.userState as any)?.batchAnalysis;
+    // REGLA DE ORO: solo leer de ctx.userState
+    const batchData = ctx.userState?.batchAnalysis;
     if (!batchData || !batchData.results || batchData.results.length === 0) {
       await ctx.reply(
         '❌ No hay datos de análisis de lote disponibles. Por favor, envía los PDFs de nuevo.'
@@ -427,29 +419,19 @@ export function registerBatchActionHandlers(bot: any): void {
       }
     }
 
-    // Asegurar que ambos objetos de estado existan
-    if (!ctx.session) ctx.session = {};
+    // REGLA DE ORO: ctx.userState es la única fuente de verdad
     if (!ctx.userState) ctx.userState = {};
 
-    // Asignar los resultados a ambos por consistencia
-    ctx.session.invoiceResults = invoiceResults;
+    // Guardar resultados en userState (única fuente de verdad)
     ctx.userState.invoiceResults = invoiceResults;
 
     const userId = ctx.from?.id || ctx.callbackQuery?.from?.id;
     if (userId) {
-      // ESTRATEGIA DE FUSIÓN DE V1
-      // Crear el estado unificado para asegurar que no se pierda nada (especialmente tenantId)
-      const stateToSave = {
-        ...ctx.userState,
-        ...ctx.session,
-        invoiceResults: invoiceResults,
-      };
-
-      // Guardar el estado unificado INMEDIATAMENTE en BD (sin skip logic)
-      await SessionService.saveUserStateImmediate(userId, stateToSave);
+      // Guardar userState completo INMEDIATAMENTE en BD
+      await SessionService.saveUserStateImmediate(userId, ctx.userState);
       logger.info(
         { tenantId, userId },
-        'Sesión de resultados de facturación guardada INMEDIATAMENTE en BD usando estrategia de fusión.'
+        'Sesión de resultados de facturación guardada en BD (solo userState según POST_MORTEM).'
       );
     }
 
@@ -507,9 +489,10 @@ export function registerBatchActionHandlers(bot: any): void {
   bot.action('batch_finish', async (ctx: BotContext): Promise<void> => {
     await ctx.answerCbQuery('Proceso finalizado.');
     await ctx.deleteMessage().catch(() => {});
-    if (ctx.session) {
-      delete ctx.session.batchAnalysis;
-      delete ctx.session.invoiceResults;
+    // REGLA DE ORO: limpiar solo userState
+    if (ctx.userState) {
+      delete ctx.userState.batchAnalysis;
+      delete ctx.userState.invoiceResults;
     }
   });
 
@@ -517,8 +500,9 @@ export function registerBatchActionHandlers(bot: any): void {
   bot.action('batch_cancel', async (ctx: BotContext): Promise<void> => {
     await ctx.answerCbQuery('Proceso cancelado.');
     await ctx.deleteMessage().catch(() => {});
-    if (ctx.session) {
-      delete ctx.session.batchAnalysis;
+    // REGLA DE ORO: limpiar solo userState
+    if (ctx.userState) {
+      delete ctx.userState.batchAnalysis;
     }
   });
 
@@ -529,19 +513,8 @@ export function registerBatchActionHandlers(bot: any): void {
  * Descarga facturas del lote en formato ZIP
  */
 async function downloadBatchZip(ctx: BotContext, type: 'pdf' | 'xml'): Promise<void> {
-  // Los datos pueden estar en ctx.session O ctx.userState (depende de cómo se cargó)
-  const invoiceResults = ctx.session?.invoiceResults || (ctx.userState as any)?.invoiceResults;
-
+  const invoiceResults = (ctx.userState as any)?.invoiceResults;
   if (!invoiceResults) {
-    logger.error(
-      {
-        hasSession: !!ctx.session,
-        hasUserState: !!ctx.userState,
-        sessionKeys: ctx.session ? Object.keys(ctx.session) : 'null',
-        userStateKeys: ctx.userState ? Object.keys(ctx.userState) : 'null',
-      },
-      'No se encontraron invoiceResults'
-    );
     await ctx.reply('❌ No se encontraron resultados de facturación en la sesión.');
     return;
   }
@@ -553,7 +526,7 @@ async function downloadBatchZip(ctx: BotContext, type: 'pdf' | 'xml'): Promise<v
   }
 
   const progressMsg = await ctx.reply(
-    `📦 Preparando ZIP con ${successfulInvoices.length} ${type.toUpperCase()}s...`
+    `📦 Preparando ZIP con ${successfulInvoices.length} ${type.toUpperCase()}s... (Esto puede tardar un momento)`
   );
   const tenantId = ctx.getTenantId();
   const facturapi = await FacturapiService.getFacturapiClient(tenantId!);
@@ -562,66 +535,81 @@ async function downloadBatchZip(ctx: BotContext, type: 'pdf' | 'xml'): Promise<v
     const tempDir = await ensureTempDirExists();
     const zipPath = path.join(tempDir, `facturas_${type}_${Date.now()}.zip`);
     const output = createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 8 } });
+
+    // Optimización: Reducir compresión para PDFs (ya están comprimidos)
+    const compressionLevel = type === 'pdf' ? 1 : 8;
+    const archive = archiver('zip', { zlib: { level: compressionLevel } });
 
     archive.pipe(output);
 
-    for (let i = 0; i < successfulInvoices.length; i++) {
-      const result = successfulInvoices[i];
-      await ctx.telegram
-        .editMessageText(
-          ctx.chat!.id,
-          progressMsg.message_id,
-          undefined,
-          `📦 Descargando y comprimiendo ${i + 1} de ${successfulInvoices.length}...`
-        )
-        .catch(() => {});
+    // --- INICIO DE LA OPTIMIZACIÓN CLAVE: DESCARGAS EN PARALELO ---
+    logger.info(
+      `Iniciando descarga paralela de ${successfulInvoices.length} archivos de tipo ${type}.`
+    );
 
-      try {
-        // Download individual file from FacturAPI
-        const fileData =
-          type === 'pdf'
-            ? await facturapi.invoices.downloadPdf(result.invoice.id)
-            : await facturapi.invoices.downloadXml(result.invoice.id);
+    const downloadPromises = successfulInvoices.map((result: any) => {
+      const downloadAction =
+        type === 'pdf'
+          ? facturapi.invoices.downloadPdf(result.invoice.id)
+          : facturapi.invoices.downloadXml(result.invoice.id);
 
-        // Convert to Buffer if needed
-        let fileBuffer: Buffer;
-        if (fileData instanceof Blob) {
-          const arrayBuffer = await fileData.arrayBuffer();
-          fileBuffer = Buffer.from(arrayBuffer);
-        } else if (fileData instanceof ReadableStream) {
-          const reader = fileData.getReader();
-          const chunks: Uint8Array[] = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
+      return downloadAction
+        .then(async (fileData: any) => {
+          let fileBuffer: Buffer;
+          if (fileData instanceof Blob) {
+            const arrayBuffer = await fileData.arrayBuffer();
+            fileBuffer = Buffer.from(arrayBuffer);
+          } else if (fileData instanceof ReadableStream) {
+            const reader = fileData.getReader();
+            const chunks: Uint8Array[] = [];
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+            }
+            fileBuffer = Buffer.concat(chunks);
+          } else {
+            fileBuffer = fileData as unknown as Buffer;
           }
-          fileBuffer = Buffer.concat(chunks);
-        } else {
-          // Assume it's already a Buffer
-          fileBuffer = fileData as unknown as Buffer;
-        }
 
-        const fileName = `${result.invoice.series || ''}${result.invoice.folio_number}.${type}`;
-        archive.append(fileBuffer, { name: fileName });
-      } catch (error: any) {
-        logger.error(
-          { error },
-          `No se pudo descargar ${type} para la factura ${result.invoice.id}`
-        );
+          const fileName = `${result.invoice.series || ''}${result.invoice.folio_number}.${type}`;
+          return { fileName, fileBuffer };
+        })
+        .catch((error) => {
+          logger.error(
+            { error },
+            `No se pudo descargar ${type} para la factura ${result.invoice.id}`
+          );
+          return null; // Retornar null si una descarga falla
+        });
+    });
+
+    // Ejecutar todas las promesas de descarga en paralelo
+    const downloadedFiles = await Promise.all(downloadPromises);
+
+    // --- FIN DE LA OPTIMIZACIÓN CLAVE ---
+
+    // Añadir los archivos descargados al ZIP
+    let filesAdded = 0;
+    for (const file of downloadedFiles) {
+      if (file) {
+        archive.append(file.fileBuffer, { name: file.fileName });
+        filesAdded++;
       }
     }
+
+    logger.info(`${filesAdded} de ${successfulInvoices.length} archivos añadidos al ZIP.`);
 
     await archive.finalize();
 
     await new Promise<void>((resolve, reject) => {
-      output.on('close', () => resolve());
-      output.on('error', (err: any) => reject(err));
+      output.on('close', resolve);
+      output.on('error', reject);
     });
 
-    await ctx.replyWithDocument({ source: zipPath, filename: `facturas_${type}.zip` });
     await ctx.deleteMessage(progressMsg.message_id).catch(() => {});
+    await ctx.replyWithDocument({ source: zipPath, filename: `facturas_${type}.zip` });
+
     await fs.unlink(zipPath);
   } catch (error: any) {
     logger.error({ error }, `Fallo fatal al crear el ZIP de ${type}`);
