@@ -71,7 +71,11 @@ class BatchProcessorService {
     return true;
   }
 
-  static async downloadPDF(ctx: any, document: TelegramDocument, batchId: string): Promise<PDFInfo> {
+  static async downloadPDF(
+    ctx: any,
+    document: TelegramDocument,
+    batchId: string
+  ): Promise<PDFInfo> {
     if (!fs.existsSync(TEMP_DIR)) {
       fs.mkdirSync(TEMP_DIR, { recursive: true });
     }

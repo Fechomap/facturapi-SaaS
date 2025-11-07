@@ -77,15 +77,14 @@ async function updateProgress(
   status: string
 ) {
   try {
-    const progressBar = '█'.repeat(Math.floor(progress / 10)) + '░'.repeat(10 - Math.floor(progress / 10));
+    const progressBar =
+      '█'.repeat(Math.floor(progress / 10)) + '░'.repeat(10 - Math.floor(progress / 10));
 
     await ctx.telegram.editMessageText(
       chatId,
       messageId,
       undefined,
-      `📊 **Generando Reporte Excel**\n\n` +
-        `${progressBar} ${progress}%\n\n` +
-        `📝 ${status}`,
+      `📊 **Generando Reporte Excel**\n\n` + `${progressBar} ${progress}%\n\n` + `📝 ${status}`,
       { parse_mode: 'Markdown' }
     );
   } catch (error: any) {

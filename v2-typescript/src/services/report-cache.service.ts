@@ -151,7 +151,9 @@ class ReportCacheService {
 
       if (keys.length > 0) {
         await this.client.del(keys);
-        console.log(`🗑️ Cache invalidado para tenant ${tenantId}: ${keys.length} claves eliminadas`);
+        console.log(
+          `🗑️ Cache invalidado para tenant ${tenantId}: ${keys.length} claves eliminadas`
+        );
       }
 
       return true;

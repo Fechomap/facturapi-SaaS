@@ -150,7 +150,9 @@ export async function processExpiredSubscriptions(): Promise<void> {
       },
     });
 
-    subscriptionLogger.info(`Se encontraron ${expiredSubscriptions.length} suscripciones expiradas`);
+    subscriptionLogger.info(
+      `Se encontraron ${expiredSubscriptions.length} suscripciones expiradas`
+    );
 
     for (const subscription of expiredSubscriptions) {
       try {

@@ -66,7 +66,10 @@ class RedisBatchStateService {
         return { success: false, error: result.error };
       }
 
-      logger.info({ userId, batchId, ttl: BATCH_EXPIRATION_SECONDS }, 'Batch data guardado exitosamente');
+      logger.info(
+        { userId, batchId, ttl: BATCH_EXPIRATION_SECONDS },
+        'Batch data guardado exitosamente'
+      );
       return { success: true, data: batchId };
     } catch (error) {
       logger.error({ userId, batchId, error }, 'Error guardando batch data');

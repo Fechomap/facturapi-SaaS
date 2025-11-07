@@ -19,28 +19,30 @@ export function registerJobs(): void {
   jobsLogger.info('Iniciando registro de jobs programados');
 
   try {
-    Object.entries(subscriptionJobs as Record<string, JobConfig>).forEach(([jobName, jobConfig]) => {
-      if (jobConfig.schedule && jobConfig.task) {
-        cron.schedule(
-          jobConfig.schedule,
-          async () => {
-            jobsLogger.info(`Ejecutando job: ${jobName}`);
-            try {
-              await jobConfig.task();
-              jobsLogger.info(`Job ${jobName} completado exitosamente`);
-            } catch (error) {
-              jobsLogger.error({ error }, `Error en job ${jobName}`);
+    Object.entries(subscriptionJobs as Record<string, JobConfig>).forEach(
+      ([jobName, jobConfig]) => {
+        if (jobConfig.schedule && jobConfig.task) {
+          cron.schedule(
+            jobConfig.schedule,
+            async () => {
+              jobsLogger.info(`Ejecutando job: ${jobName}`);
+              try {
+                await jobConfig.task();
+                jobsLogger.info(`Job ${jobName} completado exitosamente`);
+              } catch (error) {
+                jobsLogger.error({ error }, `Error en job ${jobName}`);
+              }
+            },
+            {
+              scheduled: true,
+              timezone: 'America/Mexico_City',
             }
-          },
-          {
-            scheduled: true,
-            timezone: 'America/Mexico_City',
-          }
-        );
+          );
 
-        jobsLogger.info(`Job registrado: ${jobName} (${jobConfig.schedule})`);
+          jobsLogger.info(`Job registrado: ${jobName} (${jobConfig.schedule})`);
+        }
       }
-    });
+    );
 
     Object.entries(invoiceJobs as Record<string, JobConfig>).forEach(([jobName, jobConfig]) => {
       if (jobConfig.schedule && jobConfig.task) {

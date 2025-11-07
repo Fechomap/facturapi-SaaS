@@ -220,7 +220,8 @@ class OnboardingProgressService {
         completedSteps,
         pendingSteps,
         progress: Math.round(
-          (completedSteps.filter((s) => REQUIRED_STEPS.includes(s)).length / REQUIRED_STEPS.length) *
+          (completedSteps.filter((s) => REQUIRED_STEPS.includes(s)).length /
+            REQUIRED_STEPS.length) *
             100
         ),
         method: 'manual_events',

@@ -165,7 +165,10 @@ class FacturapiService {
 
       try {
         // Create instance with API key
-        logger.debug({ tenantId, apiKeyPrefix: apiKey.substring(0, 10) }, 'Creating FacturAPI client');
+        logger.debug(
+          { tenantId, apiKeyPrefix: apiKey.substring(0, 10) },
+          'Creating FacturAPI client'
+        );
         const client = new FacturapiConstructor(apiKey);
 
         // Save to cache
@@ -186,7 +189,7 @@ class FacturapiService {
             errorMessage: error?.message,
             errorName: error?.name,
             errorStack: error?.stack,
-            apiKeyPrefix: apiKey?.substring(0, 10)
+            apiKeyPrefix: apiKey?.substring(0, 10),
           },
           'Error creating FacturAPI client'
         );

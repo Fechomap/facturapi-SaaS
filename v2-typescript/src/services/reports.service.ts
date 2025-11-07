@@ -392,7 +392,10 @@ class ReportsService {
       });
 
       if (admins.length === 0) {
-        reportsLogger.warn({ tenantId }, 'No se encontraron administradores para enviar el reporte');
+        reportsLogger.warn(
+          { tenantId },
+          'No se encontraron administradores para enviar el reporte'
+        );
         return {
           success: false,
           error: 'No hay administradores para enviar el reporte',

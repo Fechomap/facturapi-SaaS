@@ -73,10 +73,7 @@ export async function syncInvoiceStatus(): Promise<void> {
               `Tenant: ${invoice.tenant.businessName}\n`;
 
             for (const admin of adminUsers) {
-              await NotificationService.sendTelegramNotification(
-                Number(admin.telegramId),
-                message
-              );
+              await NotificationService.sendTelegramNotification(Number(admin.telegramId), message);
             }
           }
         }

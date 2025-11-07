@@ -45,5 +45,5 @@ export const BOT_ACTIONS = {
 } as const;
 
 // Type helpers para autocompletado
-export type BotFlow = typeof BOT_FLOWS[keyof typeof BOT_FLOWS];
-export type BotAction = typeof BOT_ACTIONS[keyof typeof BOT_ACTIONS];
+export type BotFlow = (typeof BOT_FLOWS)[keyof typeof BOT_FLOWS];
+export type BotAction = (typeof BOT_ACTIONS)[keyof typeof BOT_ACTIONS];
