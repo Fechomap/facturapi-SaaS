@@ -9,7 +9,7 @@
     "dev:bot": "tsx watch src/bot.ts",
     "dev:cluster": "tsx watch src/cluster.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:bot\"",
-    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json --resolve-full-paths",
     "start": "node dist/server.js",
     "start:cluster": "node dist/cluster.js",
     "start:bot": "node dist/bot.js",
