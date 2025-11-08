@@ -53,6 +53,10 @@ import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 // Utils
 import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
+import {
+  calculateFinancialDataFromFacturaData,
+  extractAdditionalDataFromFacturapiResponse,
+} from '../utils/invoice-calculation.utils.js';
 
 // Logger
 import { createModuleLogger } from '@core/utils/logger.js';
@@ -556,8 +560,14 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
       const facturaInfo = escotelData.facturas[i];
 
       try {
+        // Calcular datos ANTES de enviar a FacturAPI
+        const calculatedData = calculateFinancialDataFromFacturaData(facturaInfo.facturaData);
+
         // Crear factura directamente (sin queue por ahora, se puede agregar después)
         const factura = await facturapi.invoices.create(facturaInfo.facturaData);
+
+        // Extraer datos de la respuesta
+        const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
 
         // Registrar en BD
         await TenantService.registerInvoice(
@@ -570,7 +580,22 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
           escotelData.clienteId,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-          factura.uuid
+          factura.uuid,
+          {
+            subtotal: calculatedData.subtotal,
+            ivaAmount: calculatedData.ivaAmount,
+            retencionAmount: calculatedData.retencionAmount,
+            discount: calculatedData.discount,
+            currency: additionalData.currency,
+            paymentForm: additionalData.paymentForm,
+            paymentMethod: additionalData.paymentMethod,
+            verificationUrl: additionalData.verificationUrl,
+            satCertNumber: additionalData.satCertNumber,
+            usoCfdi: additionalData.usoCfdi,
+            tipoComprobante: additionalData.tipoComprobante,
+            exportacion: additionalData.exportacion,
+            items: additionalData.items,
+          }
         );
 
         facturasGeneradas.push({
@@ -648,36 +673,7 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
 
       await ctx.reply(resumenText, { parse_mode: 'Markdown' });
 
-      // Crear botones de descarga individuales para cada factura
-      const botonesDescarga: any[] = [];
-
-      facturasGeneradas.forEach((f, idx) => {
-        const folio = `${f.factura.series}-${f.factura.folio_number}`;
-
-        // Par de botones PDF/XML por cada factura
-        botonesDescarga.push([
-          Markup.button.callback(
-            `📄 PDF ${folio}`,
-            `pdf_${f.factura.id}_${f.factura.folio_number}`
-          ),
-          Markup.button.callback(
-            `🔠 XML ${folio}`,
-            `xml_${f.factura.id}_${f.factura.folio_number}`
-          ),
-        ]);
-      });
-
-      // Agregar botón de volver al final
-      botonesDescarga.push([
-        Markup.button.callback('🔙 Volver al Menú', BOT_ACTIONS.MENU_PRINCIPAL),
-      ]);
-
-      await ctx.reply(`📥 **Descargas Individuales:**\n\nSeleccione PDF o XML de cada factura:`, {
-        parse_mode: 'Markdown',
-        reply_markup: Markup.inlineKeyboard(botonesDescarga).reply_markup,
-      });
-
-      // Botones de descarga masiva en ZIP
+      // Botones de descarga masiva en ZIP (solo ZIP, sin botones individuales)
       const botonesZip = [
         [
           Markup.button.callback(

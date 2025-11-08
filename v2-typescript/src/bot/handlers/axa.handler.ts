@@ -52,6 +52,12 @@ const __dirname = path.dirname(__filename);
 const MAX_FILE_SIZE_MB = 15;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+// Utilidades
+import {
+  calculateFinancialDataFromFacturaData,
+  extractAdditionalDataFromFacturapiResponse,
+} from '../utils/invoice-calculation.utils.js';
+
 // Utilidades para progreso visual
 const PROGRESS_FRAMES = ['⏳', '⌛', '⏳', '⌛'];
 const PROGRESS_BARS = [
@@ -545,6 +551,14 @@ async function enviarFacturaDirectaAxa(
 
     const facturapi = await FacturapiService.getFacturapiClient(tenantId);
 
+    // PASO 1: Calcular datos financieros ANTES de enviar a FacturAPI
+    // (desde facturaData que nosotros preparamos)
+    const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+    logger.debug(
+      { subtotal: calculatedData.subtotal, iva: calculatedData.ivaAmount },
+      'Datos financieros calculados desde facturaData'
+    );
+
     // Actualizar progreso
     if (progressMessageId) {
       await ctx.telegram.editMessageText(
@@ -556,7 +570,7 @@ async function enviarFacturaDirectaAxa(
       );
     }
 
-    // Envío DIRECTO (datos ya preparados)
+    // PASO 2: Enviar a FacturAPI
     logger.info('Enviando solicitud directa a FacturAPI...');
     const factura = await facturapi.invoices.create(facturaData);
 
@@ -565,10 +579,14 @@ async function enviarFacturaDirectaAxa(
       'Factura creada exitosamente'
     );
 
-    // Registrar factura en BD
-    logger.info('Registrando factura en BD...');
+    // PASO 3: Extraer datos adicionales de la respuesta de FacturAPI
+    const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
+
+    // PASO 4: Registrar factura en BD con datos completos
+    logger.info('Registrando factura en BD con datos completos...');
 
     const userId = ctx.from?.id;
+
     await TenantService.registerInvoice(
       tenantId,
       factura.id,
@@ -579,7 +597,23 @@ async function enviarFacturaDirectaAxa(
       clienteId,
       factura.total,
       userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-      factura.uuid
+      factura.uuid,
+      // DATOS COMPLETOS: Calculados + Respuesta de FacturAPI
+      {
+        subtotal: calculatedData.subtotal,
+        ivaAmount: calculatedData.ivaAmount,
+        retencionAmount: calculatedData.retencionAmount,
+        discount: calculatedData.discount,
+        currency: additionalData.currency,
+        paymentForm: additionalData.paymentForm,
+        paymentMethod: additionalData.paymentMethod,
+        verificationUrl: additionalData.verificationUrl,
+        satCertNumber: additionalData.satCertNumber,
+        usoCfdi: additionalData.usoCfdi,
+        tipoComprobante: additionalData.tipoComprobante,
+        exportacion: additionalData.exportacion,
+        items: additionalData.items,
+      }
     );
 
     logger.info('Factura registrada en BD exitosamente');

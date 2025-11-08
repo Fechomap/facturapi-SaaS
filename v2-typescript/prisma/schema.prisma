@@ -164,6 +164,30 @@ model TenantInvoice {
   paymentStatus      String?          @map("payment_status") @db.VarChar(20)
   tags               String?
   uuid               String?          @db.VarChar(100)
+
+  // ============================================================
+  // DATOS FINANCIEROS COMPLETOS
+  // ============================================================
+  subtotal           Decimal?         @db.Decimal(12, 2)
+  ivaAmount          Decimal?         @map("iva_amount") @db.Decimal(12, 2)
+  retencionAmount    Decimal?         @map("retencion_amount") @db.Decimal(12, 2)
+  discount           Decimal?         @db.Decimal(12, 2)
+
+  // Datos de transacción
+  currency           String?          @db.VarChar(3)
+  paymentForm        String?          @map("payment_form") @db.VarChar(50)
+  paymentMethod      String?          @map("payment_method") @db.VarChar(50)
+
+  // Datos SAT adicionales
+  verificationUrl    String?          @map("verification_url") @db.VarChar(500)
+  satCertNumber      String?          @map("sat_cert_number") @db.VarChar(50)
+  usoCfdi            String?          @map("uso_cfdi") @db.VarChar(10)
+  tipoComprobante    String?          @map("tipo_comprobante") @db.VarChar(10)
+  exportacion        String?          @db.VarChar(10)
+
+  // Items y productos (JSON para flexibilidad)
+  items              Json?
+
   documents          TenantDocument[]
   createdBy          TenantUser?      @relation(fields: [createdById], references: [id])
   customer           TenantCustomer?  @relation(fields: [customerId], references: [id])
@@ -171,6 +195,9 @@ model TenantInvoice {
 
   @@unique([tenantId, facturapiInvoiceId])
   @@unique([tenantId, series, folioNumber])
+  @@index([currency])
+  @@index([paymentMethod])
+  @@index([usoCfdi])
   @@map("tenant_invoices")
 }
 

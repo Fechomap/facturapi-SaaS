@@ -8,6 +8,10 @@ import { createModuleLogger } from '@core/utils/logger.js';
 import TenantService from './tenant.service.js';
 import FacturapiService from './facturapi.service.js';
 import type { TenantInvoice } from '@prisma/client';
+import {
+  calculateFinancialDataFromFacturaData,
+  extractAdditionalDataFromFacturapiResponse,
+} from '../bot/utils/invoice-calculation.utils.js';
 
 const logger = createModuleLogger('InvoiceService');
 
@@ -179,6 +183,9 @@ class InvoiceService {
         payment_method: 'PPD',
       };
 
+      // Calcular datos ANTES de enviar a FacturAPI
+      const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+
       logger.info({ tenantId }, 'Creating invoice in FacturAPI');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const factura = await (facturapi.invoices as any).create(facturaData);
@@ -188,6 +195,9 @@ class InvoiceService {
         'Invoice created in FacturAPI'
       );
 
+      // Extraer datos de la respuesta
+      const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
+
       // Register invoice in background (async, no await)
       TenantService.registerInvoice(
         tenantId,
@@ -196,7 +206,23 @@ class InvoiceService {
         factura.folio_number,
         localCustomerDbId,
         factura.total,
-        null
+        null,
+        factura.uuid,
+        {
+          subtotal: calculatedData.subtotal,
+          ivaAmount: calculatedData.ivaAmount,
+          retencionAmount: calculatedData.retencionAmount,
+          discount: calculatedData.discount,
+          currency: additionalData.currency,
+          paymentForm: additionalData.paymentForm,
+          paymentMethod: additionalData.paymentMethod,
+          verificationUrl: additionalData.verificationUrl,
+          satCertNumber: additionalData.satCertNumber,
+          usoCfdi: additionalData.usoCfdi,
+          tipoComprobante: additionalData.tipoComprobante,
+          exportacion: additionalData.exportacion,
+          items: additionalData.items,
+        }
       ).catch((error) => {
         logger.error(
           { tenantId, facturaId: factura.id, error },

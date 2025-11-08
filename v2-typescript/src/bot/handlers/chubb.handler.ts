@@ -32,6 +32,10 @@ import {
 } from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
+import {
+  calculateFinancialDataFromFacturaData,
+  extractAdditionalDataFromFacturapiResponse,
+} from '../utils/invoice-calculation.utils.js';
 
 const logger = createModuleLogger('ChubbHandler');
 
@@ -486,7 +490,13 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           exchange: 1,
         };
 
+        // Calcular datos ANTES de enviar a FacturAPI
+        const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+
         const factura = await facturapi.invoices.create(facturaData);
+
+        // Extraer datos de la respuesta
+        const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
 
         await TenantService.registerInvoice(
           tenantId,
@@ -498,7 +508,22 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-          factura.uuid
+          factura.uuid,
+          {
+            subtotal: calculatedData.subtotal,
+            ivaAmount: calculatedData.ivaAmount,
+            retencionAmount: calculatedData.retencionAmount,
+            discount: calculatedData.discount,
+            currency: additionalData.currency,
+            paymentForm: additionalData.paymentForm,
+            paymentMethod: additionalData.paymentMethod,
+            verificationUrl: additionalData.verificationUrl,
+            satCertNumber: additionalData.satCertNumber,
+            usoCfdi: additionalData.usoCfdi,
+            tipoComprobante: additionalData.tipoComprobante,
+            exportacion: additionalData.exportacion,
+            items: additionalData.items,
+          }
         );
 
         facturasGeneradas.push({
@@ -531,7 +556,13 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           exchange: 1,
         };
 
+        // Calcular datos ANTES de enviar a FacturAPI
+        const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+
         const factura = await facturapi.invoices.create(facturaData);
+
+        // Extraer datos de la respuesta
+        const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
 
         await TenantService.registerInvoice(
           tenantId,
@@ -543,7 +574,22 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-          factura.uuid
+          factura.uuid,
+          {
+            subtotal: calculatedData.subtotal,
+            ivaAmount: calculatedData.ivaAmount,
+            retencionAmount: calculatedData.retencionAmount,
+            discount: calculatedData.discount,
+            currency: additionalData.currency,
+            paymentForm: additionalData.paymentForm,
+            paymentMethod: additionalData.paymentMethod,
+            verificationUrl: additionalData.verificationUrl,
+            satCertNumber: additionalData.satCertNumber,
+            usoCfdi: additionalData.usoCfdi,
+            tipoComprobante: additionalData.tipoComprobante,
+            exportacion: additionalData.exportacion,
+            items: additionalData.items,
+          }
         );
 
         facturasGeneradas.push({
@@ -576,7 +622,13 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           exchange: 1,
         };
 
+        // Calcular datos ANTES de enviar a FacturAPI
+        const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+
         const factura = await facturapi.invoices.create(facturaData);
+
+        // Extraer datos de la respuesta
+        const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
 
         await TenantService.registerInvoice(
           tenantId,
@@ -588,7 +640,22 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
           chubbData.clienteId!,
           factura.total,
           typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-          factura.uuid
+          factura.uuid,
+          {
+            subtotal: calculatedData.subtotal,
+            ivaAmount: calculatedData.ivaAmount,
+            retencionAmount: calculatedData.retencionAmount,
+            discount: calculatedData.discount,
+            currency: additionalData.currency,
+            paymentForm: additionalData.paymentForm,
+            paymentMethod: additionalData.paymentMethod,
+            verificationUrl: additionalData.verificationUrl,
+            satCertNumber: additionalData.satCertNumber,
+            usoCfdi: additionalData.usoCfdi,
+            tipoComprobante: additionalData.tipoComprobante,
+            exportacion: additionalData.exportacion,
+            items: additionalData.items,
+          }
         );
 
         facturasGeneradas.push({

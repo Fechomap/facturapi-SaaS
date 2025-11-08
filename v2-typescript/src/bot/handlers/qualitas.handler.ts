@@ -31,6 +31,10 @@ import {
 
 // Utils
 import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
+import {
+  calculateFinancialDataFromFacturaData,
+  extractAdditionalDataFromFacturapiResponse,
+} from '../utils/invoice-calculation.utils.js';
 import { BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 const logger = createModuleLogger('bot-qualitas-handler');
@@ -421,6 +425,9 @@ async function enviarFacturaDirectaQualitas(
 
     const facturapi = await FacturapiService.getFacturapiClient(tenantId);
 
+    // Calcular datos ANTES de enviar a FacturAPI
+    const calculatedData = calculateFinancialDataFromFacturaData(facturaData);
+
     if (progressMessageId) {
       await ctx.telegram.editMessageText(
         ctx.chat?.id,
@@ -436,6 +443,9 @@ async function enviarFacturaDirectaQualitas(
       'Factura creada exitosamente'
     );
 
+    // Extraer datos de la respuesta
+    const additionalData = extractAdditionalDataFromFacturapiResponse(factura);
+
     const cliente = await prisma.tenantCustomer.findFirst({
       where: {
         tenantId,
@@ -448,6 +458,7 @@ async function enviarFacturaDirectaQualitas(
     }
 
     const userId = ctx.from?.id;
+
     await TenantService.registerInvoice(
       tenantId,
       factura.id,
@@ -458,7 +469,22 @@ async function enviarFacturaDirectaQualitas(
       cliente.id,
       factura.total,
       userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null,
-      factura.uuid
+      factura.uuid,
+      {
+        subtotal: calculatedData.subtotal,
+        ivaAmount: calculatedData.ivaAmount,
+        retencionAmount: calculatedData.retencionAmount,
+        discount: calculatedData.discount,
+        currency: additionalData.currency,
+        paymentForm: additionalData.paymentForm,
+        paymentMethod: additionalData.paymentMethod,
+        verificationUrl: additionalData.verificationUrl,
+        satCertNumber: additionalData.satCertNumber,
+        usoCfdi: additionalData.usoCfdi,
+        tipoComprobante: additionalData.tipoComprobante,
+        exportacion: additionalData.exportacion,
+        items: additionalData.items,
+      }
     );
 
     logger.info('Factura registrada en BD exitosamente');

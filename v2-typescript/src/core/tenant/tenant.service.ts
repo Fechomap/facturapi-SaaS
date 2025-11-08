@@ -31,6 +31,22 @@ interface CanGenerateResult {
   reason?: string;
 }
 
+interface AdditionalInvoiceData {
+  subtotal?: number;
+  ivaAmount?: number;
+  retencionAmount?: number;
+  discount?: number;
+  currency?: string;
+  paymentForm?: string;
+  paymentMethod?: string;
+  verificationUrl?: string;
+  satCertNumber?: string;
+  usoCfdi?: string;
+  tipoComprobante?: string;
+  exportacion?: string;
+  items?: any[];
+}
+
 /**
  * Servicio para la gestión de tenants
  */
@@ -512,7 +528,8 @@ class TenantService {
     customerId: number | null,
     total: number,
     createdById: bigint | string | number | null,
-    uuid: string
+    uuid: string,
+    additionalData?: AdditionalInvoiceData
   ) {
     tenantLogger.info(
       {
@@ -549,6 +566,20 @@ class TenantService {
             createdById: createdByIdInt,
             invoiceDate: new Date(),
             uuid,
+            // NUEVOS CAMPOS FINANCIEROS COMPLETOS
+            subtotal: additionalData?.subtotal,
+            ivaAmount: additionalData?.ivaAmount,
+            retencionAmount: additionalData?.retencionAmount,
+            discount: additionalData?.discount,
+            currency: additionalData?.currency || 'MXN',
+            paymentForm: additionalData?.paymentForm,
+            paymentMethod: additionalData?.paymentMethod,
+            verificationUrl: additionalData?.verificationUrl,
+            satCertNumber: additionalData?.satCertNumber,
+            usoCfdi: additionalData?.usoCfdi,
+            tipoComprobante: additionalData?.tipoComprobante,
+            exportacion: additionalData?.exportacion,
+            items: additionalData?.items,
           },
         });
 
@@ -604,6 +635,20 @@ class TenantService {
       total: number;
       createdById?: bigint | string | number | null;
       uuid: string;
+      // NUEVOS CAMPOS OPCIONALES
+      subtotal?: number;
+      ivaAmount?: number;
+      retencionAmount?: number;
+      discount?: number;
+      currency?: string;
+      paymentForm?: string;
+      paymentMethod?: string;
+      verificationUrl?: string;
+      satCertNumber?: string;
+      usoCfdi?: string;
+      tipoComprobante?: string;
+      exportacion?: string;
+      items?: any[];
     }>
   ) {
     tenantLogger.info({ tenantId, count: invoices.length }, 'Registrando lote de facturas');
@@ -628,6 +673,20 @@ class TenantService {
             createdById: createdByIdInt,
             invoiceDate: new Date(),
             uuid: inv.uuid,
+            // NUEVOS CAMPOS FINANCIEROS COMPLETOS
+            subtotal: inv.subtotal,
+            ivaAmount: inv.ivaAmount,
+            retencionAmount: inv.retencionAmount,
+            discount: inv.discount,
+            currency: inv.currency || 'MXN',
+            paymentForm: inv.paymentForm,
+            paymentMethod: inv.paymentMethod,
+            verificationUrl: inv.verificationUrl,
+            satCertNumber: inv.satCertNumber,
+            usoCfdi: inv.usoCfdi,
+            tipoComprobante: inv.tipoComprobante,
+            exportacion: inv.exportacion,
+            items: inv.items,
           };
         });
 
@@ -637,8 +696,10 @@ class TenantService {
           skipDuplicates: true, // Evita errores si hay duplicados
         });
 
-        // Incrementar contador de facturas
-        await this.incrementInvoiceCountBy(tenantId, result.count);
+        // Incrementar contador de facturas (UNA SOLA VEZ, de forma atómica)
+        if (result.count > 0) {
+          await this.incrementInvoiceCountBy(tenantId, result.count, tx);
+        }
 
         // Audit log del lote
         await auditLog(tx, {
@@ -650,6 +711,7 @@ class TenantService {
           details: {
             count: result.count,
             invoiceIds: invoices.map((i) => i.facturapiInvoiceId),
+            withCompleteData: invoices.filter((i) => i.subtotal !== undefined).length,
           },
         });
 
@@ -666,12 +728,54 @@ class TenantService {
 
   /**
    * Incrementa el contador de facturas por una cantidad específica
+   * VERSIÓN OPTIMIZADA: Una sola actualización atómica (sin bucle N+1)
    */
-  private static async incrementInvoiceCountBy(tenantId: string, count: number) {
-    // Incrementar el contador para cada factura en el lote
-    for (let i = 0; i < count; i++) {
-      await this.incrementInvoiceCount(tenantId);
+  private static async incrementInvoiceCountBy(
+    tenantId: string,
+    count: number,
+    tx?: any // Prisma transaction opcional
+  ) {
+    tenantLogger.debug({ tenantId, count }, 'Incrementando contador de facturas por lote');
+
+    const prismaClient = tx || prisma;
+
+    // UNA SOLA CONSULTA para encontrar la suscripción activa
+    const subscription = await prismaClient.tenantSubscription.findFirst({
+      where: {
+        tenantId,
+        OR: [{ status: 'active' }, { status: 'trial' }],
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!subscription) {
+      tenantLogger.warn({ tenantId }, 'No se encontró suscripción activa o en trial');
+      return;
     }
+
+    // UNA SOLA ACTUALIZACIÓN ATÓMICA (Prisma maneja el increment en BD)
+    const updatedSubscription = await prismaClient.tenantSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        invoicesUsed: {
+          increment: count, // Operación atómica: UPDATE SET invoices_used = invoices_used + count
+        },
+      },
+    });
+
+    tenantLogger.debug(
+      {
+        subscriptionId: updatedSubscription.id,
+        tenantId,
+        count,
+        newTotal: updatedSubscription.invoicesUsed,
+      },
+      'Contador de facturas incrementado atómicamente'
+    );
+
+    return updatedSubscription;
   }
 
   /**

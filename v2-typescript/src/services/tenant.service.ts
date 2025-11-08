@@ -195,7 +195,23 @@ class TenantService {
     folioNumber: number,
     customerId: number | null,
     total: number,
-    createdById?: number | null
+    createdById: number | null,
+    uuid: string,
+    additionalData?: {
+      subtotal?: number;
+      ivaAmount?: number;
+      retencionAmount?: number;
+      discount?: number;
+      currency?: string;
+      paymentForm?: string;
+      paymentMethod?: string;
+      verificationUrl?: string;
+      satCertNumber?: string;
+      usoCfdi?: string;
+      tipoComprobante?: string;
+      exportacion?: string;
+      items?: any;
+    }
   ): Promise<TenantInvoice> {
     logger.info({ tenantId, series, folioNumber }, 'Registering invoice');
 
@@ -211,6 +227,21 @@ class TenantService {
           status: 'valid',
           createdById: createdById || null,
           invoiceDate: new Date(),
+          uuid,
+          // NUEVOS CAMPOS FINANCIEROS COMPLETOS
+          subtotal: additionalData?.subtotal,
+          ivaAmount: additionalData?.ivaAmount,
+          retencionAmount: additionalData?.retencionAmount,
+          discount: additionalData?.discount,
+          currency: additionalData?.currency || 'MXN',
+          paymentForm: additionalData?.paymentForm,
+          paymentMethod: additionalData?.paymentMethod,
+          verificationUrl: additionalData?.verificationUrl,
+          satCertNumber: additionalData?.satCertNumber,
+          usoCfdi: additionalData?.usoCfdi,
+          tipoComprobante: additionalData?.tipoComprobante,
+          exportacion: additionalData?.exportacion,
+          items: additionalData?.items,
         },
       });
 
