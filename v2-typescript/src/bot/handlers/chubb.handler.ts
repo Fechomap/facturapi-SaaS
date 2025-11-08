@@ -8,7 +8,6 @@
  * - ✅ Tipos bien definidos
  */
 
-import { Context } from 'telegraf';
 import { Markup } from 'telegraf';
 import axios from 'axios';
 import { promises as fs } from 'fs';
@@ -256,12 +255,18 @@ async function procesarArchivoChubb(
       const esGrua =
         servicio.includes('GRUA') || servicio.includes('ARRASTRE') || servicio.includes('REMOLQUE');
 
-      // Determinar si tiene retención (4%)
-      const tieneRetencion = columnMappings.retencion
-        ? String(row[columnMappings.retencion] || '')
-            .toLowerCase()
-            .includes('si') || String(row[columnMappings.retencion] || '') === '1'
-        : false;
+      // Determinar si tiene retención (4%) - CORREGIDO para coincidir con V1
+      // V1 usa valores numéricos negativos en la columna RETENCION para indicar retención del 4%
+      let tieneRetencion = false;
+      if (columnMappings.retencion) {
+        let valorRetencion = row[columnMappings.retencion];
+        // Si es string, intentar convertir a número
+        if (typeof valorRetencion === 'string') {
+          valorRetencion = parseFloat(valorRetencion.replace(/[^\d.-]/g, ''));
+        }
+        // Si el valor es negativo, tiene retención (mismo criterio que V1)
+        tieneRetencion = valorRetencion < 0;
+      }
 
       const item = {
         numeroCaso,
