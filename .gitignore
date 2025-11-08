@@ -56,3 +56,5 @@ NOTES.md
 
 # Archivos específicos de Cline/MCP local
 cline_mcp_settings.json
+backups/
+*.backup

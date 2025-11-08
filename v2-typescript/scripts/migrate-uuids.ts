@@ -10,9 +10,9 @@
  *   npx tsx scripts/migrate-uuids.ts --help       # Mostrar ayuda
  */
 
-import { prisma } from '../src/config/database.js';
-import FacturapiService from '../src/services/facturapi.service.js';
-import { createModuleLogger } from '../src/core/utils/logger.js';
+import prisma from '../src/lib/prisma';
+import FacturapiService from '../src/services/facturapi.service';
+import { createModuleLogger } from '../src/core/utils/logger';
 
 const logger = createModuleLogger('migrate-uuids');
 
@@ -80,6 +80,13 @@ async function migrateUUIDs() {
   };
 
   try {
+    // Debug: verificar que prisma está definido
+    if (!prisma) {
+      throw new Error('Prisma client no está definido');
+    }
+
+    logger.info('Cliente Prisma cargado correctamente');
+
     // 1. Obtener facturas sin UUID
     const invoicesWithoutUuid = await prisma.tenantInvoice.findMany({
       where: {
