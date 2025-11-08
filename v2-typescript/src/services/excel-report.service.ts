@@ -390,7 +390,8 @@ class ExcelReportService {
   }
 
   /**
-   * Enriquecer facturas con datos de FacturAPI
+   * Enriquecer facturas con datos de FacturAPI - VERSIÓN OPTIMIZADA
+   * Esta versión NUNCA llama a la API si el UUID ya existe en la base de datos.
    */
   static async enrichWithFacturapiData(
     tenantId: string,
@@ -399,51 +400,66 @@ class ExcelReportService {
   ): Promise<EnrichedInvoice[]> {
     logger.info(
       { tenantId, count: invoices.length },
-      'Enriqueciendo facturas con datos de FacturAPI'
+      'Enriqueciendo facturas con datos de FacturAPI (MODO OPTIMIZADO)'
     );
 
     const facturapiClient = await FacturapiService.getFacturapiClient(tenantId);
-
-    // OPTIMIZACIÓN: Procesar en paralelo con chunks de 20 para no saturar API
     const CHUNK_SIZE = 20;
     const enrichedInvoices: EnrichedInvoice[] = [];
 
     for (let chunkStart = 0; chunkStart < invoices.length; chunkStart += CHUNK_SIZE) {
       const chunk = invoices.slice(chunkStart, chunkStart + CHUNK_SIZE);
 
-      logger.debug(
-        {
-          chunk: Math.floor(chunkStart / CHUNK_SIZE) + 1,
-          total: Math.ceil(invoices.length / CHUNK_SIZE),
-          invoices: chunk.length,
-        },
-        'Procesando chunk en paralelo'
-      );
-
-      // Procesar chunk en PARALELO con Promise.all()
-      const chunkPromises = chunk.map(async (invoice, idx) => {
+      const chunkPromises = chunk.map(async (invoice) => {
         try {
-          const actualIndex = chunkStart + idx;
-          logger.debug(
-            { current: actualIndex + 1, total: invoices.length, id: invoice.facturapiInvoiceId },
-            'Procesando factura'
-          );
-
-          // OPTIMIZACIÓN: Solo llamar a FacturAPI si NO tenemos UUID en BD
-          let facturapiData: FacturapiInvoiceData | null = null;
-          if (!invoice.uuid) {
-            logger.debug(
-              { id: invoice.facturapiInvoiceId },
-              'UUID no disponible en BD, obteniendo de FacturAPI (factura antigua)'
-            );
-            facturapiData = (await facturapiClient.invoices.retrieve(
-              invoice.facturapiInvoiceId
-            )) as FacturapiInvoiceData;
+          // SI YA TENEMOS UUID, NO HACEMOS NADA MÁS.
+          // Los datos que falten (subtotal, etc.) quedarán en blanco,
+          // pero el reporte será instantáneo.
+          if (invoice.uuid) {
+            return {
+              id: invoice.id,
+              facturapiInvoiceId: invoice.facturapiInvoiceId,
+              series: invoice.series,
+              folioNumber: invoice.folioNumber,
+              total: parseFloat(invoice.total.toString()),
+              status: invoice.status,
+              createdAt: invoice.createdAt,
+              invoiceDate: invoice.invoiceDate,
+              realEmissionDate: invoice.invoiceDate,
+              customer: {
+                legalName: invoice.customer?.legalName || 'N/A',
+                rfc: invoice.customer?.rfc || 'N/A',
+                email: invoice.customer?.email || '',
+              },
+              tenant: {
+                businessName: invoice.tenant?.businessName || 'N/A',
+                rfc: invoice.tenant?.rfc || 'N/A',
+              },
+              uuid: invoice.uuid,
+              folio: `${invoice.series}${invoice.folioNumber}`,
+              folioFiscal: invoice.uuid,
+              // Datos que no tenemos se quedan vacíos o en cero
+              subtotal: 0,
+              currency: 'MXN',
+              verificationUrl: '',
+              ivaAmount: 0,
+              retencionAmount: 0,
+              processedAt: new Date().toISOString(),
+            } as EnrichedInvoice;
           }
 
-          // Combinar datos
-          const enrichedInvoice: EnrichedInvoice = {
-            // Datos de BD
+          // SI NO TENEMOS UUID (factura muy antigua no migrada), hacemos la llamada a la API.
+          // Este es el único caso donde el proceso será lento.
+          logger.debug(
+            { id: invoice.facturapiInvoiceId },
+            'UUID no disponible en BD, obteniendo de FacturAPI (factura antigua)'
+          );
+          const facturapiData = (await facturapiClient.invoices.retrieve(
+            invoice.facturapiInvoiceId
+          )) as FacturapiInvoiceData;
+
+          // Combinar datos como antes
+          return {
             id: invoice.id,
             facturapiInvoiceId: invoice.facturapiInvoiceId,
             series: invoice.series,
@@ -452,43 +468,26 @@ class ExcelReportService {
             status: invoice.status,
             createdAt: invoice.createdAt,
             invoiceDate: invoice.invoiceDate,
-
-            // Usar PostgreSQL como fuente única de fechas
             realEmissionDate: invoice.invoiceDate,
-
-            // Datos del cliente
             customer: {
-              legalName: invoice.customer?.legalName || 'Cliente no especificado',
-              rfc: invoice.customer?.rfc || 'RFC no disponible',
+              legalName: invoice.customer?.legalName || 'N/A',
+              rfc: invoice.customer?.rfc || 'N/A',
               email: invoice.customer?.email || '',
             },
-
-            // Datos del tenant emisor
             tenant: {
-              businessName: invoice.tenant?.businessName || 'Empresa',
-              rfc: invoice.tenant?.rfc || 'RFC Emisor',
+              businessName: invoice.tenant?.businessName || 'N/A',
+              rfc: invoice.tenant?.rfc || 'N/A',
             },
-
-            // UUID: Preferir BD, fallback a FacturAPI
-            uuid: invoice.uuid || facturapiData?.uuid || 'No disponible',
-            // Para otros datos, usar FacturAPI solo si hicimos la llamada
-            subtotal:
-              facturapiData?.subtotal ||
-              this.calculateSubtotal(facturapiData || ({} as FacturapiInvoiceData)),
+            uuid: facturapiData?.uuid || 'No disponible',
+            subtotal: facturapiData?.subtotal || 0,
             currency: facturapiData?.currency || 'MXN',
             verificationUrl: facturapiData?.verification_url || '',
-
-            // Datos calculados
             folio: `${invoice.series}${invoice.folioNumber}`,
-            folioFiscal: invoice.uuid || facturapiData?.uuid || 'No disponible',
+            folioFiscal: facturapiData?.uuid || 'No disponible',
             ivaAmount: facturapiData ? this.calculateIVA(facturapiData) : 0,
             retencionAmount: facturapiData ? this.calculateRetencion(facturapiData) : 0,
-
-            // Metadatos
             processedAt: new Date().toISOString(),
-          };
-
-          return enrichedInvoice;
+          } as EnrichedInvoice;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
           logger.error(
@@ -530,20 +529,11 @@ class ExcelReportService {
         }
       });
 
-      // Esperar a que termine el chunk completo en PARALELO
       const chunkResults = await Promise.all(chunkPromises);
       enrichedInvoices.push(...chunkResults);
-
-      // Pequeña pausa entre chunks para no saturar completamente la API
-      if (chunkStart + CHUNK_SIZE < invoices.length) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
     }
 
-    logger.info(
-      { total: enrichedInvoices.length, duration: Date.now() },
-      'Enriquecimiento completado'
-    );
+    logger.info({ total: enrichedInvoices.length }, 'Enriquecimiento completado (MODO OPTIMIZADO)');
 
     return enrichedInvoices;
   }
