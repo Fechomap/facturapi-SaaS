@@ -98,42 +98,48 @@ const __dirname = path.dirname(__filename);
  * Interface para mapeo de columnas Excel Club de Asistencia
  */
 interface CASColumnMapping {
-  orden?: string;
-  folio?: string;
-  autorizacion?: string;
-  importe: string;
-  descripcion?: string;
+  fecha?: string;
+  folioCas?: string;
+  pedidoSap?: string;
+  total: string;
+  moneda?: string;
 }
 
 /**
  * Mapea los nombres de las columnas encontrados en el Excel Club de Asistencia
+ * CORREGIDO: Ahora busca las mismas columnas que V1
  */
 function mapColumnNamesCAS(firstRow: Record<string, any>): CASColumnMapping | null {
   if (!firstRow) return null;
 
+  const excelKeys = Object.keys(firstRow);
+
   const posiblesColumnas: Record<string, string[]> = {
-    orden: ['ORDEN', 'Orden', 'No. ORDEN', 'Numero Orden', 'No ORDEN'],
-    folio: ['FOLIO', 'Folio', 'No. FOLIO', 'Numero Folio', 'No FOLIO'],
-    autorizacion: ['AUTORIZACION', 'Autorizacion', 'Autorización', 'Auth'],
-    importe: ['IMPORTE', 'Importe', 'Monto', 'Valor', 'Total'],
-    descripcion: ['DESCRIPCION', 'Descripcion', 'Descripción', 'Desc', 'Servicio'],
+    fecha: ['Fecha', 'FECHA', 'Date'],
+    folioCas: ['Folio CAS', 'FOLIO CAS', 'FolioCAS'],
+    pedidoSap: ['PEDIDO SAP', 'Pedido SAP', 'PedidoSAP'],
+    total: ['Total', 'TOTAL', 'Monto', 'Importe', 'IMPORTE'],
+    moneda: ['Moneda', 'MONEDA', 'Currency'],
   };
 
   const columnMapping: Record<string, string> = {};
 
   Object.keys(posiblesColumnas).forEach((tipoColumna) => {
+    // Búsqueda exacta
     const nombreEncontrado = posiblesColumnas[tipoColumna].find((posibleNombre) =>
-      Object.keys(firstRow).includes(posibleNombre)
+      excelKeys.includes(posibleNombre)
     );
 
     if (nombreEncontrado) {
       columnMapping[tipoColumna] = nombreEncontrado;
     } else {
-      const keys = Object.keys(firstRow);
-      const matchParcial = keys.find((key) =>
-        posiblesColumnas[tipoColumna].some((posibleNombre) =>
-          key.toLowerCase().includes(posibleNombre.toLowerCase())
-        )
+      // Búsqueda parcial (case-insensitive y sin espacios)
+      const matchParcial = excelKeys.find((key) =>
+        posiblesColumnas[tipoColumna].some((posibleNombre) => {
+          const keyNormalized = key.toLowerCase().replace(/\s+/g, '');
+          const possibleNormalized = posibleNombre.toLowerCase().replace(/\s+/g, '');
+          return keyNormalized.includes(possibleNormalized);
+        })
       );
 
       if (matchParcial) {
@@ -142,19 +148,20 @@ function mapColumnNamesCAS(firstRow: Record<string, any>): CASColumnMapping | nu
     }
   });
 
-  // Verificar que encontramos al menos la columna de importe (requerida)
-  if (columnMapping.importe) {
+  // Verificar columnas requeridas: fecha, folioCas, pedidoSap, total
+  const requiredKeys = ['fecha', 'folioCas', 'pedidoSap', 'total'];
+  if (requiredKeys.every((key) => columnMapping[key])) {
     return {
-      importe: columnMapping.importe,
-      orden: columnMapping.orden,
-      folio: columnMapping.folio,
-      autorizacion: columnMapping.autorizacion,
-      descripcion: columnMapping.descripcion,
+      total: columnMapping.total,
+      fecha: columnMapping.fecha,
+      folioCas: columnMapping.folioCas,
+      pedidoSap: columnMapping.pedidoSap,
+      moneda: columnMapping.moneda,
     };
   }
 
   logger.warn(
-    { columnMapping },
+    { columnMapping, requiredKeys, excelKeys },
     'No se encontraron todas las columnas requeridas para Club de Asistencia'
   );
   return null;
@@ -191,7 +198,8 @@ async function procesarArchivoCAS(
       'Analizando estructura...'
     );
 
-    const data = XLSX.utils.sheet_to_json(worksheet);
+    // IMPORTANTE: range: 1 salta la primera fila (que puede ser título) y usa fila 2 como headers
+    const data = XLSX.utils.sheet_to_json(worksheet, { range: 1 });
 
     if (data.length === 0) {
       await ctx.reply('❌ El archivo Excel no contiene datos.');
@@ -201,7 +209,9 @@ async function procesarArchivoCAS(
     const columnMappings = mapColumnNamesCAS(data[0] as Record<string, any>);
 
     if (!columnMappings) {
-      await ctx.reply('❌ El archivo Excel no tiene la columna de IMPORTE requerida.');
+      await ctx.reply(
+        '❌ El archivo Excel no tiene todas las columnas requeridas.\n\nColumnas necesarias: Fecha, Folio CAS, PEDIDO SAP y Total.'
+      );
       return { success: false, error: 'Estructura de Excel inválida' };
     }
 
@@ -222,9 +232,9 @@ async function procesarArchivoCAS(
     // Validar datos numéricos
     const erroresNumericos: string[] = [];
     data.forEach((row: any, index: number) => {
-      const importe = parseFloat(row[columnMappings.importe]);
-      if (isNaN(importe) || importe <= 0) {
-        erroresNumericos.push(`Fila ${index + 2}: El importe debe ser un número positivo.`);
+      const total = parseFloat(row[columnMappings.total]);
+      if (isNaN(total) || total <= 0) {
+        erroresNumericos.push(`Fila ${index + 2}: El total debe ser un número positivo.`);
       }
     });
 
@@ -245,8 +255,11 @@ async function procesarArchivoCAS(
       `Procesando ${data.length} registros...`
     );
 
+    // IMPORTANTE: Los valores del Excel incluyen IVA, dividir entre 1.16 para obtener el precio base
     const montoTotal = data.reduce((total: number, item: any) => {
-      return total + parseFloat(item[columnMappings.importe] || 0);
+      const totalConIva = parseFloat(item[columnMappings.total] || 0);
+      const precioBase = totalConIva / 1.16; // Remover IVA
+      return total + precioBase;
     }, 0);
 
     validateInvoiceAmount(montoTotal, 'CLUB_ASISTENCIA', 'el monto total del archivo');
@@ -283,26 +296,32 @@ async function procesarArchivoCAS(
     let subtotal = 0;
 
     for (const row of data as any[]) {
-      const orden = columnMappings.orden ? row[columnMappings.orden] || '' : '';
-      const folio = columnMappings.folio ? row[columnMappings.folio] || '' : '';
-      const autorizacion = columnMappings.autorizacion
-        ? row[columnMappings.autorizacion] || ''
-        : '';
-      const importe = parseFloat(row[columnMappings.importe]) || 0;
-      const descripcion = columnMappings.descripcion
-        ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA'
-        : 'SERVICIO DE GRUA';
+      const fecha = columnMappings.fecha ? row[columnMappings.fecha] || '' : '';
+      const folioCas = columnMappings.folioCas ? row[columnMappings.folioCas] || '' : '';
+      const pedidoSap = columnMappings.pedidoSap ? row[columnMappings.pedidoSap] || '' : '';
+      const totalConIva = parseFloat(row[columnMappings.total]) || 0;
 
-      subtotal += importe;
+      // IMPORTANTE: Dividir entre 1.16 para obtener el precio base (sin IVA)
+      const precioBase = totalConIva / 1.16;
+
+      subtotal += precioBase;
+
+      // Formatear fecha si es necesario
+      let fechaFormateada = fecha;
+      if (fecha && typeof fecha === 'number') {
+        // Excel date serial number
+        const date = new Date((fecha - 25569) * 86400 * 1000);
+        fechaFormateada = date.toISOString().split('T')[0];
+      }
 
       const itemBase = {
         quantity: 1,
         product: {
-          description: `${descripcion}${orden ? ` ORDEN ${orden}` : ''}${folio ? ` FOLIO ${folio}` : ''}${autorizacion ? ` AUTORIZACION ${autorizacion}` : ''}`,
+          description: `Fecha ${fechaFormateada} Folio CAS ${folioCas} PEDIDO SAP ${pedidoSap}`,
           product_key: SAT_PRODUCT_KEYS.SERVICIOS_GRUA,
           unit_key: SAT_UNIT_KEYS.SERVICIO,
           unit_name: 'SERVICIO',
-          price: importe,
+          price: precioBase,
           tax_included: false,
         },
       };
@@ -383,7 +402,7 @@ async function procesarArchivoCAS(
 
     const infoResumen =
       `📊 Resumen de datos procesados:\n\n` +
-      `• Servicios de Grúa Club de Asistencia:\n  - ${data.length} registros\n  - Monto total: ${montoTotal.toFixed(2)} MXN\n\n`;
+      `• Servicios de Club de Asistencia:\n  - ${data.length} registros\n  - Subtotal (sin IVA): ${montoTotal.toFixed(2)} MXN\n\n`;
 
     await ctx.reply(`${infoResumen}\n¿El servicio tiene retención del 4%?`, {
       reply_markup: Markup.inlineKeyboard([
