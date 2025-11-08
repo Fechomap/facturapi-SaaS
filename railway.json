@@ -5,7 +5,7 @@
     "buildCommand": "echo Building facturapi-SaaS && npx prisma generate && cd frontend && npm install && CI=false npm run build"
   },
   "deploy": {
-    "startCommand": "npx prisma db push --accept-data-loss && node server.js",
+    "startCommand": "npx prisma db push --accept-data-loss && node bot.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
