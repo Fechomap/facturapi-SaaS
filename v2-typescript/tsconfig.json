@@ -68,9 +68,7 @@
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts",
-    "src/bot.ts",
-    "src/cluster.ts"
+    "**/*.spec.ts"
   ],
   "ts-node": {
     "esm": true,
