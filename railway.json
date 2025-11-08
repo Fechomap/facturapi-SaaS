@@ -2,10 +2,10 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "nixpacks",
-    "buildCommand": "npm install && npx prisma generate && npm run build"
+    "buildCommand": "cd v2-typescript && npm install && npx prisma generate && npm run build"
   },
   "deploy": {
-    "startCommand": "node dist/server.js",
+    "startCommand": "cd v2-typescript && node dist/server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
