@@ -196,54 +196,77 @@ async function procesarArchivoQualitas(
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    await updateProgressMessage(
-      ctx,
-      progressMessageId,
-      2,
-      6,
-      'Detectando columnas',
-      'Analizando estructura...'
-    );
+    await updateProgressMessage(ctx, progressMessageId, 2, 6, 'Analizando estructura');
 
-    const data = XLSX.utils.sheet_to_json(worksheet);
+    // Leer TODO el contenido como array de arrays (no JSON) - igual que V1
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-    if (data.length === 0) {
-      await ctx.reply('❌ El archivo Excel no contiene datos.');
-      return { success: false, error: 'Excel sin datos' };
-    }
+    logger.info({ totalFilas: rawData.length }, 'Total de filas en Excel');
 
-    const columnMappings = mapColumnNamesQualitas(data[0] as Record<string, any>);
+    await updateProgressMessage(ctx, progressMessageId, 3, 6, 'Agrupando servicios');
 
-    if (!columnMappings) {
-      await ctx.reply('❌ El archivo Excel no tiene la columna de IMPORTE requerida.');
-      return { success: false, error: 'Estructura de Excel inválida' };
-    }
+    // Agrupar en servicios de 3 líneas (igual que V1)
+    const servicios: Array<{
+      folio: string;
+      siniestro: string;
+      reporte: string;
+      subtotal: number;
+    }> = [];
 
-    logger.info({ columnMappings, sampleRows: data.slice(0, 2) }, 'Mapeado de columnas Qualitas');
+    for (let i = 0; i < rawData.length; i++) {
+      const fila = rawData[i] as any[];
+      const primeraCelda = String(fila[0] || '').trim();
 
-    await updateProgressMessage(
-      ctx,
-      progressMessageId,
-      3,
-      6,
-      'Validando datos',
-      `Verificando ${data.length} registros...`
-    );
+      // Detectar inicio de servicio: empieza con 25GA o 25GB
+      if (primeraCelda.startsWith('25GA') || primeraCelda.startsWith('25GB')) {
+        const folio = primeraCelda;
 
-    const erroresNumericos: string[] = [];
-    data.forEach((row: any, index: number) => {
-      const importe = parseFloat(row[columnMappings.importe]);
-      if (isNaN(importe) || importe <= 0) {
-        erroresNumericos.push(`Fila ${index + 2}: El importe debe ser un número positivo.`);
+        // Verificar que hay al menos 3 líneas más
+        if (i + 2 >= rawData.length) {
+          logger.warn({ fila: i }, 'Servicio incompleto, saltando');
+          continue;
+        }
+
+        const siniestro = String((rawData[i + 1] as any[])[0] || '').trim();
+        const lineaDatos = rawData[i + 2] as any[];
+
+        // Parsear línea de datos (buscar el primer $ para separar)
+        const lineaCompleta = lineaDatos.join(' '); // Unir todas las celdas
+        const partes = lineaCompleta.split('$').filter((p) => p.trim());
+
+        if (partes.length < 2) {
+          logger.warn({ fila: i + 2, lineaCompleta }, 'No se pudo parsear datos');
+          continue;
+        }
+
+        const reporte = partes[0].trim();
+        const subtotalStr = partes[1].trim().replace(/,/g, ''); // Remover comas
+        const subtotal = parseFloat(subtotalStr);
+
+        if (isNaN(subtotal) || subtotal <= 0) {
+          logger.warn({ subtotalStr }, 'Subtotal inválido');
+          continue;
+        }
+
+        servicios.push({
+          folio,
+          siniestro,
+          reporte,
+          subtotal,
+        });
+
+        logger.info({ servicioNum: servicios.length, folio, subtotal }, 'Servicio detectado');
+
+        // Saltar las 2 líneas siguientes (ya procesadas)
+        i += 2;
       }
-    });
+    }
 
-    if (erroresNumericos.length > 0) {
-      const erroresMostrados = erroresNumericos.slice(0, 5);
-      await ctx.reply(
-        `❌ Se encontraron errores:\n${erroresMostrados.join('\n')}\n${erroresNumericos.length > 5 ? `...y ${erroresNumericos.length - 5} más.` : ''}`
-      );
-      return { success: false, error: 'Datos numéricos inválidos' };
+    logger.info({ totalServicios: servicios.length }, 'Total de servicios detectados');
+
+    if (servicios.length === 0) {
+      await ctx.reply('❌ No se encontraron servicios válidos en el Excel.');
+      return { success: false, error: 'Sin servicios válidos' };
     }
 
     await updateProgressMessage(
@@ -251,13 +274,12 @@ async function procesarArchivoQualitas(
       progressMessageId,
       4,
       6,
-      'Calculando totales',
-      `Procesando ${data.length} registros...`
+      'Validando datos',
+      `${servicios.length} servicios encontrados`
     );
 
-    const montoTotal = data.reduce((total: number, item: any) => {
-      return total + parseFloat(item[columnMappings.importe] || 0);
-    }, 0);
+    // Calcular total
+    const montoTotal = servicios.reduce((sum, s) => sum + s.subtotal, 0);
 
     validateInvoiceAmount(montoTotal, 'QUALITAS', 'el monto total del archivo');
 
@@ -290,25 +312,17 @@ async function procesarArchivoQualitas(
     const itemsSinRetencion: any[] = [];
     let subtotal = 0;
 
-    for (const row of data as any[]) {
-      const orden = columnMappings.orden ? row[columnMappings.orden] || '' : '';
-      const folio = columnMappings.folio ? row[columnMappings.folio] || '' : '';
-      const servicio = columnMappings.servicio ? row[columnMappings.servicio] || '' : '';
-      const importe = parseFloat(row[columnMappings.importe]) || 0;
-      const descripcion = columnMappings.descripcion
-        ? row[columnMappings.descripcion] || 'SERVICIO DE GRUA QUALITAS'
-        : 'SERVICIO DE GRUA QUALITAS';
-
-      subtotal += importe;
+    for (const servicio of servicios) {
+      subtotal += servicio.subtotal;
 
       const itemBase = {
         quantity: 1,
         product: {
-          description: `${descripcion}${servicio ? ` ${servicio}` : ''}${orden ? ` REPORTE ${orden}` : ''}${folio ? ` FOLIO ${folio}` : ''}`,
+          description: `FOLIO ${servicio.folio} SINIESTRO ${servicio.siniestro} REPORTE ${servicio.reporte}`,
           product_key: SAT_PRODUCT_KEYS.SERVICIOS_GRUA,
           unit_key: SAT_UNIT_KEYS.SERVICIO,
           unit_name: 'SERVICIO',
-          price: importe,
+          price: servicio.subtotal,
           tax_included: false,
         },
       };
@@ -369,7 +383,10 @@ async function procesarArchivoQualitas(
       throw new Error(`Error guardando datos en Redis: ${saveResult.error}`);
     }
 
-    logger.info({ userId, batchId, totalRecords: data.length }, 'Batch Qualitas guardado en Redis');
+    logger.info(
+      { userId, batchId, totalRecords: servicios.length },
+      'Batch Qualitas guardado en Redis'
+    );
 
     if (ctx.userState) {
       ctx.userState.qualitasBatchId = batchId;
@@ -381,18 +398,18 @@ async function procesarArchivoQualitas(
       6,
       6,
       'Procesamiento completado',
-      `${data.length} registros listos`
+      `${servicios.length} registros listos`
     );
 
     const infoResumen =
       `📊 Resumen de datos procesados:\n\n` +
-      `• Servicios Qualitas:\n  - ${data.length} registros\n  - Monto total: ${montoTotal.toFixed(2)} MXN\n\n`;
+      `• Servicios de Qualitas:\n  - ${servicios.length} registros\n  - Subtotal: ${montoTotal.toFixed(2)} MXN\n\n`;
 
-    await ctx.reply(`${infoResumen}\n¿El servicio tiene retención del 4%?`, {
+    await ctx.reply(`${infoResumen}\n¿Qué tipo de servicios son?`, {
       reply_markup: Markup.inlineKeyboard([
-        [Markup.button.callback('✅ Sí, con retención 4%', `qualitas_con_retencion:${batchId}`)],
-        [Markup.button.callback('❌ No, sin retención', `qualitas_sin_retencion:${batchId}`)],
-        [Markup.button.callback('🔙 Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
+        [Markup.button.callback('✅ Con Retención (4%)', `qualitas_con_retencion:${batchId}`)],
+        [Markup.button.callback('❌ Sin Retención', `qualitas_sin_retencion:${batchId}`)],
+        [Markup.button.callback('❌ Cancelar', BOT_ACTIONS.MENU_PRINCIPAL)],
       ]).reply_markup,
     });
 
