@@ -61,9 +61,19 @@ async function startBot() {
       }
     });
 
-    // Iniciar el bot en modo polling (sin servidor web)
-    await bot.launch();
-    botLogger.info('Bot iniciado en modo polling');
+    // Iniciar el bot según el entorno
+    if (config.env === 'production' && config.isRailway) {
+      // En Railway, solo configurar webhook
+      const webhookUrl = `${config.api.baseUrl}/telegram-webhook`;
+      botLogger.info(`Configurando webhook: ${webhookUrl}`);
+
+      await bot.telegram.setWebhook(webhookUrl);
+      botLogger.info('Webhook configurado. El servidor principal manejará las peticiones.');
+    } else {
+      // En desarrollo, usar polling
+      await bot.launch();
+      botLogger.info('Bot iniciado en modo polling');
+    }
 
     botLogger.info('Bot de Telegram iniciado correctamente');
     botLogger.info(`Entorno: ${config.env}`);
