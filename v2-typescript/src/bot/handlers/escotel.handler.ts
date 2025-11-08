@@ -51,6 +51,9 @@ import {
 } from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
 
+// Utils
+import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
+
 // Logger
 import { createModuleLogger } from '@core/utils/logger.js';
 const logger = createModuleLogger('EscotelHandler');
@@ -184,6 +187,9 @@ function procesarHojaEscotel(worksheet: XLSX.WorkSheet, sheetName: string): Esco
   const ivaTotal = servicios.reduce((sum, s) => sum + s.iva, 0);
   const retencionTotal = servicios.reduce((sum, s) => sum + s.retencion, 0);
   const totalFinal = subtotalTotal + ivaTotal - retencionTotal;
+
+  // Circuit breaker: validar monto por hoja
+  validateInvoiceAmount(totalFinal, 'ESCOTEL', `el total de la hoja '${sheetName}'`);
 
   // Calcular discrepancia
   const discrepancia = totalEsperadoExcel ? totalFinal - totalEsperadoExcel : 0;

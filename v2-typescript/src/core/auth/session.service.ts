@@ -256,6 +256,10 @@ class SessionService {
         },
       });
 
+      // CRÍTICO: Actualizar cache Redis inmediatamente para mantener sincronización
+      const cacheKey = `session:${telegramIdBigInt.toString()}`;
+      await redisSessionService.setSession(cacheKey, state);
+
       const dbDuration = Date.now() - dbStartTime;
       console.log(
         `[SESSION_METRICS] Usuario ${telegramIdBigInt} - DB upsert saveUserState tomó ${dbDuration}ms`
@@ -263,7 +267,7 @@ class SessionService {
 
       sessionLogger.debug(
         { telegramId: telegramIdBigInt.toString() },
-        'Estado de sesión guardado correctamente'
+        'Estado de sesión guardado correctamente en BD y cache'
       );
       return session;
     } catch (error: any) {

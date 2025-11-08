@@ -38,6 +38,7 @@ import {
   PAYMENT_METHOD,
 } from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
+import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
 
 // Logger
 import { createModuleLogger } from '@core/utils/logger.js';
@@ -327,6 +328,8 @@ async function procesarArchivoAxa(
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
     }, 0);
+
+    validateInvoiceAmount(montoTotal, 'AXA', 'el monto total del archivo');
 
     // Obtener tenantId y cliente AXA
     const tenantId = (ctx as any).getTenantId?.();

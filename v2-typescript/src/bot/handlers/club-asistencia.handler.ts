@@ -30,6 +30,7 @@ import {
   PAYMENT_METHOD,
 } from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
+import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
 
 const logger = createModuleLogger('bot-club-asistencia-handler');
 
@@ -243,6 +244,8 @@ async function procesarArchivoCAS(
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
     }, 0);
+
+    validateInvoiceAmount(montoTotal, 'CLUB_ASISTENCIA', 'el monto total del archivo');
 
     // Obtener tenantId y cliente
     const tenantId = ctx.getTenantId();

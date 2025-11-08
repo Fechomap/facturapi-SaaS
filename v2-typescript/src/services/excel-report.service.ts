@@ -403,107 +403,137 @@ class ExcelReportService {
     );
 
     const facturapiClient = await FacturapiService.getFacturapiClient(tenantId);
+
+    // OPTIMIZACIÓN: Procesar en paralelo con chunks de 20 para no saturar API
+    const CHUNK_SIZE = 20;
     const enrichedInvoices: EnrichedInvoice[] = [];
 
-    for (let i = 0; i < invoices.length; i++) {
-      const invoice = invoices[i];
+    for (let chunkStart = 0; chunkStart < invoices.length; chunkStart += CHUNK_SIZE) {
+      const chunk = invoices.slice(chunkStart, chunkStart + CHUNK_SIZE);
 
-      try {
-        logger.debug(
-          { current: i + 1, total: invoices.length, id: invoice.facturapiInvoiceId },
-          'Procesando factura'
-        );
+      logger.debug(
+        {
+          chunk: Math.floor(chunkStart / CHUNK_SIZE) + 1,
+          total: Math.ceil(invoices.length / CHUNK_SIZE),
+          invoices: chunk.length,
+        },
+        'Procesando chunk en paralelo'
+      );
 
-        // Obtener datos de FacturAPI
-        const facturapiData = (await facturapiClient.invoices.retrieve(
-          invoice.facturapiInvoiceId
-        )) as FacturapiInvoiceData;
+      // Procesar chunk en PARALELO con Promise.all()
+      const chunkPromises = chunk.map(async (invoice, idx) => {
+        try {
+          const actualIndex = chunkStart + idx;
+          logger.debug(
+            { current: actualIndex + 1, total: invoices.length, id: invoice.facturapiInvoiceId },
+            'Procesando factura'
+          );
 
-        // Combinar datos
-        const enrichedInvoice: EnrichedInvoice = {
-          // Datos de BD
-          id: invoice.id,
-          facturapiInvoiceId: invoice.facturapiInvoiceId,
-          series: invoice.series,
-          folioNumber: invoice.folioNumber,
-          total: parseFloat(invoice.total.toString()),
-          status: invoice.status,
-          createdAt: invoice.createdAt,
-          invoiceDate: invoice.invoiceDate,
+          // Obtener datos de FacturAPI
+          const facturapiData = (await facturapiClient.invoices.retrieve(
+            invoice.facturapiInvoiceId
+          )) as FacturapiInvoiceData;
 
-          // Usar PostgreSQL como fuente única de fechas
-          realEmissionDate: invoice.invoiceDate,
+          // Combinar datos
+          const enrichedInvoice: EnrichedInvoice = {
+            // Datos de BD
+            id: invoice.id,
+            facturapiInvoiceId: invoice.facturapiInvoiceId,
+            series: invoice.series,
+            folioNumber: invoice.folioNumber,
+            total: parseFloat(invoice.total.toString()),
+            status: invoice.status,
+            createdAt: invoice.createdAt,
+            invoiceDate: invoice.invoiceDate,
 
-          // Datos del cliente
-          customer: {
-            legalName: invoice.customer?.legalName || 'Cliente no especificado',
-            rfc: invoice.customer?.rfc || 'RFC no disponible',
-            email: invoice.customer?.email || '',
-          },
+            // Usar PostgreSQL como fuente única de fechas
+            realEmissionDate: invoice.invoiceDate,
 
-          // Datos del tenant emisor
-          tenant: {
-            businessName: invoice.tenant?.businessName || 'Empresa',
-            rfc: invoice.tenant?.rfc || 'RFC Emisor',
-          },
+            // Datos del cliente
+            customer: {
+              legalName: invoice.customer?.legalName || 'Cliente no especificado',
+              rfc: invoice.customer?.rfc || 'RFC no disponible',
+              email: invoice.customer?.email || '',
+            },
 
-          // Datos de FacturAPI
-          uuid: facturapiData.uuid,
-          subtotal: facturapiData.subtotal || this.calculateSubtotal(facturapiData),
-          currency: facturapiData.currency || 'MXN',
-          verificationUrl: facturapiData.verification_url || '',
+            // Datos del tenant emisor
+            tenant: {
+              businessName: invoice.tenant?.businessName || 'Empresa',
+              rfc: invoice.tenant?.rfc || 'RFC Emisor',
+            },
 
-          // Datos calculados
-          folio: `${invoice.series}${invoice.folioNumber}`,
-          folioFiscal: facturapiData.uuid,
-          ivaAmount: this.calculateIVA(facturapiData),
-          retencionAmount: this.calculateRetencion(facturapiData),
+            // Datos de FacturAPI
+            uuid: facturapiData.uuid,
+            subtotal: facturapiData.subtotal || this.calculateSubtotal(facturapiData),
+            currency: facturapiData.currency || 'MXN',
+            verificationUrl: facturapiData.verification_url || '',
 
-          // Metadatos
-          processedAt: new Date().toISOString(),
-        };
+            // Datos calculados
+            folio: `${invoice.series}${invoice.folioNumber}`,
+            folioFiscal: facturapiData.uuid,
+            ivaAmount: this.calculateIVA(facturapiData),
+            retencionAmount: this.calculateRetencion(facturapiData),
 
-        enrichedInvoices.push(enrichedInvoice);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-        logger.error(
-          { error, invoiceId: invoice.facturapiInvoiceId },
-          'Error enriqueciendo factura'
-        );
+            // Metadatos
+            processedAt: new Date().toISOString(),
+          };
 
-        // Incluir solo datos de BD si falla FacturAPI
-        enrichedInvoices.push({
-          id: invoice.id,
-          facturapiInvoiceId: invoice.facturapiInvoiceId,
-          series: invoice.series,
-          folioNumber: invoice.folioNumber,
-          total: parseFloat(invoice.total.toString()),
-          status: invoice.status,
-          createdAt: invoice.createdAt,
-          invoiceDate: invoice.invoiceDate,
-          realEmissionDate: invoice.invoiceDate,
-          customer: {
-            legalName: invoice.customer?.legalName || 'Cliente no especificado',
-            rfc: invoice.customer?.rfc || 'RFC no disponible',
-            email: invoice.customer?.email || '',
-          },
-          tenant: {
-            businessName: invoice.tenant?.businessName || 'Empresa',
-            rfc: invoice.tenant?.rfc || 'RFC Emisor',
-          },
-          folio: `${invoice.series}${invoice.folioNumber}`,
-          uuid: 'Error al obtener',
-          subtotal: 0,
-          ivaAmount: 0,
-          retencionAmount: 0,
-          verificationUrl: '',
-          currency: 'MXN',
-          folioFiscal: 'Error al obtener',
-          processedAt: new Date().toISOString(),
-          error: errorMessage,
-        });
+          return enrichedInvoice;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+          logger.error(
+            { error, invoiceId: invoice.facturapiInvoiceId },
+            'Error enriqueciendo factura'
+          );
+
+          // Retornar factura con datos de BD si falla FacturAPI
+          return {
+            id: invoice.id,
+            facturapiInvoiceId: invoice.facturapiInvoiceId,
+            series: invoice.series,
+            folioNumber: invoice.folioNumber,
+            total: parseFloat(invoice.total.toString()),
+            status: invoice.status,
+            createdAt: invoice.createdAt,
+            invoiceDate: invoice.invoiceDate,
+            realEmissionDate: invoice.invoiceDate,
+            customer: {
+              legalName: invoice.customer?.legalName || 'Cliente no especificado',
+              rfc: invoice.customer?.rfc || 'RFC no disponible',
+              email: invoice.customer?.email || '',
+            },
+            tenant: {
+              businessName: invoice.tenant?.businessName || 'Empresa',
+              rfc: invoice.tenant?.rfc || 'RFC Emisor',
+            },
+            folio: `${invoice.series}${invoice.folioNumber}`,
+            uuid: 'Error al obtener',
+            subtotal: 0,
+            ivaAmount: 0,
+            retencionAmount: 0,
+            verificationUrl: '',
+            currency: 'MXN',
+            folioFiscal: 'Error al obtener',
+            processedAt: new Date().toISOString(),
+            error: errorMessage,
+          } as EnrichedInvoice;
+        }
+      });
+
+      // Esperar a que termine el chunk completo en PARALELO
+      const chunkResults = await Promise.all(chunkPromises);
+      enrichedInvoices.push(...chunkResults);
+
+      // Pequeña pausa entre chunks para no saturar completamente la API
+      if (chunkStart + CHUNK_SIZE < invoices.length) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       }
     }
+
+    logger.info(
+      { total: enrichedInvoices.length, duration: Date.now() },
+      'Enriquecimiento completado'
+    );
 
     return enrichedInvoices;
   }

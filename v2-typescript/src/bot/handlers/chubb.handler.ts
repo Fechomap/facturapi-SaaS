@@ -31,6 +31,7 @@ import {
   PAYMENT_METHOD,
 } from '@/constants/clients.js';
 import { BOT_FLOWS, BOT_ACTIONS } from '@/constants/bot-flows.js';
+import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
 
 const logger = createModuleLogger('ChubbHandler');
 
@@ -317,6 +318,15 @@ async function procesarArchivoChubb(
       gruaSinRetencion: grupos.gruaSinRetencion.reduce((sum, item) => sum + item.monto, 0),
       otrosServicios: grupos.otrosServicios.reduce((sum, item) => sum + item.monto, 0),
     };
+
+    // Circuit breaker: validar cada grupo
+    for (const grupo in montosPorGrupo) {
+      const monto = montosPorGrupo[grupo as keyof typeof montosPorGrupo];
+      if (monto > 0) {
+        // Solo validar si hay monto
+        validateInvoiceAmount(monto, 'CHUBB', `el grupo '${grupo}'`);
+      }
+    }
 
     const batchId = redisBatchStateService.generateBatchId();
     const userId = ctx.from?.id;

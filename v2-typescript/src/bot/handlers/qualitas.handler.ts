@@ -28,6 +28,9 @@ import {
   PAYMENT_FORM,
   PAYMENT_METHOD,
 } from '@/constants/clients.js';
+
+// Utils
+import { validateInvoiceAmount } from '../utils/invoice-validation.utils.js';
 import { BOT_ACTIONS } from '@/constants/bot-flows.js';
 
 const logger = createModuleLogger('bot-qualitas-handler');
@@ -251,6 +254,8 @@ async function procesarArchivoQualitas(
     const montoTotal = data.reduce((total: number, item: any) => {
       return total + parseFloat(item[columnMappings.importe] || 0);
     }, 0);
+
+    validateInvoiceAmount(montoTotal, 'QUALITAS', 'el monto total del archivo');
 
     const tenantId = ctx.getTenantId();
     if (!tenantId) {
