@@ -511,7 +511,8 @@ class TenantService {
     folioNumber: number,
     customerId: number | null,
     total: number,
-    createdById: bigint | string | number | null
+    createdById: bigint | string | number | null,
+    uuid: string
   ) {
     tenantLogger.info(
       {
@@ -521,6 +522,7 @@ class TenantService {
         folioNumber,
         customerId,
         total,
+        uuid,
       },
       'Registrando factura'
     );
@@ -546,6 +548,7 @@ class TenantService {
             status: 'valid',
             createdById: createdByIdInt,
             invoiceDate: new Date(),
+            uuid,
           },
         });
 
@@ -568,6 +571,7 @@ class TenantService {
             folioNumber,
             customerId,
             total,
+            uuid,
           },
         });
 
@@ -599,6 +603,7 @@ class TenantService {
       customerId: number | null;
       total: number;
       createdById?: bigint | string | number | null;
+      uuid: string;
     }>
   ) {
     tenantLogger.info({ tenantId, count: invoices.length }, 'Registrando lote de facturas');
@@ -622,6 +627,7 @@ class TenantService {
             status: 'valid' as const,
             createdById: createdByIdInt,
             invoiceDate: new Date(),
+            uuid: inv.uuid,
           };
         });
 

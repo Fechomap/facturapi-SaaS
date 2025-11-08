@@ -440,6 +440,7 @@ function generarReporteExcel(
       'Número de Pedido',
       'Serie',
       'Folio',
+      'UUID (Folio Fiscal)',
       'Total Facturado',
       'Servicios',
       'Total Excel',
@@ -459,6 +460,7 @@ function generarReporteExcel(
       f.nombreHoja,
       f.factura.series,
       f.factura.folio_number,
+      f.factura.uuid || 'No disponible',
       f.totales.total,
       f.servicios,
       f.totalEsperadoExcel || f.totales.total,
@@ -567,7 +569,8 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
             : parseInt(factura.folio_number, 10),
           escotelData.clienteId,
           factura.total,
-          typeof userId === 'number' && userId <= 2147483647 ? userId : null
+          typeof userId === 'number' && userId <= 2147483647 ? userId : null,
+          factura.uuid
         );
 
         facturasGeneradas.push({
@@ -580,6 +583,7 @@ async function enviarFacturasEscotel(ctx: Context, batchId: string): Promise<Esc
                 ? factura.folio_number
                 : parseInt(factura.folio_number, 10),
             total: factura.total,
+            uuid: factura.uuid,
           },
           servicios: facturaInfo.servicios.length,
           totales: facturaInfo.totales,

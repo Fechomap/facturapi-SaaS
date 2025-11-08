@@ -116,6 +116,7 @@ export interface EscotelFacturaGenerada {
     series: string;
     folio_number: number;
     total: number;
+    uuid: string;
   };
   servicios: number; // cantidad de servicios
   totales: EscotelTotales;

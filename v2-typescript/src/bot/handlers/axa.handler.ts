@@ -578,7 +578,8 @@ async function enviarFacturaDirectaAxa(
         : parseInt(factura.folio_number, 10),
       clienteId,
       factura.total,
-      userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null
+      userId && typeof userId === 'number' && userId <= 2147483647 ? userId : null,
+      factura.uuid
     );
 
     logger.info('Factura registrada en BD exitosamente');

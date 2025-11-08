@@ -429,10 +429,17 @@ class ExcelReportService {
             'Procesando factura'
           );
 
-          // Obtener datos de FacturAPI
-          const facturapiData = (await facturapiClient.invoices.retrieve(
-            invoice.facturapiInvoiceId
-          )) as FacturapiInvoiceData;
+          // OPTIMIZACIÓN: Solo llamar a FacturAPI si NO tenemos UUID en BD
+          let facturapiData: FacturapiInvoiceData | null = null;
+          if (!invoice.uuid) {
+            logger.debug(
+              { id: invoice.facturapiInvoiceId },
+              'UUID no disponible en BD, obteniendo de FacturAPI (factura antigua)'
+            );
+            facturapiData = (await facturapiClient.invoices.retrieve(
+              invoice.facturapiInvoiceId
+            )) as FacturapiInvoiceData;
+          }
 
           // Combinar datos
           const enrichedInvoice: EnrichedInvoice = {
@@ -462,17 +469,20 @@ class ExcelReportService {
               rfc: invoice.tenant?.rfc || 'RFC Emisor',
             },
 
-            // Datos de FacturAPI
-            uuid: facturapiData.uuid,
-            subtotal: facturapiData.subtotal || this.calculateSubtotal(facturapiData),
-            currency: facturapiData.currency || 'MXN',
-            verificationUrl: facturapiData.verification_url || '',
+            // UUID: Preferir BD, fallback a FacturAPI
+            uuid: invoice.uuid || facturapiData?.uuid || 'No disponible',
+            // Para otros datos, usar FacturAPI solo si hicimos la llamada
+            subtotal:
+              facturapiData?.subtotal ||
+              this.calculateSubtotal(facturapiData || ({} as FacturapiInvoiceData)),
+            currency: facturapiData?.currency || 'MXN',
+            verificationUrl: facturapiData?.verification_url || '',
 
             // Datos calculados
             folio: `${invoice.series}${invoice.folioNumber}`,
-            folioFiscal: facturapiData.uuid,
-            ivaAmount: this.calculateIVA(facturapiData),
-            retencionAmount: this.calculateRetencion(facturapiData),
+            folioFiscal: invoice.uuid || facturapiData?.uuid || 'No disponible',
+            ivaAmount: facturapiData ? this.calculateIVA(facturapiData) : 0,
+            retencionAmount: facturapiData ? this.calculateRetencion(facturapiData) : 0,
 
             // Metadatos
             processedAt: new Date().toISOString(),
@@ -507,13 +517,13 @@ class ExcelReportService {
               rfc: invoice.tenant?.rfc || 'RFC Emisor',
             },
             folio: `${invoice.series}${invoice.folioNumber}`,
-            uuid: 'Error al obtener',
+            uuid: invoice.uuid || 'Error al obtener',
             subtotal: 0,
             ivaAmount: 0,
             retencionAmount: 0,
             verificationUrl: '',
             currency: 'MXN',
-            folioFiscal: 'Error al obtener',
+            folioFiscal: invoice.uuid || 'Error al obtener',
             processedAt: new Date().toISOString(),
             error: errorMessage,
           } as EnrichedInvoice;

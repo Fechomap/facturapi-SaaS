@@ -5,6 +5,8 @@
 
 import ExcelReportService from './excel-report.service.js';
 import { createModuleLogger } from '@core/utils/logger.js';
+import redisBatchStateService from './redis-batch-state.service.js';
+import { Markup } from 'telegraf';
 import type { BotContext } from '../types/bot.types.js';
 
 const logger = createModuleLogger('simple-excel');
@@ -46,18 +48,80 @@ export async function generateExcelReportAsync(
   });
 
   try {
-    // PASO 1: Mensaje inmediato (nunca bloquea)
-    const progressMsg = await ctx.reply(
-      '📊 **Generando Reporte Excel**\n\n' +
-        '🔄 Procesando facturas...\n' +
-        '📱 Te mantendré informado del progreso',
-      { parse_mode: 'Markdown' }
-    );
+    // PASO 1: ESTIMAR el trabajo ANTES de empezar
+    logger.info('Estimando tamaño del reporte antes de procesar', { tenantId, userId, filters });
+    const estimation = await ExcelReportService.estimateReportGeneration(tenantId, filters);
 
-    // PASO 2: Procesar en background SIN BLOQUEAR
-    processInBackground(ctx, tenantId, userId, chatId, filters, progressMsg.message_id);
+    // PASO 2: Decidir el flujo basado en la estimación
+    const INVOICE_THRESHOLD = 500; // Umbral configurable
 
-    return { success: true };
+    if (estimation.willGenerate > INVOICE_THRESHOLD) {
+      // REPORTE GRANDE: Guardar filtros en Redis y pedir confirmación
+      logger.info('Reporte grande detectado, solicitando confirmación', {
+        tenantId,
+        userId,
+        willGenerate: estimation.willGenerate,
+      });
+
+      // 1. Generar un ID único para esta solicitud de reporte
+      const reportId = redisBatchStateService.generateBatchId();
+
+      // 2. Guardar los filtros en Redis (TTL de 15 minutos por defecto)
+      await redisBatchStateService.saveBatchData(userId, reportId, {
+        batchId: reportId,
+        userId,
+        timestamp: Date.now(),
+        filters,
+      });
+
+      // 3. Mostrar advertencia y botón de confirmación con el reportId
+      await ctx.reply(
+        `⚠️ **Reporte Grande Detectado**\n\n` +
+          `El reporte que solicitaste contiene **${estimation.willGenerate} facturas** y podría tardar un poco en generarse.\n\n` +
+          `⏱️ **Tiempo estimado:** ~${estimation.estimatedTimeSeconds} segundos\n\n` +
+          `¿Deseas continuar?`,
+        {
+          parse_mode: 'Markdown',
+          ...Markup.inlineKeyboard([
+            // El botón ahora solo lleva el ID, es seguro y corto
+            [
+              Markup.button.callback(
+                '✅ Sí, generar reporte',
+                `confirm_generate_report:${reportId}`
+              ),
+            ],
+            [Markup.button.callback('❌ No, cancelar', 'cancel_report')],
+          ]),
+        }
+      );
+
+      return { success: true };
+    } else {
+      // REPORTE PEQUEÑO: Proceder directamente como antes
+      if (estimation.willGenerate === 0) {
+        await ctx.reply('✅ No se encontraron facturas con los filtros seleccionados.');
+        return { success: true };
+      }
+
+      logger.info('Reporte pequeño, procesando directamente', {
+        tenantId,
+        userId,
+        willGenerate: estimation.willGenerate,
+      });
+
+      // PASO 1: Mensaje inmediato (nunca bloquea)
+      const progressMsg = await ctx.reply(
+        `📊 **Generando Reporte Excel para ${estimation.willGenerate} facturas**\n\n` +
+          '🔄 Procesando facturas...\n' +
+          '📱 Te mantendré informado del progreso',
+        { parse_mode: 'Markdown' }
+      );
+
+      // PASO 2: Procesar en background SIN BLOQUEAR
+      processInBackground(ctx, tenantId, userId, chatId, filters, progressMsg.message_id);
+
+      return { success: true };
+    }
   } catch (error: unknown) {
     logger.error('Error iniciando reporte asíncrono', {
       tenantId,
@@ -72,8 +136,9 @@ export async function generateExcelReportAsync(
 
 /**
  * Procesar Excel en background con BARRA DE PROGRESO VISUAL
+ * EXPORTADA para ser usada por reports.handler.ts
  */
-async function processInBackground(
+export async function processInBackground(
   ctx: BotContext,
   tenantId: string,
   userId: number,

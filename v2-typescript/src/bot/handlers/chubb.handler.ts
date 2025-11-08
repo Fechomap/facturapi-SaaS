@@ -497,7 +497,8 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
             : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
-          typeof userId === 'number' && userId <= 2147483647 ? userId : null
+          typeof userId === 'number' && userId <= 2147483647 ? userId : null,
+          factura.uuid
         );
 
         facturasGeneradas.push({
@@ -541,7 +542,8 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
             : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
-          typeof userId === 'number' && userId <= 2147483647 ? userId : null
+          typeof userId === 'number' && userId <= 2147483647 ? userId : null,
+          factura.uuid
         );
 
         facturasGeneradas.push({
@@ -585,7 +587,8 @@ async function enviarFacturasChubb(ctx: BotContext, batchId: string): Promise<vo
             : parseInt(factura.folio_number, 10),
           chubbData.clienteId!,
           factura.total,
-          typeof userId === 'number' && userId <= 2147483647 ? userId : null
+          typeof userId === 'number' && userId <= 2147483647 ? userId : null,
+          factura.uuid
         );
 
         facturasGeneradas.push({

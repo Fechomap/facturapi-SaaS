@@ -32,6 +32,7 @@ import { registerAxaHandler } from './handlers/axa.handler.js';
 import { registerChubbHandler } from './handlers/chubb.handler.js';
 import { registerTestHandlers } from './handlers/test.handler.js';
 import { registerExcelReportHandlers } from './handlers/excel-report.handler.js';
+import { registerReportHandlers } from './handlers/reports.handler.js';
 import { registerProductionSetupHandler } from './handlers/production-setup.handler.js';
 import { registerPaymentComplementHandler } from './handlers/payment-complement.handler.js';
 import { registerBatchActionHandlers } from './handlers/pdf-batch.handler.js';
@@ -90,6 +91,7 @@ export async function createBot(botLogger: Logger): Promise<Bot> {
   registerChubbHandler(bot);
   registerTestHandlers(bot);
   registerExcelReportHandlers(bot);
+  registerReportHandlers(bot); // Handler para confirmación/cancelación de reportes
   registerProductionSetupHandler(bot);
 
   // 8. Manejador para texto no reconocido (debe ir al final)
